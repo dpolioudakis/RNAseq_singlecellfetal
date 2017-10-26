@@ -1,0 +1,9 @@
+python3 /u/home/d/dpolioud/bin/magic/src/magic/MAGIC.py \
+--data-file /u/home/d/dpolioud/project-geschwind/RNAseq_singlecellfetal/analysis/Test500_Expression_Matrix_Compile_dge_FtMm250_DS-2-3-4-5-6-7-8-9-11.csv \
+--output-file /u/home/d/dpolioud/project-geschwind/RNAseq_singlecellfetal/analysis/Test500_Expression_Matrix_Compile_dge_FtMm250_Magic_DS-2-3-4-5-6-7-8-9-11.csv \
+--use-ensemble-ids --cell-axis 'columns' -k 2 -ka 0 csv
+
+python3 /u/home/d/dpolioud/bin/magic/src/magic/MAGIC.py \
+--data-file /u/home/d/dpolioud/project-geschwind/RNAseq_singlecellfetal/analysis/Expression_Matrix_Compile_dge_FtMm250_DS-2-3-4-5-6-7-8-9-11_exon_FtMm250_200-3sdgd.csv \
+--output-file /u/home/d/dpolioud/project-geschwind/RNAseq_singlecellfetal/analysis/Expression_Matrix_Compile_dge_FtMm250_Magic_DS-2-3-4-5-6-7-8-9-11_exon_FtMm250_200-3sdgd.csv \
+--use-ensemble-ids --cell-axis 'columns' -k 2 -ka 0 csv
