@@ -658,4 +658,44 @@ Gene_Expression_By_Cluster_ViolinPlot <- function(genes, exprM, clusterIDs
   
   return(gg)
 }
+
+## Violin plots of expression faceted by cluster
+Gene_Expression_Facet_By_Cluster_ViolinPlot <- function(genes, exprM, clusterIDs
+  , geneOrder = NULL, grouping = NULL, ggtitle = NULL, ncol){
+  
+  # Normalized, no mean centering scaling
+  ggDF <- merge(genes, exprM
+    , by.x = 1, by.y = "row.names", all.x = TRUE)
+  ggDF <- melt(ggDF)
+  # Add cluster ID
+  idx <- match(ggDF$variable, names(clusterIDs))
+  ggDF$CLUSTER <- clusterIDs[idx]
+  # Set gene order if provided
+  if (! is.null(geneOrder)) {
+    ggDF$x <- factor(ggDF$x, levels = geneOrder)
+  }
+  print(str(ggDF))
+  # Mean expression of gene group if grouping is provided
+  if (! is.null(grouping)) {
+    idx <- match(ggDF$x, genes)
+    ggDF$Grouping <- grouping[idx]
+    ggDF <- aggregate(
+      ggDF$value, list(ggDF$Grouping, ggDF$variable, ggDF$CLUSTER)
+      , mean, na.rm = TRUE)
+    colnames(ggDF) <- c("x", "variable", "CLUSTER", "value")
+  }
+  
+  # Violin plots of expression by cluster
+  gg <- ggplot(ggDF, aes(x = x, y = value)) +
+    geom_violin(aes(fill = x)) +
+    geom_jitter(aes(x = x, y = value)
+      , size = 0.02, height = 0, alpha = 0.1) +
+    facet_wrap(~CLUSTER, scales = "free", ncol = ncol) +
+    theme(legend.position = "none") +
+    ylab("Normalized expression") +
+    xlab("Genes") +
+    ggtitle(ggtitle)
+  
+  return(gg)
+}
 ################################################################################
