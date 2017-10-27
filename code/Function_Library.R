@@ -409,9 +409,9 @@ FeaturePlot <- function(genes, tsneDF, seuratO, exM, limLow, limHigh) {
 ### General functions
 
 # Cowplot plot_grid and add title
-Plot_Grid <- function(ggPlotsL, ncol, title, rel_height) {
+Plot_Grid <- function(ggPlotsL, ncol, title, rel_height, ...) {
   # Plot grid
-  pg <- plot_grid(plotlist = ggPlotsL, ncol = 2)
+  pg <- plot_grid(plotlist = ggPlotsL, ncol = ncol, ...)
   # now add the title
   title <- ggdraw() + draw_label(title)
   # rel_heights values control title margins
