@@ -19,6 +19,9 @@ require(ggplot2)
 require(cowplot)
 require(WGCNA)
 require(pheatmap)
+require(RColorBrewer)
+require(viridis)
+source("Function_Library.R")
 
 options(stringsAsFactors = FALSE)
 
@@ -454,6 +457,137 @@ nUMI_RgIP_Boxplot <- function(exM, seuratO, title) {
     ggtitle(title)
   return(gg)
 }
+
+MeanExprRank_Stdev_Variance_ScatterPlot <- function (exM, title) {
+  mns <- rowMeans(exM)
+  sdev <- apply(exM, 1, sd)
+  variance <- apply(exM, 1, var)
+  df <- data.frame(Mean = mns, StdDev = sdev)
+  df$CoefficentOfVariation = Coefficent_Of_Variation(df$Mean, df$StdDev)
+  df$Variance <- variance
+  df$MeanRank <- rank(df$Mean)
+  gg1 <- ggplot(df, aes(x = MeanRank, y = Mean)) +
+    geom_point(size = 0.1)
+  gg2 <- ggplot(df, aes(x = MeanRank, y = StdDev)) +
+    geom_point(size = 0.1)
+  gg3 <- ggplot(df, aes(x = MeanRank, y = Variance)) +
+    geom_point(size = 0.1)
+  pg <- Plot_Grid(ggPlotsL = list(gg1, gg2, gg3), ncol = 3, rel_height = 0.2
+    , title = title)
+  return(pg)
+}
+
+Prcomp_Loadings_Plot <- function(pca, nGenes, nPCs, title) {
+  
+  # Example function call:
+  # Prcomp_Loadings_Plot(pca = pca, nGenes = 1:20, nPCs = 1:8)
+  
+  # Plot highest loading genes
+  ggL <- lapply(nPCs, function(pc) {
+    df <- rbind(data.frame(PC = sort(pca$rotation[ ,pc])[nGenes])
+      , data.frame(PC = sort(pca$rotation[ ,pc], decreasing = TRUE)[nGenes])
+    )
+    df$GENE <- factor(row.names(df), levels = row.names(df))
+    gg <- ggplot(df, aes(x = PC, y = GENE)) +
+      geom_point() +
+      xlab("Loading") +
+      ylab("Gene") +
+      ggtitle(paste0("PC ", pc))
+    return(gg)
+  })
+  Plot_Grid(ggPlotsL = ggL
+    , ncol = 4
+    , align = 'v'
+    , axis = 'r'
+    , rel_height = 0.1
+    , title = title
+  )
+}
+# Plot PCA loadings
+lapply(names(pcaL), function(name){
+  pca <- pcaL[[name]]
+  Prcomp_Loadings_Plot(pca = pca, nGenes = c(1:20), nPCs = c(1:8)
+    , title = paste0(graphCodeTitle, "\n\n", name, "\nGenes with highest PC loadings"))
+  ggsave(paste0(outGraph, name, "_PCAloadings.pdf"), width = 13
+    , height = 20, limitsize = FALSE)
+})
+
+PCA_Format_For_GGplot <- function(pca) {
+  
+  df <- as.data.frame(pca$x)
+  
+  df1 <- Format_Number_Cell_Types_Cluster_Dataframe(
+    exM = keepCcExM, seuratO = keepCcSO)
+  
+  # Flag RG+, IP+, and RG+ IP+
+  df$Cell_Subset <- NA
+  df$Cell_Subset[rownames(df) %in% row.names(df1)[df1$RG > 0.5]] <- "RG"
+  df$Cell_Subset[rownames(df) %in% row.names(df1)[df1$IP > 0.5]] <- "IP"
+  df$Cell_Subset[rownames(df) %in% row.names(df1)[df1$RG > 0.5 & df1$IP > 0.5]] <- "RG IP"
+  
+  # Flag vRG+, oRG+, and vRG+ oRG+
+  df$vRG_oRG_Subset <- NA
+  df$vRG_oRG_Subset[rownames(df) %in% row.names(df1)[df1$vRG > 0.5]] <- "vRG"
+  df$vRG_oRG_Subset[rownames(df) %in% row.names(df1)[df1$oRG > 0.5]] <- "oRG"
+  df$vRG_oRG_Subset[rownames(df) %in% row.names(df1)[df1$vRG > 0.5 & df1$oRG > 0.5]] <- "vRG oRG"
+  
+  # vRG and oRG marker expression
+  idx <- match(rownames(df), row.names(df1))
+  df$vRG <- df1$vRG[idx]
+  df$oRG <- df1$oRG[idx]
+  
+  # Seurat S phase and G2M scores
+  idx <- match(rownames(df), row.names(keepCcSO@meta.data))
+  df$G2M_Score <- keepCcSO@meta.data$G2M.Score[idx]
+  df$S_Score <- keepCcSO@meta.data$S.Score[idx]
+  
+  return(df)
+}
+
+PCA_Plot_PC1to8 <- function (pcaDF, colorBy, limLow = NULL, limHigh = NULL) {
+  
+  # Column to color by
+  ggDF <- pcaDF
+  # Color by
+  ggDF$colorBy = pcaDF[ ,colnames(pcaDF) %in% colorBy]
+  # Set expression limits
+  if (class(ggDF$colorBy) == "numeric" & ! is.null(limLow) & ! is.null(limHigh)) {
+    ggDF$colorBy[ggDF$colorBy < limLow] <- limLow
+    ggDF$colorBy[ggDF$colorBy > limHigh] <- limHigh
+  }
+  
+  # Plot
+  ggL <- list(
+    ggplot(ggDF, aes(x = PC1, y = PC2, color = colorBy)) +
+      geom_point()
+    , ggplot(ggDF, aes(x = PC1, y = PC3, color = colorBy)) +
+      geom_point()
+    , ggplot(ggDF, aes(x = PC1, y = PC4, color = colorBy)) +
+      geom_point()
+    , ggplot(ggDF, aes(x = PC2, y = PC3, color = colorBy)) +
+      geom_point()
+    , ggplot(ggDF, aes(x = PC2, y = PC4, color = colorBy)) +
+      geom_point()
+    , ggplot(ggDF, aes(x = PC3, y = PC4, color = colorBy)) +
+      geom_point()
+    , ggplot(ggDF, aes(x = PC1, y = PC5, color = colorBy)) +
+      geom_point()
+    , ggplot(ggDF, aes(x = PC1, y = PC6, color = colorBy)) +
+      geom_point()
+    , ggplot(ggDF, aes(x = PC1, y = PC7, color = colorBy)) +
+      geom_point()
+    , ggplot(ggDF, aes(x = PC1, y = PC8, color = colorBy)) +
+      geom_point()
+  )
+  if (class(ggDF$colorBy) == "numeric") {
+    # ggL <- lapply(ggL, function(gg) {gg + scale_color_viridis()})
+    ggL <- lapply(ggL, function(gg) {
+      gg <- gg + scale_color_distiller(name = "Normalized\nexpression"
+        , type = "div", palette = 5, direction = -1, limits = c(limLow, limHigh))
+      return(gg)})
+  }
+  return(ggL)
+}
 ################################################################################
 
 ### Cell Cycle phase plots
@@ -883,7 +1017,7 @@ Plot_Grid(list(gg1, gg2, gg3, gg4, gg5, gg6), ncol = 2, rel_height = 0.2
     , "\nRemove cell cycle genes from genes used for clustering"
     , "\nRegress out cell cycle scores"
     , "\n")
-  )
+)
 # Save
 ggsave(paste0(outGraph, "NumberRgIpCluster_Barplot.pdf")
   , width = 12, height = 18)
@@ -1077,200 +1211,264 @@ ggsave(paste0(outGraph, "NumberCCphase_RG_IP_Subset_Barplot.pdf")
 df1 <- Format_Number_Cell_Types_Cluster_Dataframe(
   exM = keepCcExM, seuratO = keepCcSO)
 
-ME_By_Markers_And_Phase <- function(markerGroup, phase)
-
-cellType <- NA
-cellType[df1$IP > 0.5 & df1$PHASE %in% "G2M"] <- "IPC"
-eg1 <- moduleEigengenes(keepCcExM, cellType)$eigengenes
-
-cellType <- NA
-cellType[df1$RG > 0.5 & df1$PHASE == "G2M"] <- "RG"
-eg2 <- moduleEigengenes(keepCcExM, cellType)$eigengenes
-
-cellType <- NA
-cellType[df1$IP > 0.5 & df1$PHASE %in% "S"] <- "IPC"
-eg3 <- moduleEigengenes(keepCcExM, cellType)$eigengenes
-
-cellType <- NA
-cellType[df1$RG > 0.5 & df1$PHASE == "S"] <- "RG"
-eg4 <- moduleEigengenes(keepCcExM, cellType)$eigengenes
-
-cellType <- NA
-cellType[df1$IP > 0.5 & df1$PHASE %in% "G1"] <- "IPC"
-eg5 <- moduleEigengenes(keepCcExM, cellType)$eigengenes
-
-cellType <- NA
-cellType[df1$RG > 0.5 & df1$PHASE == "G1"] <- "RG"
-eg6 <- moduleEigengenes(keepCcExM, cellType)$eigengenes
-
-cellType <- NA
-cellType[df1$IP > 0.5] <- "IPC"
-eg7 <- moduleEigengenes(keepCcExM, cellType)$eigengenes
-
-cellType <- NA
-cellType[df1$RG > 0.5] <- "RG"
-eg8 <- moduleEigengenes(keepCcExM, cellType)$eigengenes
-
-
-
-
-cellType[df1$RG > 0.5 & df1$IP > 0.5 & df1$PHASE == "G2M"] <- "G2M"
-cellType[df1$RG > 0.5 & df1$IP > 0.5 & df1$PHASE == "S"] <- "S"
-cellType[df1$RG > 0.5 & df1$IP > 0.5 & df1$PHASE == "G1"] <- "G1"
-eg10 <- moduleEigengenes(keepCcExM, cellType)$eigengenes
-
-cellType <- NA
-cellType[df1$RG > 0.5 & df1$IP > 0.5] <- "All CC phase"
-eg11 <- moduleEigengenes(keepCcExM, cellType)$eigengenes
-
-df <- data.frame(eg1, eg2)
-
-
-
-
-cellIDs <- row.names(df1)[df1$RG > 0.5 & df1$IP > 0.5 & df1$PHASE == "G2M"]
-exM <- keepCcExM[ ,colnames(keepCcExM) %in% cellIDs]
-mnEx <- rowMeans(exM)
-cor(mnEx, egIPC$MEIPC)
-cor(mnEx, egRG$MERG)
-
-cellIDs <- row.names(df1)[df1$RG < 0.5 & df1$IP > 0.5 & df1$PHASE == "G2M"]
-exM <- keepCcExM[ ,colnames(keepCcExM) %in% cellIDs]
-mnEx <- rowMeans(exM)
-cor(mnEx, egIPC$MEIPC)
-cor(mnEx, egRG$MERG)
-
-cellIDs <- row.names(df1)[df1$RG > 0.5 & df1$IP < 0.5 & df1$PHASE == "G2M"]
-exM <- keepCcExM[ ,colnames(keepCcExM) %in% cellIDs]
-mnEx <- rowMeans(exM)
-cor(mnEx, egIPC$MEIPC)
-cor(mnEx, egRG$MERG)
-
-
-
-
-
-
-
-
-cellType <- NA
-cellType[keepCcSO@ident == 2] <- "IPC"
-cellType[keepCcSO@ident %in% c(7,9)] <- "RG"
-eg <- moduleEigengenes(keepCcExM, cellType)$eigengenes
-
-
-
-
-cellIDs <- row.names(df1)[df1$RG > 0.5 & df1$IP > 0.5 & df1$PHASE == "G2M"]
-exM <- keepCcExM[ ,colnames(keepCcExM) %in% cellIDs]
-mnEx <- rowMeans(exM)
-cor(mnEx, eg$MEIPC)
-cor(mnEx, eg$MERG)
-
-cellIDs <- row.names(df1)[df1$RG < 0.5 & df1$IP > 0.5 & df1$PHASE == "G2M"]
-exM <- keepCcExM[ ,colnames(keepCcExM) %in% cellIDs]
-mnEx <- rowMeans(exM)
-cor(mnEx, eg$MEIPC)
-cor(mnEx, eg$MERG)
-
-cellIDs <- row.names(df1)[df1$RG > 0.5 & df1$IP < 0.5 & df1$PHASE == "G2M"]
-exM <- keepCcExM[ ,colnames(keepCcExM) %in% cellIDs]
-mnEx <- rowMeans(exM)
-cor(mnEx, eg$MEIPC)
-cor(mnEx, eg$MERG)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-df2 <- Positive_Negative_Expression_Flag(
-  exDF = df1, highThreshold = 0.5, lowThreshold = 0.5)
-
-cellIDs <- row.names(df2)[df2$TYPE == "IP+ RG+"]
-cellIDs <- cellIDs[! is.na(cellIDs)]
-
-exM <- keepCcExM[ ,colnames(keepCcExM) %in% cellIDs]
-mnEx <- rowMeans(exM)
-
-cor(mnEx, eg$MEIPC)
-cor(mnEx, eg$MERG)
-
-
-cellIDs <- row.names(df2)[df2$TYPE == "IP+ vRG- oRG- RG-"]
-cellIDs <- cellIDs[! is.na(cellIDs)]
-
-exM <- keepCcExM[ ,colnames(keepCcExM) %in% cellIDs]
-mnEx <- rowMeans(exM)
-
-cor(mnEx, eg$MEIPC)
-cor(mnEx, eg$MERG)
-
-
-cellIDs <- row.names(df2)[df2$TYPE == "oRG+ IP-"]
-cellIDs <- cellIDs[! is.na(cellIDs)]
-
-exM <- keepCcExM[ ,colnames(keepCcExM) %in% cellIDs]
-mnEx <- rowMeans(exM)
-
-cor(mnEx, eg$MEIPC)
-cor(mnEx, eg$MERG)
-
-cellIDs <- row.names(df2)[df2$TYPE == "vRG+ IP-"]
-cellIDs <- cellIDs[! is.na(cellIDs)]
-
-exM <- keepCcExM[ ,colnames(keepCcExM) %in% cellIDs]
-mnEx <- rowMeans(exM)
-
-cor(mnEx, eg$MEIPC)
-cor(mnEx, eg$MERG)
-
-
-
-
-
-cellIDs <- row.names(df2)[df2$TYPE == "oRG+ IP-"]
-cellIDs <- cellIDs[! is.na(cellIDs)]
-
-exM <- keepCcExM[ ,colnames(keepCcExM) %in% cellIDs]
-mnEx <- rowMeans(exM)
-
-cor(mnEx, eg$MEIPC)
-
-mnIPC <- rowMeans(keepCcExM[ ,keepCcSO@ident == 2])
-cor(mnEx, mnIPC)
-
-
+# ME_By_Markers_And_Phase <- function(markerGroup, phase)
+
+
+cellSubsetsL <- list(
+  IP_G2M = df1$IP > 0.5 & df1$PHASE %in% "G2M"
+  , RG_G2M = df1$RG > 0.5 & df1$PHASE %in% "G2M"
+  
+  , IP_S = df1$IP > 0.5 & df1$PHASE %in% "S"
+  , RG_S = df1$RG > 0.5 & df1$PHASE %in% "S"
+  
+  , IP_G1 = df1$IP > 0.5 & df1$PHASE %in% "G1"
+  , RG_G1 = df1$RG > 0.5 & df1$PHASE %in% "G1"
+  
+  , IP = df1$IP > 0.5
+  , RG = df1$RG > 0.5
+  
+  , RG_IP_G2M = df1$RG > 0.5 & df1$IP > 0.5 & df1$PHASE %in% "G2M"
+  , RG_IPn_G2M = df1$RG > 0.5 & df1$IP < 0.5 & df1$PHASE %in% "G2M"
+  , RGn_IP_G2M = df1$RG < 0.5 & df1$IP > 0.5 & df1$PHASE %in% "G2M"
+  
+  , RG_IP_S = df1$RG > 0.5 & df1$IP > 0.5 & df1$PHASE %in% "S"
+  , RG_IPn_S = df1$RG > 0.5 & df1$IP < 0.5 & df1$PHASE %in% "S"
+  , RGn_IP_S = df1$RG < 0.5 & df1$IP > 0.5 & df1$PHASE %in% "S"
+  
+  , RG_IP_G1 = df1$RG > 0.5 & df1$IP > 0.5 & df1$PHASE %in% "G1"
+  , RG_IPn_G1 = df1$RG > 0.5 & df1$IP < 0.5 & df1$PHASE %in% "G1"
+  , RGn_IP_G1 = df1$RG < 0.5 & df1$IP > 0.5 & df1$PHASE %in% "G1"
+  
+  , RG_IP = df1$RG > 0.5 & df1$IP > 0.5
+  , RG_IPn = df1$RG > 0.5 & df1$IP < 0.5
+  , RGn_IP = df1$RG < 0.5 & df1$IP > 0.5
+)
+egL <- lapply(names(cellSubsetsL), function(name) {
+  cellSubsetL <- cellSubsetsL[[name]]
+  eg <- moduleEigengenes(exM, cellSubsetL)$eigengenes
+  eg <- eg["METRUE"]
+  colnames(eg) <- name
+  return(eg)
+})
+names(egL) <- names(cellSubsetsL)
+corM <- round(cor(data.frame(egL)), 2)
+
+write.csv(corM
+  , file = paste0(outTable, "RG_IP_subsets_EG_correlation_matrix.csv")
+  , quote = FALSE)
 
 # randomIDs <- sample(colnames(keepCcExM), size = length(cellIDs), replace = FALSE)
 # exM <- keepCcExM[ ,colnames(keepCcExM) %in% randomIDs]
 # mnEx <- rowMeans(exM)
 # cor(mnEx, eg$MEIPC)
-
-
 ################################################################################
 
+### vRG and oRG gene expression by cluster
+
+ggL <- lapply(c("vRG", "oRG", "RG"), function(grouping) {
+  genes <- kmDF$Gene.Symbol[kmDF$Grouping %in% grouping]
+  genes <- genes[! duplicated(genes)]
+  gg <- Gene_Expression_Facet_By_Cluster_ViolinPlot(
+    genes = genes
+    , exprM = keepCcExM[ ,colnames(keepCcExM) %in% names(keepCcSO@ident)[keepCcSO@ident %in% c(7,8,9,10)]]
+    , clusterIDs = keepCcSO@ident[keepCcSO@ident %in% c(7,8,9,10)]
+    , geneOrder = genes
+    , ncol = 4
+    , ggtitle = grouping)
+  gg <- gg + theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  return(gg)
+})
+Plot_Grid(ggPlotsL = ggL
+  , ncol = 1
+  , title = paste0(graphCodeTitle
+    , "\n\nvRG, oRG, and RG markers expression by cluster")
+  , rel_height = 0.1)
+ggsave(paste0(outGraph, "vRG_oRG_RG_Expression_ViolinPlot.png")
+  , width = 13, height = 11)
+################################################################################
+
+### Heatmap and heirarchical clustering of RG and IP G2M cells
 
 df1 <- Format_Number_Cell_Types_Cluster_Dataframe(
   exM = keepCcExM, seuratO = keepCcSO)
-cellIDs <- row.names(df1)[df1$RG > 0.5 | df1$IP > 0.5 & df1$PHASE == "G2M"]
+cellIDs <- row.names(df1)[df1$RG > 0.5 | df1$IP > 0.5]
+cellIDs <- intersect(cellIDs, row.names(df1)[df1$PHASE == "G2M"])
 exM <- keepCcSO@scale.data[ ,colnames(keepCcSO@scale.data) %in% cellIDs]
 mns <- rowMeans(exM)
-genes <- names(sort(mns, decreasing = TRUE))[1:5000]
+genes <- names(sort(mns, decreasing = TRUE))[1:2500]
 exM <- exM[row.names(exM) %in% genes, ]
 
-png(paste0(outGraph, "pheatmap.png"))
+annotation_col <- data.frame(Type = rep(NA, nrow(df1)))
+row.names(annotation_col) <- row.names(df1)
+annotation_col$Type[df1$RG > 0.5] <- "RG+"
+annotation_col$Type[df1$IP > 0.5] <- "IP+"
+annotation_col$Type[df1$RG > 0.5 & df1$IP > 0.5] <- "RG+ IP+"
+annotation_col <- annotation_col[df1$PHASE == "G2M", , drop = FALSE]
+annotation_col <- annotation_col[! is.na(annotation_col$Type), , drop = FALSE]
+
+annotation_col$vRGoRG <- NA
+ids <- row.names(df1)[df1$oRG > 0.25]
+annotation_col$vRGoRG[row.names(annotation_col) %in% ids] <- "oRG+"
+ids <- row.names(df1)[df1$vRG > 0.25]
+annotation_col$vRGoRG[row.names(annotation_col) %in% ids] <- "vRG+"
+ids <- row.names(df1)[df1$vRG > 0.25 & df1$oRG > 0.25]
+annotation_col$vRGoRG[row.names(annotation_col) %in% ids] <- "vRG+ oRG+"
+
+exM[exM > 2] <- 2
+exM[exM < -2] <- 2
+breaks <- seq(-2, 2, by = 0.1)
+
+png(paste0(outGraph, "pheatmap.png"), width = 9, height = 9, units = "in", res = 300)
 pheatmap(exM, 
-  cluster_row = TRUE,
-  cluster_cols = TRUE
+  cluster_row = TRUE
+  , cluster_cols = TRUE
+  , annotation_col = annotation_col
+  , color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdBu")))(length(breaks))
+  , breaks = breaks
+  , show_rownames = FALSE
+  , show_colnames = FALSE
 )
 dev.off()
+################################################################################
+
+### PCA of RG+ and / or IP+ cells
+
+exLM <- list()
+
+# Identify RG+ and / or IP+ G2M cells
+df1 <- Format_Number_Cell_Types_Cluster_Dataframe(
+  exM = keepCcExM, seuratO = keepCcSO)
+cellIDs <- row.names(df1)[df1$RG > 0.5 | df1$IP > 0.5]
+cellIDs <- intersect(cellIDs, row.names(df1)[df1$PHASE == "G2M"])
+exLM[["RG_IP_G2M"]] <- keepCcSO@scale.data[ ,colnames(keepCcSO@scale.data) %in% cellIDs]
+
+# Identify RG+ and / or IP+ S phase cells
+df1 <- Format_Number_Cell_Types_Cluster_Dataframe(
+  exM = keepCcExM, seuratO = keepCcSO)
+cellIDs <- row.names(df1)[df1$RG > 0.5 | df1$IP > 0.5]
+cellIDs <- intersect(cellIDs, row.names(df1)[df1$PHASE == "S"])
+exLM[["RG_IP_Sphase"]] <- keepCcSO@scale.data[ ,colnames(keepCcSO@scale.data) %in% cellIDs]
+
+# Identify RG+ G2M cells
+df1 <- Format_Number_Cell_Types_Cluster_Dataframe(
+  exM = keepCcExM, seuratO = keepCcSO)
+cellIDs <- row.names(df1)[df1$RG > 0.5]
+cellIDs <- intersect(cellIDs, row.names(df1)[df1$PHASE == "G2M"])
+exLM[["RG_G2M"]] <- keepCcSO@scale.data[ ,colnames(keepCcSO@scale.data) %in% cellIDs]
+
+# Identify RG+ S phase cells
+df1 <- Format_Number_Cell_Types_Cluster_Dataframe(
+  exM = keepCcExM, seuratO = keepCcSO)
+cellIDs <- row.names(df1)[df1$RG > 0.5]
+cellIDs <- intersect(cellIDs, row.names(df1)[df1$PHASE == "S"])
+exLM[["RG_Sphase"]] <- keepCcSO@scale.data[ ,colnames(keepCcSO@scale.data) %in% cellIDs]
+
+# Plot mean expression rank, standard deviation, and variance
+pgL <- lapply(names(exLM), function(name) {
+  exM <- exLM[[name]]
+  MeanExprRank_Stdev_Variance_ScatterPlot(
+  exM = exM
+  , title = name
+  )
+})
+# Combine plots from each cell subset
+Plot_Grid(ggPlotsL = pgL, ncol = 1, rel_height = 0.1
+  , title = paste0(
+    graphCodeTitle
+    , "\n\nSubset cells by RG+ and / or IP+ expression and G2M or S phase"))
+ggsave(paste0(outGraph, "RG_IP_MeanExpr_StdDev.png"), width = 13, height = 20)
+
+# Subset to top 5000 expressed genes
+exLM <- lapply(exLM, function(exM){
+  mns <- rowMeans(exM)
+  genes <- names(sort(mns, decreasing = TRUE))[1:2500]
+  exM <- exM[row.names(exM) %in% genes, ]
+  return(exM)
+})
+
+# PCA
+pcaL <- lapply(exLM, function(exM){
+  pca <- prcomp(t(exM))
+  return(pca)
+})
+
+# Plot PCA
+
+# Format for ggplot
+ldf <- lapply(pcaL, function(pca){
+  PCA_Format_For_GGplot(pca)
+})
+
+# PCA plots
+lapply(names(ldf), function(name){
+  
+  df <- ldf[[name]]
+  
+  ggL <- PCA_Plot_PC1to8(pcaDF = df, colorBy = "Cell_Subset")
+  Plot_Grid(ggPlotsL = ggL
+    , ncol = 3
+    , rel_height = 0.1
+    , title = paste0(graphCodeTitle
+      , "\n\n", name
+      , "\nColored by RG+ and / or IP+"
+      , "\n+ = > 0.5 log normalized expression")
+  )
+  ggsave(paste0(outGraph, name, "_PCA_RgIp.png"), width = 14, height = 14)
+  
+  ggL <- PCA_Plot_PC1to8(pcaDF = df, colorBy = "vRG_oRG_Subset")
+  Plot_Grid(ggPlotsL = ggL
+    , ncol = 3
+    , rel_height = 0.1
+    , title = paste0(graphCodeTitle
+      , "\n\nPCA of vRG+ and / or oRG+ cells"
+      , "\nColored by vRG+ and / or oRG+"
+      , "\n+ = > 0.5 log normalized expression")
+  )
+  ggsave(paste0(outGraph, name, "_PCA_vRGoRG.png"), width = 14, height = 14)
+  
+  ggL <- PCA_Plot_PC1to8(pcaDF = df, colorBy = "S_Score")
+  Plot_Grid(ggPlotsL = ggL
+    , ncol = 3
+    , rel_height = 0.1
+    , title = paste0(graphCodeTitle
+      , "\n\nPCA of RG+ and / or IP+ cells"
+      , "\nColored by S phase score"
+      , "\n+ = > 0.5 log normalized expression")
+  )
+  ggsave(paste0(outGraph, name, "_PCA_Sscore.png"), width = 14, height = 14)
+  
+  ggL <- PCA_Plot_PC1to8(pcaDF = df, colorBy = "G2M_Score")
+  Plot_Grid(ggPlotsL = ggL
+    , ncol = 3
+    , rel_height = 0.1
+    , title = paste0(graphCodeTitle
+      , "\n\nPCA of RG+ and / or IP+ cells"
+      , "\nColored by G2M phase score"
+      , "\n+ = > 0.5 log normalized expression")
+  )
+  ggsave(paste0(outGraph, name, "_PCA_G2Mscore.png"), width = 14, height = 14)
+  
+  ggL <- PCA_Plot_PC1to8(pcaDF = df, colorBy = "vRG", limLow = 0, limHigh = 1)
+  Plot_Grid(ggPlotsL = ggL
+    , ncol = 3
+    , rel_height = 0.1
+    , title = paste0(graphCodeTitle
+      , "\n\nPCA of RG+ and / or IP+ cells"
+      , "\nColored by vRG expression"
+      , "\n+ = > 0.5 log normalized expression")
+  )
+  ggsave(paste0(outGraph, name, "_PCA_vRG.png"), width = 14, height = 14)
+  
+  ggL <- PCA_Plot_PC1to8(pcaDF = df, colorBy = "oRG", limLow = 0, limHigh = 1)
+  Plot_Grid(ggPlotsL = ggL
+    , ncol = 3
+    , rel_height = 0.1
+    , title = paste0(graphCodeTitle
+      , "\n\nPCA of RG+ and / or IP+ cells"
+      , "\nColored by oRG expression"
+      , "\n+ = > 0.5 log normalized expression")
+  )
+  ggsave(paste0(outGraph, name, "_PCA_oRG.png"), width = 14, height = 14)
+
+})
 ################################################################################
