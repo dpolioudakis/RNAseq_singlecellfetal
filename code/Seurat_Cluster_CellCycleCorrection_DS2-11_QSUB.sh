@@ -16,8 +16,8 @@
 #$ -V
 #$ -S /bin/bash
 #$ -N SrtCC
-#$ -o logs/Seurat_Cluster_CellCycleCorrection_DS2-11_QSUB_$JOB_ID_$TASK_ID.log
-#$ -e logs/Seurat_Cluster_CellCycleCorrection_DS2-11_QSUB_$JOB_ID_$TASK_ID.error
+#$ -o logs/Seurat_Cluster_CellCycleCorrection_DS2-11_QSUB_$JOB_ID.log
+#$ -e logs/Seurat_Cluster_CellCycleCorrection_DS2-11_QSUB_$JOB_ID.error
 #$ -l h_data=128G,h_rt=12:00:00,highp
 ################################################################################
 echo ""
