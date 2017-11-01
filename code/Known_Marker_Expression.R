@@ -35,13 +35,9 @@ source("Function_Library.R")
 # Seurat
 # PC 1-40
 load("../analysis/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_seuratO.Robj")
-# # Sample for testing
-# centSObak <- centSO
-# noCentExMbak <- noCentExM
-# idx <- sample(1:ncol(centSO@scale.data), 1000)
-# centSO@dr$tsne@cell.embeddings <- centSO@dr$tsne@cell.embeddings[idx, ]
-# noCentExM <- noCentExM[ ,idx]
-# centSO@scale.data <- centSO@scale.data[ ,idx]
+# load("../analysis/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_TEST_seuratO.Robj")
+# centSO <- ssCentSO
+# noCentExM <- ssNoCentExM
 
 # Known cell type markers from Luis
 kmDF <- read.csv("../source/MarkersforSingleCell_2017-10-11_Markers.csv", header = TRUE
@@ -846,4 +842,60 @@ ggsave(paste0(outGraph, "Lake_Heatmap_NormalizedCenteredScaled.png")
 #   MultiPlotList(list(ggTsne, ggFp), cols = 2)
 # })
 # dev.off()
+################################################################################
+
+### Luis layer marker overlaps
+
+Excitatory Upper Layer Cortical
+Excitatory Deep Layer Cortical
+
+# Violin plots of expression
+# Normalized
+genes <- kmDF$Gene.Symbol[kmDF$Grouping %in% c(
+  "Excitatory Upper Layer Cortical", "Excitatory Deep Layer Cortical")]
+Gene_Expression_By_Cluster_ViolinPlot(
+  genes = genes
+  , exprM = noCentExM
+  , clusterIDs = centSO@ident
+  , geneOrder = genes
+) +
+  ggtitle(paste0(graphCodeTitle
+    , "\n"
+    , "\nMarker gene expression by cluster"
+    , "\nNormalized expression"
+    , "\n"))
+ggsave(paste0(outGraph, "LuisLayerMarks_ViolinPlot_Normalized.png")
+  , width = 13, height = 20)
+
+
+## Number of pairwise intersections of upper and lower layer markers
+
+uplGenes <- kmDF$Gene.Symbol[kmDF$Grouping %in% c(
+  "Excitatory Upper Layer Cortical")]
+lowlGenes <- kmDF$Gene.Symbol[kmDF$Grouping %in% c(
+    "Excitatory Deep Layer Cortical")]
+genes <- kmDF$Gene.Symbol[kmDF$Grouping %in% c(
+  "Excitatory Upper Layer Cortical", "Excitatory Deep Layer Cortical")]
+
+m1 <- noCentExM[row.names(noCentExM) %in% genes, ] > 0.5
+l1 <- apply(m1, 2, function(col) row.names(m1)[col])
+
+ldf <- lapply(l1, function(genes) {
+  v2 <- genes[genes %in% uplGenes]
+  v3 <- genes[genes %in% lowlGenes]
+  expand.grid(v2, v3)
+})
+df1 <- do.call("rbind", ldf)
+df2 <- data.frame(table(paste(df1[ ,1], df1[ ,2])))
+
+ggplot(df2, aes(x = Var1, y = Freq)) +
+  geom_bar(stat = "identity") +
+  coord_flip() +
+  ylab("Combinations of upper and lower layer markers") +
+  ggtitle(paste0(graphCodeTitle
+    , "\n"
+    , "\nNumber of occurances of upper and lower layer markers expressed in same cell"
+    , "\nExpression filter: > 0.5 log normalized expression"))
+ggsave(paste0(outGraph, "LuisLayerMarks_NumberIntersect.png")
+  , width = 7, height = 7)
 ################################################################################
