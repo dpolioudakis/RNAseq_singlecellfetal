@@ -26,7 +26,7 @@ source("Function_Library.R")
 
 # Log normalized, regressed nUMI and percent mito
 load("../analysis/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_seuratO.Robj")
-# load(../analysis/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_TEST_seuratO.Robj")
+# load("../analysis/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_TEST_seuratO.Robj")
 # centSO <- ssCentSO
 # noCentExM <- ssNoCentExM
 
@@ -1025,6 +1025,20 @@ df <- data.frame(v1, rank(-v1))
 df[row.names(df) %in% c("CITED2", "MALAT1"), ]
 # CITED2 0.8660202       248
 # MALAT1 6.3206253         1
+################################################################################
+
+### Feature plot of TFs of interest
+
+genes <- c("CARHSP1", "ZFHX4", "CSRP2", "ST18", "KAT6B", "CITED2")
+  ggL <- FeaturePlot_CentScale(
+    genes = genes
+    , tsneDF = as.data.frame(centSO@dr$tsne@cell.embeddings)
+    , seuratO = centSO, limLow = -2, limHigh = 2
+    )
+Plot_Grid(ggPlotsL = ggL, ncol = 3, rel_height = 0.2, align = 'v', axis = 'r'
+  , title = paste0(graphCodeTitle
+    , "\n\ntSNE colored by normalized centered scaled expression"))
+ggsave(paste0(outGraph, "TFsOfInterest_FeaturePlot.png"), width = 13, height = 10)
 ################################################################################
 
 ### Human specific expression of TFs with cell type specific expression
