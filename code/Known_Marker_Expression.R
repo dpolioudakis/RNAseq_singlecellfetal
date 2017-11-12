@@ -846,9 +846,6 @@ ggsave(paste0(outGraph, "Lake_Heatmap_NormalizedCenteredScaled.png")
 
 ### Luis layer marker overlaps
 
-Excitatory Upper Layer Cortical
-Excitatory Deep Layer Cortical
-
 # Violin plots of expression
 # Normalized
 genes <- kmDF$Gene.Symbol[kmDF$Grouping %in% c(
@@ -886,8 +883,75 @@ ldf <- lapply(l1, function(genes) {
   expand.grid(v2, v3)
 })
 df1 <- do.call("rbind", ldf)
+
+# Format for barplot
 df2 <- data.frame(table(paste(df1[ ,1], df1[ ,2])))
 
+# Format for matrix
+df3 <- dcast(df1, Var1 ~ Var2)
+row.names(df3) <- df3$Var1
+df3 <- df3[ ,-1]
+v1 <- rowSums(m1)
+# Union of each gene to normalize for frequency
+m2 <- matrix(NA, nrow(df3), ncol(df3))
+colnames(m2) <- colnames(df3)
+rownames(m2) <- rownames(df3)
+for (cName in colnames(m2)) {
+  for (rName in rownames(m2)) {
+    m2[rName,cName] <- v1[[cName]] + v1[[rName]]  
+  }
+}
+# Normalize for frequency
+df4 <- round((df3 / m2) * 100, 1)
+df4$Gene <- row.names(df4)
+df4 <- melt(df4)
+
+# Format for ggplot
+df3$Gene <- row.names(df3)
+df3 <- melt(df3)
+
+# number of cells each marker expressed in
+df5 <- data.frame(Number = rowSums(m1))
+df5$Gene <- factor(row.names(df5), levels = row.names(df5))
+
+# Plot number of cells each marker expressed in
+ggplot(df5, aes(x = Gene, y = Number)) +
+  geom_bar(stat = "identity") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  ggtitle(paste0(graphCodeTitle
+    , "\n\nNumber of cells expressing layer markers"))
+ggsave(paste0(outGraph, "LuisLayerMarks_Number_Barplot.png")
+  , width = 5, height = 5)
+
+# Plot counts of intersections
+ggplot(df3, aes(x = Gene, y = variable, fill = value)) +
+  geom_tile() +
+  geom_text(data = df3, aes(x = Gene, y = variable, label = value), color = "black") +
+  scale_fill_gradient(low = "white", high = "red", space = "Lab", name = "Number") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  xlab("Upper layer markers") +
+  ylab("Lower layer markers") +
+  ggtitle(paste0(graphCodeTitle
+    , "\n\nNumber of cells expressing both upper and lower layer markers"))
+ggsave(paste0(outGraph, "LuisLayerMarks_NumberIntersect_Heatmap.png")
+  , width = 7, height = 7)
+
+# Plot counts of intersections normalized for frequency
+ggplot(df4, aes(x = Gene, y = variable, fill = value)) +
+  geom_tile() +
+  geom_text(data = df4, aes(x = Gene, y = variable, label = value), color = "black") +
+  scale_fill_gradient(low = "white", high = "red", space = "Lab", name = "Percent") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  xlab("Upper layer markers") +
+  ylab("Lower layer markers") +
+  ggtitle(paste0(graphCodeTitle
+    , "\n\nCells expressing both upper and lower layer markers"
+    , "\n(Intersection / Union) * 100")
+    , "\nExample: 24.3% of cells expressing either POU3F2 or SOX5 express both")
+ggsave(paste0(outGraph, "LuisLayerMarks_PercentIntersect_Heatmap.png")
+  , width = 7, height = 7)
+
+# Barplot of numbers of intersections
 ggplot(df2, aes(x = Var1, y = Freq)) +
   geom_bar(stat = "identity") +
   coord_flip() +
