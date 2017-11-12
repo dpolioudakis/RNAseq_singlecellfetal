@@ -27,8 +27,8 @@ source("Function_Library.R")
 # Log normalized, regressed nUMI and percent mito
 load("../analysis/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_seuratO.Robj")
 # load("../analysis/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_TEST_seuratO.Robj")
-# centSO <- ssCentSO
-# noCentExM <- ssNoCentExM
+centSO <- ssCentSO
+noCentExM <- ssNoCentExM
 
 # BrainSpan developmental transcriptome
 bsDF <- read.csv("../source/BrainSpan_DevTranscriptome/genes_matrix_csv/expression_matrix.csv", header = FALSE)
@@ -218,6 +218,70 @@ Heatmaps_Combined <- function(ggDF, seuratO, clusters1, clusters2, clusters3
   # # rel_heights values control title margins
   # pg <- plot_grid(title, pg, ncol = 1, rel_heights = c(0.1, 1))
   return(pg)
+}
+
+Intersection_Of_Cells_Expressing_Both <- function(gene1, gene2){
+  v1 <- noCentExM[row.names(noCentExM) %in% c(gene1), ] > 0.5
+  v2 <- noCentExM[row.names(noCentExM) %in% c(gene2), ] > 0.5
+  df1 <- rbind(v1, v2)
+  int <- apply(df1, 2, all)
+  df2 <- as.data.frame(centSO@dr$tsne@cell.embeddings)
+  df2$Intersection <- int[match(row.names(df2), names(int))]
+  return(df2)
+}
+
+Intersection_tSNE_Plots <- function(genes) {
+  genesM <- t(combn(genes, 2))
+  genesM <- rbind(genesM, cbind(Gene1 = genes, Gene2 = genes))
+  ggL <- apply(genesM, 1, function(row){
+    # print(row)})
+    gene1 <- row[["Gene1"]]
+    gene2 <- row[["Gene2"]]
+    df1 <- Intersection_Of_Cells_Expressing_Both(gene1, gene2)
+    gg <- ggplot(df1, aes(x = tSNE_1, y = tSNE_2, color = Intersection)) +
+      geom_point(size = 0.05) +
+      scale_color_manual(name = "Intersection", values = c("grey", "red")) +
+      guides(colour = guide_legend(override.aes = list(size = 7))) +
+      ggtitle(paste(gene1, gene2))
+    return(gg)
+  })
+  return(ggL)
+}
+
+
+Number_Of_Cells_Intersection_Heatmap <- function(genes, title){
+  m1 <- noCentExM[row.names(noCentExM) %in% genes, ] > 0.5
+  l1 <- apply(m1, 2, function(col) row.names(m1)[col])
+  
+  ldf <- lapply(l1, function(genes) {
+    v2 <- genes[genes %in% genes]
+    v3 <- genes[genes %in% genes]
+    expand.grid(v2, v3)
+  })
+  df1 <- do.call("rbind", ldf)
+  
+  # Format for matrix
+  df3 <- dcast(df1, Var1 ~ Var2)
+  row.names(df3) <- df3$Var1
+  df3 <- df3[ ,-1]
+  
+  # Format for ggplot
+  df3$Gene <- row.names(df3)
+  df3 <- melt(df3)
+  df3$Gene <- factor(df3$Gene, levels = genes)
+  df3$variable <- factor(df3$variable, levels = genes)
+  
+  # Plot counts of intersections
+  gg <- ggplot(df3, aes(x = Gene, y = variable, fill = value)) +
+    geom_tile() +
+    geom_text(data = df3, aes(x = Gene, y = variable, label = value), color = "black") +
+    scale_fill_gradient(low = "white", high = "red", space = "Lab", name = "Number") +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+    xlab("Genes") +
+    ylab("Genes") +
+    ggtitle(title)
+  
+  return(gg)
 }
 ################################################################################
 
@@ -986,9 +1050,7 @@ ssDeDF[ssDeDF$ENSEMBL %in% aheGzDF$Identifier, ]
 
 ssDeDF[ssDeDF$GENE %in% hsDF$Gene[hsDF$Set == "Human-specific"], ]
 ssDeDF[ssDeDF$GENE %in% hsDF$Gene[hsDF$Set == "Primate-specific"], ]
- 
-
-################################################################################
+ ################################################################################
 
 ### Expression ranking in cell classes of interest
 
@@ -1123,4 +1185,138 @@ tbejDF$ALIAS[tbejDF$ALIAS %in% genes]
 
 transfacDF$alias[transfacDF$alias %in% genes]
 tbetDF$ALIAS[tbetDF$ALIAS %in% genes]
+################################################################################
+
+### Overlap genes of interest with appropiate marker genes for ISH
+
+## Number of cells each marker expressed in
+
+genes <- c("CARHSP1", "ZFHX4", "CSRP2", "ST18", "KAT6B", "CITED2"
+  , "BCL11B", "SOX5", "SATB2", "LHX6", "SOX2", "PAX6", "HOPX", "CRYAB"
+  , "EOMES", "STMN2")
+m1 <- noCentExM[row.names(noCentExM) %in% genes, ] > 0.5
+l1 <- apply(m1, 2, function(col) row.names(m1)[col])
+# number of cells each marker expressed in
+df5 <- data.frame(Number = rowSums(m1))
+df5$Gene <- factor(row.names(df5), levels = row.names(df5))
+
+# Plot number of cells each marker expressed in
+ggplot(df5, aes(x = Gene, y = Number)) +
+  geom_bar(stat = "identity") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  ggtitle(paste0(graphCodeTitle
+    , "\n\nNumber of cells expressing genes"
+    , "\n(> 0.5 normalized expression)"))
+ggsave(paste0(outGraph, "TFsOfInterest_And_Markers_Number_Barplot.png")
+  , width = 5, height = 5)
+
+
+## tSNE colored by intersection and heatmap of numbers of intersections
+
+# RG
+genes <- c("CARHSP1", "ZFHX4", "SOX2", "PAX6", "HOPX", "CRYAB")
+
+# tSNE
+ggL <- Intersection_tSNE_Plots(genes)
+gg1 <- TSNE_Plot(centSO) + theme(legend.position = "none")
+ggL <- append(list(gg1), ggL)
+Plot_Grid(ggPlotsL = ggL, ncol = 3, rel_height = 0.2, align = 'v', axis = 'r'
+  , title = paste0(paste0(graphCodeTitle
+    , "\n\ntSNE plot colored by intersection of expression of gene A and gene B"
+    , "\n(> 0.5 normalized expression)"
+    , "\nRG"))
+)
+ggsave(paste0(outGraph, "TFsOfInterest_And_Marker_Intersection_tSNE_RG.png")
+  , width = 13, height = 13)
+
+# Heatmap
+Number_Of_Cells_Intersection_Heatmap(
+  genes = genes
+  , title = paste0(graphCodeTitle
+    , "\n\nNumber of cells expressing both gene A and gene B"
+    , "\nRG")
+  )
+ggsave(paste0(outGraph, "TFsOfInterest_And_Markers_NumberIntersect_Heatmap_RG.png")
+  , width = 7, height = 7)
+
+
+# Excitatory
+genes <- c("CSRP2", "SATB2", "LHX2")
+
+# tSNE
+ggL <- Intersection_tSNE_Plots(genes)
+gg1 <- TSNE_Plot(centSO) + theme(legend.position = "none")
+ggL <- append(list(gg1), ggL)
+Plot_Grid(ggPlotsL = ggL, ncol = 3, rel_height = 0.2, align = 'v', axis = 'r'
+  , title = paste0(paste0(graphCodeTitle
+    , "\n\ntSNE plot colored by intersection of expression of gene A and gene B"
+    , "\n(> 0.5 normalized expression)"
+    , "\nExcitatory"))
+)
+ggsave(paste0(outGraph, "TFsOfInterest_And_Marker_Intersection_tSNE_Excitatory.png")
+  , width = 13, height = 10)
+
+# Heatmap
+Number_Of_Cells_Intersection_Heatmap(
+  genes = genes
+  , title = paste0(graphCodeTitle
+    , "\n\nNumber of cells expressing both gene A and gene B"
+    , "\nExcitatory")
+)
+ggsave(paste0(outGraph, "TFsOfInterest_And_Markers_NumberIntersect_Heatmap_Excitatory.png")
+  , width = 7, height = 7)
+
+
+# Deep layer excitatory
+genes <- c("ST18", "KAT6B", "BCL11B", "SOX5")
+
+# tSNE
+ggL <- Intersection_tSNE_Plots(genes)
+gg1 <- TSNE_Plot(centSO) + theme(legend.position = "none")
+ggL <- append(list(gg1), ggL)
+Plot_Grid(ggPlotsL = ggL, ncol = 3, rel_height = 0.2, align = 'v', axis = 'r'
+  , title = paste0(paste0(graphCodeTitle
+    , "\n\ntSNE plot colored by intersection of expression of gene A and gene B"
+    , "\n(> 0.5 normalized expression)"
+    , "\nExcitatory deep layer"))
+)
+ggsave(paste0(outGraph, "TFsOfInterest_And_Marker_Intersection_tSNE_ExcDeepLayer.png")
+  , width = 13, height = 10)
+
+# Heatmap
+Number_Of_Cells_Intersection_Heatmap(
+  genes = genes
+  , title = paste0(graphCodeTitle
+    , "\n\nNumber of cells expressing both gene A and gene B"
+    , "\nExcitatory deep layer")
+)
+ggsave(paste0(outGraph, "TFsOfInterest_And_Markers_NumberIntersect_Heatmap_ExcDeepLayer.png")
+  , width = 7, height = 7)
+
+
+# Interneuron
+genes <- c("CITED2", "DLX1", "DLX2", "DLX5", "DLX6")
+
+# tSNE
+ggL <- Intersection_tSNE_Plots(genes)
+gg1 <- TSNE_Plot(centSO) + theme(legend.position = "none")
+ggL <- append(list(gg1), ggL)
+Plot_Grid(ggPlotsL = ggL, ncol = 3, rel_height = 0.2, align = 'v', axis = 'r'
+  , title = paste0(paste0(graphCodeTitle
+    , "\n\ntSNE plot colored by intersection of expression of gene A and gene B"
+    , "\n(> 0.5 normalized expression)"
+    , "\nInterneuron"))
+)
+ggsave(paste0(outGraph, "TFsOfInterest_And_Marker_Intersection_tSNE_Interneuron.png")
+  , width = 13, height = 17)
+
+# Heatmap
+Number_Of_Cells_Intersection_Heatmap(
+  genes = genes
+  , title = paste0(graphCodeTitle
+    , "\n\nNumber of cells expressing both gene A and gene B"
+    , "\nInterneuron")
+)
+ggsave(paste0(outGraph, "TFsOfInterest_And_Markers_NumberIntersect_Heatmap_Interneuron.png")
+  , width = 7, height = 7)
 ################################################################################
