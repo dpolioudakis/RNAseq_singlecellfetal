@@ -305,7 +305,7 @@ Set_Limits <- function(tsneDF, limHigh, limLow) {
 # Color tSNE plot by expression from Mean_Expression()
 FeaturePlot_Graph <- function(tsneDF, title, limLow, limHigh) {
   ggFp <- ggplot(tsneDF, aes(x = tSNE_1, y = tSNE_2, col = EXPRESSION)) +
-    geom_point(size = 0.05) +
+    geom_point(size = 0.02) +
     # scale_colour_gradient(name = "Normalized\nExpression", low = "#a6cee3"
     #   , high = "#e31a1c", limits = c(0, 2)) +
     scale_color_distiller(name = "Normalized\nexpression", type = "div"
@@ -319,7 +319,7 @@ FeaturePlot_Graph <- function(tsneDF, title, limLow, limHigh) {
 # Color tSNE plot by expression from Mean_Expression()
 FeaturePlot_Graph_CentScale <- function(tsneDF, title, limLow, limHigh) {
   ggFp <- ggplot(tsneDF, aes(x = tSNE_1, y = tSNE_2, col = EXPRESSION)) +
-    geom_point(size = 0.05) +
+    geom_point(size = 0.02) +
     # scale_colour_gradient(name = "Normalized\nExpression", low = "#a6cee3"
     #   , high = "#e31a1c", limits = c(0, 2)) +
     scale_color_distiller(name = "Normalized\nexpression\nz-score", type = "div"
@@ -333,7 +333,7 @@ FeaturePlot_Graph_CentScale <- function(tsneDF, title, limLow, limHigh) {
 # tSNE plot colored by Seurat clustering
 TSNE_Plot <- function(seuratO) {
   # tSNE graph colored by cluster
-  ggTsne <- TSNEPlot(seuratO, do.label = TRUE, pt.size = 0.1, do.return = TRUE
+  ggTsne <- TSNEPlot(seuratO, do.label = TRUE, pt.size = 0.02, do.return = TRUE
     , no.legend = FALSE)
   ggTsne <- ggTsne + ggtitle(paste0(
     "tSNE plot, each point is a cell"
@@ -352,6 +352,7 @@ TSNE_Plot <- function(seuratO) {
 
 # Wrapper function for feature plots
 FeaturePlot_CentScale <- function(genes, tsneDF, seuratO, limLow, limHigh) {
+  # tsneDF: as.data.frame(centSO@dr$tsne@cell.embeddings)
   # Collect tSNE values for ggplot
   tsneDF <- as.data.frame(seuratO@dr$tsne@cell.embeddings)
   # Loop through and plot each group of genes
@@ -410,6 +411,7 @@ FeaturePlot <- function(genes, tsneDF, seuratO, exM, limLow, limHigh) {
 
 # Cowplot plot_grid and add title
 Plot_Grid <- function(ggPlotsL, ncol, title, rel_height, ...) {
+  # cowplot plot_grid ...: align = 'v', axis = 'l'
   # Plot grid
   pg <- plot_grid(plotlist = ggPlotsL, ncol = ncol, ...)
   # now add the title
