@@ -14,11 +14,12 @@ sessionInfo()
 ### Set variable to gene of interest
 # genes <- c("ARG1", "ARG2")
 # genes <- c("TTR", "SLC13A4")
-genes <- c("XIST")
+# genes <- c("XIST")
+genes <- c("PLXNA2", "SEMA5A", "SEMA6A")
 
 ### Set out graphs path (will append type of graph to end, e.g.
 # ../analysis/graphs/Expression_GenesList_ARG1-2_ExprHeatmap_NormCentScale.png)
-outGraph <- "../analysis/graphs/Expression_GenesList/Expression_GenesList_XIST_"
+outGraph <- "../analysis/graphs/Expression_GenesList/Expression_GenesList_PLXNA2_SEMA5A_SEMA6A_"
 ################################################################################
 
 require(methods)
@@ -34,7 +35,7 @@ source("/u/project/eeskin/geschwind/dpolioud/RNAseq_singlecellfetal/code/Functio
 
 # Log normalized, regressed nUMI and percent mito
 # seuratO
-load("/u/project/eeskin/geschwind/dpolioud/RNAseq_singlecellfetal/analysis/Seurat_Cluster_DS2-11/Seurat_Cluster_DS2-11_FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_PC1to40_seuratO.Robj")
+load("/u/project/eeskin/geschwind/dpolioud/RNAseq_singlecellfetal/analysis/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_seuratO.Robj")
 
 # biomaRt gene info
 bmDF <- read.csv("/u/project/eeskin/geschwind/dpolioud/RNAseq_singlecellfetal/source/BiomaRt_Compile_GeneInfo_GRCh38_Ensembl87.csv"
@@ -87,6 +88,7 @@ plot_grid(title, pg, ncol = 1
 # Save graph
 ggsave(paste0(outGraph, "violinPlots.png"), width = 14, height = 4+length(ggL))
 
+
 ## Feature plots
 
 # Feature plot - normalized, mean centered scaled on full dataset
@@ -110,7 +112,32 @@ plot_grid(title, pg, ncol = 1
 # Save graph
 ggsave(paste0(
   outGraph, "FeaturePlot_NormCentScale.png")
-  , width = 14, height = 2.5+length(ggL), limitsize = FALSE)
+  , width = 14, height = 2.5+length(ggL)*1.25, limitsize = FALSE)
+
+# Feature plot - normalized
+# Loop through and plot each group of genes
+ggL <- FeaturePlot(genes = genes
+  , tsneDF = as.data.frame(centSO@dr$tsne@cell.embeddings)
+  , seuratO = centSO
+  , exM = noCentExM
+  , limLow = -1
+  , limHigh = 3
+)
+# plot_grid combine tSNE graphs
+pg <- plot_grid(plotlist = ggL, ncol = 3, align = 'v', axis = 'r')
+# now add the title
+title <- ggdraw() + draw_label(paste0(graphCodeTitle
+  , "\n\ntSNE plots, each point is a cell"
+  , "\nColor indicates normalized expression"
+  , "\n"))
+# rel_heights values control title margins
+plot_grid(title, pg, ncol = 1
+  , rel_heights = c(length(ggL)*0.25, length(ggL)))
+# Save graph
+ggsave(paste0(
+  outGraph, "FeaturePlot_Norm.png")
+  , width = 14, height = 2.5+length(ggL)*1.25, limitsize = FALSE)
+
 
 ## Heatmaps
 
