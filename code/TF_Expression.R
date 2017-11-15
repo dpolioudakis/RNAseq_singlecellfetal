@@ -27,14 +27,14 @@ source("Function_Library.R")
 # Log normalized, regressed nUMI and percent mito
 load("../analysis/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_seuratO.Robj")
 # load("../analysis/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_TEST_seuratO.Robj")
-centSO <- ssCentSO
-noCentExM <- ssNoCentExM
+# centSO <- ssCentSO
+# noCentExM <- ssNoCentExM
 
-# BrainSpan developmental transcriptome
-bsDF <- read.csv("../source/BrainSpan_DevTranscriptome/genes_matrix_csv/expression_matrix.csv", header = FALSE)
-rnames <- read.csv("../source/BrainSpan_DevTranscriptome/genes_matrix_csv/rows_metadata.csv")
-row.names(bsDF) <- rnames$gene_symbol
-bsMtDF <- read.csv("../source/BrainSpan_DevTranscriptome/genes_matrix_csv/columns_metadata.csv")
+# # BrainSpan developmental transcriptome
+# bsDF <- read.csv("../source/BrainSpan_DevTranscriptome/genes_matrix_csv/expression_matrix.csv", header = FALSE)
+# rnames <- read.csv("../source/BrainSpan_DevTranscriptome/genes_matrix_csv/rows_metadata.csv")
+# row.names(bsDF) <- rnames$gene_symbol
+# bsMtDF <- read.csv("../source/BrainSpan_DevTranscriptome/genes_matrix_csv/columns_metadata.csv")
 
 # Miller
 load("../neurogenesis/orig.data/LCMDE/AllenLCM.Rdata")
@@ -97,10 +97,11 @@ jasparDF <- read.csv("../analysis/Seurat_ClusterDE_TFenrichment/TRANSFAC/Compile
 ## Variables
 graphCodeTitle <- "TF_Expression.R"
 outGraph <- "../analysis/graphs/TF_Expression_DS2-11/TF_Expression_DS2-11_"
+outTable <- "../analysis/tables/TF_Expression_DS2-11/TF_Expression_DS2-11_"
 
 ## Output Directories
-outGraphDir <- dirname(outGraph)
-dir.create(outGraphDir, recursive = TRUE)
+dir.create(dirname(outGraph), recursive = TRUE)
+dir.create(dirname(outTable), recursive = TRUE)
 
 ## Set ggplot2 theme
 theme_set(theme_bw())
@@ -283,6 +284,19 @@ Number_Of_Cells_Intersection_Heatmap <- function(genes, title){
   
   return(gg)
 }
+
+Mean_Expression_Rank <- function(genes, clusters = NULL) {
+  v1 <- rowMeans(noCentExM)
+  if (! is.null(clusters)) {
+    v1 <- rowMeans(noCentExM[ ,centSO@ident %in% clusters])  
+  }
+  df <- data.frame(v1, rank(-v1))
+  df <- df[row.names(df) %in% genes, ]
+  df <- df[order(-df[ ,1]), ]
+  df[ ,1] <- round(df[ ,1], 3)
+  colnames(df) <- c("Mean Expression", "Mean Expression Rank")
+  return(df)
+}
 ################################################################################
 
 ### Format
@@ -410,8 +424,8 @@ ggsave(paste0(
 # Excitatory and deep layer
 # Heatmap
 # Normalized, mean centering scaling
-ldf <- lapply(c(0, 1, 4, 13, 3, 14), function(cluster) {
-  Subset_TFs(deDF = df, cluster = cluster, okayClusters = c(0, 1, 4, 13, 3, 14)
+ldf <- lapply(c(0, 1, 4, 12, 3, 14), function(cluster) {
+  Subset_TFs(deDF = df, cluster = cluster, okayClusters = c(0, 1, 4, 12, 3, 14)
     , fcHigh = 0.4, fcLow = 0.3)
 })
 utdeDF <- do.call("rbind", ldf)
@@ -440,8 +454,8 @@ ggsave(paste0(
 # Excitatory
 # Heatmap
 # Normalized, mean centering scaling
-ldf <- lapply(c(0, 1, 4, 13), function(cluster) {
-  Subset_TFs(deDF = df, cluster = cluster, okayClusters = c(0, 1, 4, 13)
+ldf <- lapply(c(0, 1, 4, 12), function(cluster) {
+  Subset_TFs(deDF = df, cluster = cluster, okayClusters = c(0, 1, 4, 12)
     , fcHigh = 0.4, fcLow = 0.3)
 })
 utdeDF <- do.call("rbind", ldf)
@@ -1092,15 +1106,28 @@ df[row.names(df) %in% c("CITED2", "MALAT1"), ]
 ### Feature plot of TFs of interest
 
 genes <- c("CARHSP1", "ZFHX4", "CSRP2", "ST18", "KAT6B", "CITED2")
-  ggL <- FeaturePlot_CentScale(
-    genes = genes
-    , tsneDF = as.data.frame(centSO@dr$tsne@cell.embeddings)
-    , seuratO = centSO, limLow = -2, limHigh = 2
-    )
+ggL <- FeaturePlot_CentScale(
+  genes = genes
+  , tsneDF = as.data.frame(centSO@dr$tsne@cell.embeddings)
+  , seuratO = centSO, limLow = -2.5, limHigh = 2.5
+)
+ggL <- lapply(ggL, function(gg){
+  gg <- gg + theme(text = element_text(size = 20))
+  gg <- gg + theme(plot.title = element_text(size = 20))
+  return(gg)})
 Plot_Grid(ggPlotsL = ggL, ncol = 3, rel_height = 0.2, align = 'v', axis = 'r'
   , title = paste0(graphCodeTitle
     , "\n\ntSNE colored by normalized centered scaled expression"))
-ggsave(paste0(outGraph, "TFsOfInterest_FeaturePlot.png"), width = 13, height = 10)
+ggsave(paste0(outGraph, "TFsOfInterest_FeaturePlot.png"), width = 26, height = 20)
+################################################################################
+
+### Violin plot of TFs of interest
+
+genes <- c("CARHSP1", "ZFHX4", "CSRP2", "ST18", "KAT6B", "CITED2")
+Gene_Expression_By_Cluster_ViolinPlot(genes = genes
+  , exprM = noCentExM, clusterIDs = centSO@ident
+  , geneOrder = genes, grouping = NULL)
+ggsave(paste0(outGraph, "TFsOfInterest_ExprViolinPlot.png"), width = 13, height = 10)
 ################################################################################
 
 ### Human specific expression of TFs with cell type specific expression
@@ -1211,6 +1238,33 @@ ggsave(paste0(outGraph, "TFsOfInterest_And_Markers_Number_Barplot.png")
   , width = 5, height = 5)
 
 
+## Heatmap of markers and TFs
+
+genes <- c("CARHSP1", "ZFHX4", "CSRP2", "ST18", "KAT6B", "CITED2"
+  , "BCL11B", "SOX5", "SATB2", "LHX6", "SOX2", "PAX6", "HOPX", "CRYAB"
+  , "EOMES", "STMN2")
+geneGroupDF <- data.frame(GENE = genes
+  , GROUP = c("Novel_RG", "Novel_RG"
+    , "Novel_Excitatory"
+    , "Novel_Deep_Layer", "Novel_Deep_Layer"
+    , "Novel_Interneuron"
+    , "Deep_Layer", "Deep_Layer"
+    , "Excitatory", "Excitatory"
+    , "RG", "RG", "oRG", "vRG", "IPC", "Neuron")
+)
+ggL <- Heatmaps_By_Cluster_Combined(geneGroupDF, exprM = centSO@scale.data
+  , seuratO = centSO, lowerLimit = -1.5, upperLimit = 1.5
+  , clusters1 = c(0:1), clusters2 = c(2:10), clusters3 = c(11:17)
+  , geneOrder = geneGroupDF$GENE
+)
+Plot_Grid(ggL, ncol = 3, align = 'h', axis = 'b', rel_height = 0.2
+  , title = paste0(graphCodeTitle
+    , "\n\nExpression of TFs / co-factors / chromatin remodelers of interest and known markers"
+    , "\nNormalized expression"))
+ggsave(paste0(outGraph, "TFsOfInterest_And_Markers_ExprHeatmap.png")
+  , width = 11, height = 6)
+
+
 ## tSNE colored by intersection and heatmap of numbers of intersections
 
 # RG
@@ -1220,14 +1274,14 @@ genes <- c("CARHSP1", "ZFHX4", "SOX2", "PAX6", "HOPX", "CRYAB")
 ggL <- Intersection_tSNE_Plots(genes)
 gg1 <- TSNE_Plot(centSO) + theme(legend.position = "none")
 ggL <- append(list(gg1), ggL)
-Plot_Grid(ggPlotsL = ggL, ncol = 3, rel_height = 0.2, align = 'v', axis = 'r'
+Plot_Grid(ggPlotsL = ggL, ncol = 3, rel_height = 0.1, align = 'v', axis = 'r'
   , title = paste0(paste0(graphCodeTitle
     , "\n\ntSNE plot colored by intersection of expression of gene A and gene B"
     , "\n(> 0.5 normalized expression)"
     , "\nRG"))
 )
 ggsave(paste0(outGraph, "TFsOfInterest_And_Marker_Intersection_tSNE_RG.png")
-  , width = 13, height = 13)
+  , width = 13, height = 22)
 
 # Heatmap
 Number_Of_Cells_Intersection_Heatmap(
@@ -1274,6 +1328,10 @@ genes <- c("ST18", "KAT6B", "BCL11B", "SOX5")
 ggL <- Intersection_tSNE_Plots(genes)
 gg1 <- TSNE_Plot(centSO) + theme(legend.position = "none")
 ggL <- append(list(gg1), ggL)
+ggL <- lapply(ggL, function(gg){
+  gg <- gg + theme(text = element_text(size = 20))
+  gg <- gg + theme(plot.title = element_text(size = 20))
+  return(gg)})
 Plot_Grid(ggPlotsL = ggL, ncol = 3, rel_height = 0.2, align = 'v', axis = 'r'
   , title = paste0(paste0(graphCodeTitle
     , "\n\ntSNE plot colored by intersection of expression of gene A and gene B"
@@ -1281,7 +1339,7 @@ Plot_Grid(ggPlotsL = ggL, ncol = 3, rel_height = 0.2, align = 'v', axis = 'r'
     , "\nExcitatory deep layer"))
 )
 ggsave(paste0(outGraph, "TFsOfInterest_And_Marker_Intersection_tSNE_ExcDeepLayer.png")
-  , width = 13, height = 10)
+  , width = 19, height = 15)
 
 # Heatmap
 Number_Of_Cells_Intersection_Heatmap(
@@ -1320,3 +1378,46 @@ Number_Of_Cells_Intersection_Heatmap(
 ggsave(paste0(outGraph, "TFsOfInterest_And_Markers_NumberIntersect_Heatmap_Interneuron.png")
   , width = 7, height = 7)
 ################################################################################
+
+### Mean expression of CITED2 by cluster
+
+v1 <- rowMeans(noCentExM)
+df <- data.frame(
+  Expression = noCentExM[row.names(noCentExM) %in% c("CITED2"), ]
+  , Cluster = centSO@ident)
+df <- aggregate(Expression~Cluster, df, mean)
+df$Expression <- round(df$Expression, 3)
+write.csv(df, file = paste0(outTable, "MeanExpr_CITED2.csv"), quote = FALSE
+  , row.names = FALSE)
+################################################################################
+
+### Expression levels of TFs of interest and marker genes
+
+# All cells
+genes <- c("CARHSP1", "ZFHX4", "CSRP2", "ST18", "KAT6B", "CITED2"
+  , "BCL11B", "SOX5", "SATB2", "LHX6", "SOX2", "PAX6", "HOPX", "CRYAB"
+  , "EOMES", "STMN2")
+df <- Mean_Expression_Rank(genes)
+write.csv(df, file = paste0(outTable, "MeanExpr_AllCells.csv"), quote = FALSE)
+
+# RG cells
+genes <- c("CARHSP1", "ZFHX4", "SOX2", "PAX6", "HOPX", "CRYAB")
+df <- Mean_Expression_Rank(genes, clusters = c(7,9))
+write.csv(df, file = paste0(outTable, "MeanExpr_RG.csv"), quote = FALSE)
+
+# Excitatory
+genes <- c("CSRP2", "SATB2", "LHX2")
+df <- Mean_Expression_Rank(genes, clusters = c(0,1,4,12))
+write.csv(df, file = paste0(outTable, "MeanExpr_Excitatory.csv"), quote = FALSE)
+
+# Deep layer excitatory
+genes <- c("ST18", "KAT6B", "BCL11B", "SOX5")
+df <- Mean_Expression_Rank(genes, clusters = c(3,14))
+write.csv(df, file = paste0(outTable, "MeanExpr_ExcDeepLayer.csv"), quote = FALSE)
+
+# Interneuron
+genes <- c("CITED2", "DLX1", "DLX2", "DLX5", "DLX6")
+df <- Mean_Expression_Rank(genes, clusters = c(5,6))
+write.csv(df, file = paste0(outTable, "MeanExpr_Interneuron.csv"), quote = FALSE)
+################################################################################
+
