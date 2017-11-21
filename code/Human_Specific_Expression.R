@@ -58,12 +58,13 @@ kmDF <- read.csv("../source/MarkersforSingleCell_2017-10-11_Markers.csv")
 ## Variables
 graphCodeTitle <- "Human_Specific_Expression.R"
 outGraph <- "../analysis/graphs/Human_Specific_Expression/DS2-11_FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Human_Specific_Expression_"
+outTable <- "../analysis/tables/Human_Specific_Expression/DS2-11_FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Human_Specific_Expression_"
 # outGraph <- "../analysis/graphs/Human_Specific_Expression/DS2-11_FtMm250_200-3sdgd_Mt5_RegNumiLibBrainCC_PC1to40/Human_Specific_Expression_"
 # outGraph <- "../analysis/graphs/Human_Specific_Expression/DS2-11_FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Human_Specific_Expression_"
 
 ## Output Directories
-outGraphDir <- dirname(outGraph)
-dir.create(outGraphDir, recursive = TRUE)
+dir.create(dirname(outGraph), recursive = TRUE)
+dir.create(dirname(outTable), recursive = TRUE)
 
 ## Set ggplot2 theme
 theme_set(theme_bw())
@@ -310,92 +311,24 @@ ggsave(paste0(outGraph, "DeUniqueRG_FeaturePlot_NormalizedCenteredScaled.png")
   , width = 20, height = 35, limitsize = FALSE)
 ################################################################################
 
-DE_Filters_ClustersAvsB_ExpMatrix <- function(
-  so
-  , minPercent = NULL
-  , foldChange = NULL
-  , clusterIDs1 = NULL
-  , clusterIDs2 = NULL
-  ) {
-  
-  if (! is.null(minPercent)) {
-    # Expressed > 0 counts in > X% of cells in cluster
-    if (! is.null(clusterIDs1)) {
-      # Subset expression matrix to cluster
-      cdf <- as.matrix(so@data)[ ,so@ident %in% clusterIDs1]  
-    }
-    # Expressed > 0 counts in > X% of cells in cluster
-    idxp <- (rowSums(cdf > 0) / ncol(cdf)) > (minPercent / 100)
-    print(paste0("Genes expressed in > ", minPercent, "% of cells in cluster"))
-    print(table(idxp))
-  } else {
-    idxp <- rep(TRUE, nrow(so@data))
-  }
-  
-  if (! is.null(foldChange)) {
-    # Fold change > Y of gene in cluster versus all other cells
-    if (! is.null(clusterIDs1)) {
-      # Subset expression matrix to cluster
-      cdf <- noCentExM[ ,so@ident %in% clusterIDs1]
-      # Subset expression matrix to all other cells
-      ndf <- noCentExM[ ,so@ident %in% clusterIDs2]
-    }
-    # Fold change
-    v1 <- rowMeans(cdf) - rowMeans(ndf)
-    idxf <- v1 > foldChange
-    print(paste0("Genes > ", foldChange, " fold change in cluster versus all other cells"))
-    print(table(idxf))
-  } else {
-    idxf <- rep(TRUE, nrow(so@data))
-  }
-  
-  # Filter exDF
-  exDF <- as.matrix(so@data[idxp & idxf, so@ident %in% c(clusterIDs1, clusterIDs2)])
-  return(exDF)
+
+DE_oRG_vs_vRG_Boxplot <- function(genes, title) {
+  df <- deOvDF[row.names(deOvDF) %in% genes, ]
+  df[ ,2] <- round(df[ ,2], 2)
+  ggplot(df, aes(x = Gene, y = Log_Fold_Change_oRGvsvRG)) +
+    geom_bar(stat = "identity") +
+    geom_text(aes(label = signif(Pvalue_oRGvsvRG, 2)
+      , y = Log_Fold_Change_oRGvsvRG, x = Gene), angle = 90) +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+    xlab("Genes") +
+    ylab("Log fold change") +
+    ggtitle(title)
 }
 
 ## oRG vs vRG
 
 clusterIDs1 <- 7
 clusterIDs2 <- 9
-
-exDF <- DE_Filters_ClustersAvsB_ExpMatrix(
-  so = centSO
-  , minPercent = 0.1
-  , foldChange = 0.2
-  , clusterIDs1 = clusterIDs1
-  , clusterIDs2 = clusterIDs2
-  )
-
-# DE Linear model
-termsDF <- centSO@meta.data[c("nUMI", "librarylab", "individual", "res.0.6")]
-# Subset to clusters of interest
-termsDF <- termsDF[termsDF$res.0.6 %in% c(clusterIDs1, clusterIDs2), ]
-# Add term TRUE/FALSE cell is in cluster
-termsDF$cluster <- FALSE
-termsDF$cluster[termsDF$res.0.6 %in% clusterIDs1] <- TRUE
-deVoLM <- DE_Linear_Model(
-  exDatDF = exDF
-  , termsDF = termsDF
-  , mod = "y ~ cluster+nUMI+librarylab+individual")
-
-# df <- deLM$coefmat
-# df[row.names(df) %in% kmDF$Gene.Symbol[kmDF$Grouping == "oRG"], ]
-# df[row.names(df) %in% kmDF$Gene.Symbol[kmDF$Grouping == "oRG-PollenS3"], ]
-
-
-## oRG vs vRG
-
-clusterIDs1 <- 7
-clusterIDs2 <- 9
-
-exDF <- DE_Filters_ClustersAvsB_ExpMatrix(
-  so = centSO
-  , minPercent = 0.1
-  , foldChange = 0.2
-  , clusterIDs1 = clusterIDs1
-  , clusterIDs2 = clusterIDs2
-)
 
 exDF <- centSO@data
 ids <- names(centSO@ident)[centSO@ident %in% c(clusterIDs1, clusterIDs2)]
@@ -408,16 +341,53 @@ termsDF <- termsDF[termsDF$res.0.6 %in% c(clusterIDs1, clusterIDs2), ]
 # Add term TRUE/FALSE cell is in cluster
 termsDF$cluster <- FALSE
 termsDF$cluster[termsDF$res.0.6 %in% clusterIDs1] <- TRUE
-
+# Linear model
 deLM1 <- DE_Linear_Model(
   exDatDF = exDF
   , termsDF = termsDF
   , mod = "y ~ cluster+nUMI+librarylab+individual")
 
-df <- deLM1$coefmat
-df[row.names(df) %in% kmDF$Gene.Symbol[kmDF$Grouping == "oRG"], ]
-df[row.names(df) %in% kmDF$Gene.Symbol[kmDF$Grouping == "oRG-PollenS3"], ]
-df[row.names(df) %in% c("ITGA6", "LGALS1", "LYN", "NPC2"), ]
+# Format DE
+deOvDF <- data.frame(
+  Gene = row.names(deLM1$coefmat)
+  , Log_Fold_Change_oRGvsvRG = deLM1$coefmat[ ,"clusterTRUE"]
+  , Pvalue_oRGvsvRG = deLM1$pvalmat[ ,"clusterTRUE"]
+)
+
+# Plot fold changes of oRG marker gene lists
+
+DE_oRG_vs_vRG_Boxplot(
+  genes = kmDF$Gene.Symbol[kmDF$Grouping == "oRG"]
+  , title = paste0(graphCodeTitle
+    , "\n\noRG known markers"
+    , "\n\nDE of oRG (cluster 7) vs vRG (cluster 9)"
+    , "\nLog fold change (oRG vs vRG)"
+    , "\nText indicates pvalue")
+  )
+ggsave(paste0(outGraph, "DE_oRGvsvRG_intersect_oRGknownMarkers.pdf")
+  , width = 7, height = 6)
+
+DE_oRG_vs_vRG_Boxplot(
+  genes = kmDF$Gene.Symbol[kmDF$Grouping == "oRG-PollenS3"]
+  , title = paste0(graphCodeTitle
+    , "\n\noRG Pollen Table S3 markers"
+    , "\n\nDE of oRG (cluster 7) vs vRG (cluster 9)"
+    , "\nLog fold change (oRG vs vRG)"
+    , "\nText indicates pvalue")
+)
+ggsave(paste0(outGraph, "DE_oRGvsvRG_intersect_oRGPollenS3.pdf")
+  , width = 11, height = 7)
+
+DE_oRG_vs_vRG_Boxplot(
+  genes = c("ITGA6", "LGALS1", "LYN", "NPC2")
+  , title = paste0(graphCodeTitle
+    , "\n\noRG Pollen Table S3 markers"
+    , "\n\nDE of oRG (cluster 7) vs vRG (cluster 9)"
+    , "\nLog fold change (oRG vs vRG)"
+    , "\nText indicates pvalue")
+)
+ggsave(paste0(outGraph, "DE_oRGvsvRG_intersect_ITGA6_LGALS1_LYN_NPC2.pdf")
+  , width = 4, height = 7)
 
 
 ## oRG vs Neurons, IPCs, vRGs
