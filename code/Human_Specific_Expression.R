@@ -19,6 +19,7 @@ require(reshape2)
 require(gridExtra)
 require(ggplot2)
 require(cowplot)
+require(fdrtool)
 source("Function_Library.R")
 
 # Set variable to gene of interest
@@ -39,13 +40,20 @@ load("../analysis/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_Ke
 # centSO <- ssCentSO
 # noCentExM <- ssNoCentExM
 
-# Marker gene lists
+# Cluster DE table
 deDF <- read.table(
   "../analysis/tables/Seurat_ClusterDE_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_ClusterDE_DS2-11_ClusterX_Vs_All_Clusters.txt"
   , header = TRUE)
 
 # Luis metaMat results
 mmapDF <- read.csv("../source/metaMat/Overlapped-Genes.csv", header = TRUE)
+
+# Allen Developmental Macaque human specific genes
+hsDF <- read.csv("../source/Bakken_2016_AllenDevMacaque_ST10_HumanSpecific.csv"
+  , header = TRUE, skip = 1)
+
+# Known marker Luis table
+kmDF <- read.csv("../source/MarkersforSingleCell_2017-10-11_Markers.csv")
 
 ## Variables
 graphCodeTitle <- "Human_Specific_Expression.R"
@@ -99,11 +107,36 @@ Combine_DE_and_Expression <- function(deDF, exDF) {
 }
 ################################################################################
 
-### metaMat cluster DE oRG human specific genes
+### metaMat cluster DE oRG human specific genes and expression ranking in RG
 
 genes <- mmapDF[mmapDF$X == "Human-specific", "X7"]
 genes <- unlist(strsplit(as.character(genes), split = "\\|"))
 
+## Expression ranking in RG
+v1 <- rowMeans(noCentExM[ ,centSO@ident %in% c(7)])
+df <- data.frame(v1, rank(-v1))
+df <- df[row.names(df) %in% genes, ]
+df <- df[order(-df[ ,1]), ]
+# PTN     3.7742088         3
+# SERF2   1.0234892       205
+# GNG5    0.7509851       312
+# ID2     0.5910675       453
+# ARL6IP5 0.5367576       507
+# PTPRA   0.5233324       522
+# EEF1D   0.4840341       591
+# PTTG1IP 0.4240280       703
+# ITGA6   0.4094136       734
+# PHGDH   0.3610526       875
+# LGALS1  0.3597090       881
+# FAM63B  0.3568268       889
+# ALDH7A1 0.3537301       901
+# LYN     0.3138616      1042
+# NPC2    0.2648934      1272
+# VEGFA   0.2635715      1279
+# UTRN    0.2339614      1491
+# JPH1    0.2312890      1512
+
+genes <- row.names(df)
 ################################################################################
 
 ### Human specific genes DE in oRG cluster
@@ -119,7 +152,7 @@ ggL <- Heatmaps_By_Cluster_Combined(
   , clusters3 = c(11:17)
   , lowerLimit = 0
   , upperLimit = 3
-  , geneOrder = NULL)
+  , geneOrder = genes)
 Plot_Grid(ggPlotsL = ggL, ncol = 3, rel_height = 0.2, align = 'h', axis = 'b'
   , title = paste0(graphCodeTitle
     , "\n\nExpression of Allen human specific genes DE in oRG (cluster 7)"
@@ -142,7 +175,7 @@ ggL <- Heatmaps_By_Cluster_Combined(
   , clusters3 = c(11:17)
   , lowerLimit = -1.5
   , upperLimit = 1.5
-  , geneOrder = NULL)
+  , geneOrder = genes)
 Plot_Grid(ggPlotsL = ggL, ncol = 3, rel_height = 0.2, align = 'h', axis = 'b'
   , title = paste0(graphCodeTitle
     , "\n\nExpression of Allen human specific genes DE in oRG (cluster 7)"
@@ -163,6 +196,8 @@ nrow(deDF)
 # Intersect DE gene lists and TFs, co-factors, chromatin remodelers list: 408
 df <- deDF[deDF$GENE %in% genes, ]
 
+## expressed in oRG, and may be in cycling cells, endo, OPCs, pericytes, microglia
+
 # Subset to expressed in oRG, and may be in cycling cells, endo, OPCs, pericytes, microglia
 ldf <- lapply(c(7), function(cluster) {
   Subset_To_Specific_Clusters(deDF = df, cluster = cluster
@@ -182,7 +217,7 @@ ggL <- Heatmaps_By_Cluster_Combined(
   , clusters3 = c(11:17)
   , lowerLimit = -1.5
   , upperLimit = 1.5
-  , geneOrder = NULL)
+  , geneOrder = genes)
 Plot_Grid(ggPlotsL = ggL, ncol = 3, rel_height = 0.3, align = 'h', axis = 'b'
   , title = paste0(graphCodeTitle
     , "\n\nExpression of Allen human specific differentially expressed in RG clusters"
@@ -209,7 +244,7 @@ ggL <- Heatmaps_By_Cluster_Combined(
   , clusters3 = c(11:17)
   , lowerLimit = -1
   , upperLimit = 3
-  , geneOrder = NULL)
+  , geneOrder = genes)
 Plot_Grid(ggPlotsL = ggL, ncol = 3, rel_height = 0.3, align = 'h', axis = 'b'
   , title = paste0(graphCodeTitle
     , "\n\nExpression of Allen human specific differentially expressed in RG clusters"
@@ -273,4 +308,189 @@ Plot_Grid(
 )
 ggsave(paste0(outGraph, "DeUniqueRG_FeaturePlot_NormalizedCenteredScaled.png")
   , width = 20, height = 35, limitsize = FALSE)
+################################################################################
+
+DE_Filters_ClustersAvsB_ExpMatrix <- function(
+  so
+  , minPercent = NULL
+  , foldChange = NULL
+  , clusterIDs1 = NULL
+  , clusterIDs2 = NULL
+  ) {
+  
+  if (! is.null(minPercent)) {
+    # Expressed > 0 counts in > X% of cells in cluster
+    if (! is.null(clusterIDs1)) {
+      # Subset expression matrix to cluster
+      cdf <- as.matrix(so@data)[ ,so@ident %in% clusterIDs1]  
+    }
+    # Expressed > 0 counts in > X% of cells in cluster
+    idxp <- (rowSums(cdf > 0) / ncol(cdf)) > (minPercent / 100)
+    print(paste0("Genes expressed in > ", minPercent, "% of cells in cluster"))
+    print(table(idxp))
+  } else {
+    idxp <- rep(TRUE, nrow(so@data))
+  }
+  
+  if (! is.null(foldChange)) {
+    # Fold change > Y of gene in cluster versus all other cells
+    if (! is.null(clusterIDs1)) {
+      # Subset expression matrix to cluster
+      cdf <- noCentExM[ ,so@ident %in% clusterIDs1]
+      # Subset expression matrix to all other cells
+      ndf <- noCentExM[ ,so@ident %in% clusterIDs2]
+    }
+    # Fold change
+    v1 <- rowMeans(cdf) - rowMeans(ndf)
+    idxf <- v1 > foldChange
+    print(paste0("Genes > ", foldChange, " fold change in cluster versus all other cells"))
+    print(table(idxf))
+  } else {
+    idxf <- rep(TRUE, nrow(so@data))
+  }
+  
+  # Filter exDF
+  exDF <- as.matrix(so@data[idxp & idxf, so@ident %in% c(clusterIDs1, clusterIDs2)])
+  return(exDF)
+}
+
+## oRG vs vRG
+
+clusterIDs1 <- 7
+clusterIDs2 <- 9
+
+exDF <- DE_Filters_ClustersAvsB_ExpMatrix(
+  so = centSO
+  , minPercent = 0.1
+  , foldChange = 0.2
+  , clusterIDs1 = clusterIDs1
+  , clusterIDs2 = clusterIDs2
+  )
+
+# DE Linear model
+termsDF <- centSO@meta.data[c("nUMI", "librarylab", "individual", "res.0.6")]
+# Subset to clusters of interest
+termsDF <- termsDF[termsDF$res.0.6 %in% c(clusterIDs1, clusterIDs2), ]
+# Add term TRUE/FALSE cell is in cluster
+termsDF$cluster <- FALSE
+termsDF$cluster[termsDF$res.0.6 %in% clusterIDs1] <- TRUE
+deVoLM <- DE_Linear_Model(
+  exDatDF = exDF
+  , termsDF = termsDF
+  , mod = "y ~ cluster+nUMI+librarylab+individual")
+
+# df <- deLM$coefmat
+# df[row.names(df) %in% kmDF$Gene.Symbol[kmDF$Grouping == "oRG"], ]
+# df[row.names(df) %in% kmDF$Gene.Symbol[kmDF$Grouping == "oRG-PollenS3"], ]
+
+
+## oRG vs vRG
+
+clusterIDs1 <- 7
+clusterIDs2 <- 9
+
+exDF <- DE_Filters_ClustersAvsB_ExpMatrix(
+  so = centSO
+  , minPercent = 0.1
+  , foldChange = 0.2
+  , clusterIDs1 = clusterIDs1
+  , clusterIDs2 = clusterIDs2
+)
+
+exDF <- centSO@data
+ids <- names(centSO@ident)[centSO@ident %in% c(clusterIDs1, clusterIDs2)]
+exDF <- exDF[ ,colnames(exDF) %in% ids]
+
+# DE Linear model
+termsDF <- centSO@meta.data[c("nUMI", "librarylab", "individual", "res.0.6")]
+# Subset to clusters of interest
+termsDF <- termsDF[termsDF$res.0.6 %in% c(clusterIDs1, clusterIDs2), ]
+# Add term TRUE/FALSE cell is in cluster
+termsDF$cluster <- FALSE
+termsDF$cluster[termsDF$res.0.6 %in% clusterIDs1] <- TRUE
+
+deLM1 <- DE_Linear_Model(
+  exDatDF = exDF
+  , termsDF = termsDF
+  , mod = "y ~ cluster+nUMI+librarylab+individual")
+
+df <- deLM1$coefmat
+df[row.names(df) %in% kmDF$Gene.Symbol[kmDF$Grouping == "oRG"], ]
+df[row.names(df) %in% kmDF$Gene.Symbol[kmDF$Grouping == "oRG-PollenS3"], ]
+df[row.names(df) %in% c("ITGA6", "LGALS1", "LYN", "NPC2"), ]
+
+
+## oRG vs Neurons, IPCs, vRGs
+
+clusterIDs1 <- 7
+clusterIDs2 <- c(0,1,2,3,4,5,6,9,12,14)
+
+exDF <- DE_Filters_ClustersAvsB_ExpMatrix(
+  so = centSO
+  , minPercent = 0.1
+  , foldChange = 0.2
+  , clusterIDs1 = clusterIDs1
+  , clusterIDs2 = clusterIDs2
+)
+
+# DE Linear model
+termsDF <- centSO@meta.data[c("nUMI", "librarylab", "individual", "res.0.6")]
+# Subset to clusters of interest
+termsDF <- termsDF[termsDF$res.0.6 %in% c(clusterIDs1, clusterIDs2), ]
+# Add term TRUE/FALSE cell is in cluster
+termsDF$cluster <- FALSE
+termsDF$cluster[termsDF$res.0.6 %in% clusterIDs1] <- TRUE
+deLM2 <- DE_Linear_Model(
+  exDatDF = exDF
+  , termsDF = termsDF
+  , mod = "y ~ cluster+nUMI+librarylab+individual")
+
+df2 <- deLM1$coefmat
+df2[row.names(df) %in% c("GNG5"), ]
+
+
+
+deLM1$coefmat[ ,"clusterTRUE"]
+deLM1$pvalmat[ ,"clusterTRUE"] < 0.05
+corrected <- fdrtool(deLM1$pvalmat[ ,"clusterTRUE"], statistic = "pvalue", plot = FALSE)
+
+
+genes <- intersect(row.names(deLM1$coefmat)[deLM1$coefmat[ ,"clusterTRUE"] > 0.3]
+  , row.names(deLM2$coefmat)[deLM2$coefmat[ ,"clusterTRUE"] > 0.3]
+  )
+
+# Subset to human specific
+intersect(row.names(deLM1$coefmat)[deLM1$coefmat[ ,"clusterTRUE"] > 0.2]
+  , hsDF$Gene[hsDF$Set == "Human-specific"])
+intersect(row.names(deLM2$coefmat)[deLM1$coefmat[ ,"clusterTRUE"] > 0.2]
+  , hsDF$Gene[hsDF$Set == "Human-specific"])
+intersect(genes, hsDF$Gene[hsDF$Set == "Human-specific"])
+genes
+
+# Heatmap
+# Normalized, mean centering scaling
+geneGroupDF <- data.frame(GENE = genes, GROUP = "")
+ggL <- Heatmaps_By_Cluster_Combined(
+  geneGroupDF = geneGroupDF
+  , exprM = as.matrix(centSO@scale.data)
+  , seuratO = centSO
+  , clusters1 = c(0:1)
+  , clusters2 = c(2:10)
+  , clusters3 = c(11:17)
+  , lowerLimit = -1.5
+  , upperLimit = 1.5
+  , geneOrder = genes)
+Plot_Grid(ggPlotsL = ggL, ncol = 3, rel_height = 0.3, align = 'h', axis = 'b'
+  , title = paste0(graphCodeTitle
+    , "\n\nExpression of Allen human specific differentially expressed in RG clusters"
+    , "\nExpressed in oRG, and may be in cycling cells, endo, OPCs, pericytes, microglia"
+    , "\nx-axis: Genes"
+    , "\ny-axis: Cells ordered by cluster"
+    , "\nNormalized expression, mean centered, variance scaled"
+    , "\nDE filters: > 0.2 log fold change in cluster; < 0.1 for other clusters"
+    , "\n")
+)
+ggsave(paste0(
+  outGraph, "DeRGspecific_Heatmap_NormalizedCenteredScaled.png")
+  , width = 12, height = 10, limitsize = FALSE)
 ################################################################################
