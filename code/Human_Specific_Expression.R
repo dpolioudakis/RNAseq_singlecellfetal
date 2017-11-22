@@ -106,6 +106,97 @@ Combine_DE_and_Expression <- function(deDF, exDF) {
   # Remove order variable now set
   ggDF <- ggDF[ ,! colnames(ggDF) == "ORDER"]
 }
+
+DE_oRG_vs_vRG_Boxplot <- function(genes, title) {
+  df <- deOvDF[row.names(deOvDF) %in% genes, ]
+  df[ ,2] <- round(df[ ,2], 2)
+  ggplot(df, aes(x = Gene, y = Log_Fold_Change_oRGvsvRG, fill = Human_specific)) +
+    geom_bar(stat = "identity") +
+    geom_text(aes(label = signif(Pvalue_oRGvsvRG, 2)
+      , y = Log_Fold_Change_oRGvsvRG, x = Gene), angle = 90) +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+    xlab("Genes") +
+    ylab("Log fold change") +
+    ggtitle(title)
+}
+
+DE_oRG_vs_vRG_Neuron_IPC_Boxplot <- function(genes, title) {
+  df <- deOnivDF[row.names(deOnivDF) %in% genes, ]
+  df[ ,2] <- round(df[ ,2], 2)
+  ggplot(df, aes(x = Gene, y = Log_Fold_Change_oRG_vs_vRG_Neuron_IPC
+    , fill = Human_specific)) +
+    geom_bar(stat = "identity") +
+    geom_text(aes(label = signif(Pvalue_oRG_vs_vRG_Neuron_IPC, 2)
+      , y = Log_Fold_Change_oRG_vs_vRG_Neuron_IPC, x = Gene), angle = 90) +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+    xlab("Genes") +
+    ylab("Log fold change") +
+    ggtitle(title)
+}
+
+Intersection_Of_Cells_Expressing_Both <- function(gene1, gene2){
+  v1 <- noCentExM[row.names(noCentExM) %in% c(gene1), ] > 0.5
+  v2 <- noCentExM[row.names(noCentExM) %in% c(gene2), ] > 0.5
+  df1 <- rbind(v1, v2)
+  int <- apply(df1, 2, all)
+  df2 <- as.data.frame(centSO@dr$tsne@cell.embeddings)
+  df2$Intersection <- int[match(row.names(df2), names(int))]
+  return(df2)
+}
+
+Intersection_tSNE_Plots <- function(genes) {
+  genesM <- t(combn(genes, 2))
+  genesM <- rbind(genesM, cbind(Gene1 = genes, Gene2 = genes))
+  ggL <- apply(genesM, 1, function(row){
+    # print(row)})
+    gene1 <- row[["Gene1"]]
+    gene2 <- row[["Gene2"]]
+    df1 <- Intersection_Of_Cells_Expressing_Both(gene1, gene2)
+    gg <- ggplot(df1, aes(x = tSNE_1, y = tSNE_2, color = Intersection)) +
+      geom_point(size = 0.05) +
+      scale_color_manual(name = "Intersection", values = c("grey", "red")) +
+      guides(colour = guide_legend(override.aes = list(size = 7))) +
+      ggtitle(paste(gene1, gene2))
+    return(gg)
+  })
+  return(ggL)
+}
+
+
+Number_Of_Cells_Intersection_Heatmap <- function(genes, title){
+  m1 <- noCentExM[row.names(noCentExM) %in% genes, ] > 0.5
+  l1 <- apply(m1, 2, function(col) row.names(m1)[col])
+  
+  ldf <- lapply(l1, function(genes) {
+    v2 <- genes[genes %in% genes]
+    v3 <- genes[genes %in% genes]
+    expand.grid(v2, v3)
+  })
+  df1 <- do.call("rbind", ldf)
+  
+  # Format for matrix
+  df3 <- dcast(df1, Var1 ~ Var2)
+  row.names(df3) <- df3$Var1
+  df3 <- df3[ ,-1]
+  
+  # Format for ggplot
+  df3$Gene <- row.names(df3)
+  df3 <- melt(df3)
+  df3$Gene <- factor(df3$Gene, levels = genes)
+  df3$variable <- factor(df3$variable, levels = genes)
+  
+  # Plot counts of intersections
+  gg <- ggplot(df3, aes(x = Gene, y = variable, fill = value)) +
+    geom_tile() +
+    geom_text(data = df3, aes(x = Gene, y = variable, label = value), color = "black") +
+    scale_fill_gradient(low = "white", high = "red", space = "Lab", name = "Number") +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+    xlab("Genes") +
+    ylab("Genes") +
+    ggtitle(title)
+  
+  return(gg)
+}
 ################################################################################
 
 ### metaMat cluster DE oRG human specific genes and expression ranking in RG
@@ -311,25 +402,15 @@ ggsave(paste0(outGraph, "DeUniqueRG_FeaturePlot_NormalizedCenteredScaled.png")
   , width = 20, height = 35, limitsize = FALSE)
 ################################################################################
 
-
-DE_oRG_vs_vRG_Boxplot <- function(genes, title) {
-  df <- deOvDF[row.names(deOvDF) %in% genes, ]
-  df[ ,2] <- round(df[ ,2], 2)
-  ggplot(df, aes(x = Gene, y = Log_Fold_Change_oRGvsvRG)) +
-    geom_bar(stat = "identity") +
-    geom_text(aes(label = signif(Pvalue_oRGvsvRG, 2)
-      , y = Log_Fold_Change_oRGvsvRG, x = Gene), angle = 90) +
-    theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-    xlab("Genes") +
-    ylab("Log fold change") +
-    ggtitle(title)
-}
+### Human specific genes that are DE oRG vs vRG and DE oRG vs neuron, IPC, vRG
 
 ## oRG vs vRG
 
+# Clusters of interest
 clusterIDs1 <- 7
 clusterIDs2 <- 9
 
+# Subset exDF to clusters of interest
 exDF <- centSO@data
 ids <- names(centSO@ident)[centSO@ident %in% c(clusterIDs1, clusterIDs2)]
 exDF <- exDF[ ,colnames(exDF) %in% ids]
@@ -354,6 +435,11 @@ deOvDF <- data.frame(
   , Pvalue_oRGvsvRG = deLM1$pvalmat[ ,"clusterTRUE"]
 )
 
+# Add human specific
+deOvDF$Human_specific <- FALSE
+deOvDF$Human_specific[
+  deOvDF$Gene %in% hsDF$Gene[hsDF$Set == "Human-specific"]] <- TRUE
+
 # Plot fold changes of oRG marker gene lists
 
 DE_oRG_vs_vRG_Boxplot(
@@ -362,7 +448,8 @@ DE_oRG_vs_vRG_Boxplot(
     , "\n\noRG known markers"
     , "\n\nDE of oRG (cluster 7) vs vRG (cluster 9)"
     , "\nLog fold change (oRG vs vRG)"
-    , "\nText indicates pvalue")
+    , "\nText indicates pvalue"
+    , "\nHuman specific: Allen list")
   )
 ggsave(paste0(outGraph, "DE_oRGvsvRG_intersect_oRGknownMarkers.pdf")
   , width = 7, height = 6)
@@ -373,7 +460,8 @@ DE_oRG_vs_vRG_Boxplot(
     , "\n\noRG Pollen Table S3 markers"
     , "\n\nDE of oRG (cluster 7) vs vRG (cluster 9)"
     , "\nLog fold change (oRG vs vRG)"
-    , "\nText indicates pvalue")
+    , "\nText indicates pvalue"
+    , "\nHuman specific: Allen list")
 )
 ggsave(paste0(outGraph, "DE_oRGvsvRG_intersect_oRGPollenS3.pdf")
   , width = 11, height = 7)
@@ -384,24 +472,35 @@ DE_oRG_vs_vRG_Boxplot(
     , "\n\noRG Pollen Table S3 markers"
     , "\n\nDE of oRG (cluster 7) vs vRG (cluster 9)"
     , "\nLog fold change (oRG vs vRG)"
-    , "\nText indicates pvalue")
+    , "\nText indicates pvalue"
+    , "\nHuman specific: Allen list")
 )
 ggsave(paste0(outGraph, "DE_oRGvsvRG_intersect_ITGA6_LGALS1_LYN_NPC2.pdf")
   , width = 4, height = 7)
 
+DE_oRG_vs_vRG_Boxplot(
+  genes = deOvDF$Gene[deOvDF$Human_specific == TRUE]
+  , title = paste0(graphCodeTitle
+    , "\n\noRG Pollen Table S3 markers"
+    , "\n\nDE of oRG (cluster 7) vs vRG (cluster 9)"
+    , "\nLog fold change (oRG vs vRG)"
+    , "\nText indicates pvalue"
+    , "\nHuman specific: Allen list")
+)
+ggsave(paste0(outGraph, "DE_oRGvsvRG_intersect_HumanSpecific.pdf")
+  , width = 28, height = 7)
+
 
 ## oRG vs Neurons, IPCs, vRGs
 
+# Clusters of interest
 clusterIDs1 <- 7
 clusterIDs2 <- c(0,1,2,3,4,5,6,9,12,14)
 
-exDF <- DE_Filters_ClustersAvsB_ExpMatrix(
-  so = centSO
-  , minPercent = 0.1
-  , foldChange = 0.2
-  , clusterIDs1 = clusterIDs1
-  , clusterIDs2 = clusterIDs2
-)
+# Subset exDF to clusters of interest
+exDF <- centSO@data
+ids <- names(centSO@ident)[centSO@ident %in% c(clusterIDs1, clusterIDs2)]
+exDF <- exDF[ ,colnames(exDF) %in% ids]
 
 # DE Linear model
 termsDF <- centSO@meta.data[c("nUMI", "librarylab", "individual", "res.0.6")]
@@ -415,27 +514,79 @@ deLM2 <- DE_Linear_Model(
   , termsDF = termsDF
   , mod = "y ~ cluster+nUMI+librarylab+individual")
 
-df2 <- deLM1$coefmat
-df2[row.names(df) %in% c("GNG5"), ]
 
+# Format DE
+deOnivDF <- data.frame(
+  Gene = row.names(deLM2$coefmat)
+  , Log_Fold_Change_oRG_vs_vRG_Neuron_IPC = deLM2$coefmat[ ,"clusterTRUE"]
+  , Pvalue_oRG_vs_vRG_Neuron_IPC = deLM2$pvalmat[ ,"clusterTRUE"]
+)
+# Save as csv
+write.csv(deOnivDF, file = paste0(outTable, "DE_oRG_vs_Neuron_IPC_vRG.csv")
+  , quote = FALSE)
+deOnivDF <- read.csv(paste0(outTable, "DE_oRG_vs_Neuron_IPC_vRG.csv")
+  , header = TRUE, row.names = 1)
 
+# Add human specific
+deOnivDF$Human_specific <- FALSE
+deOnivDF$Human_specific[
+  deOnivDF$Gene %in% hsDF$Gene[hsDF$Set == "Human-specific"]] <- TRUE
 
-deLM1$coefmat[ ,"clusterTRUE"]
-deLM1$pvalmat[ ,"clusterTRUE"] < 0.05
-corrected <- fdrtool(deLM1$pvalmat[ ,"clusterTRUE"], statistic = "pvalue", plot = FALSE)
+# Plot fold changes of oRG marker gene lists
 
+DE_oRG_vs_vRG_Neuron_IPC_Boxplot(
+  genes = kmDF$Gene.Symbol[kmDF$Grouping == "oRG"]
+  , title = paste0(graphCodeTitle
+    , "\n\noRG known markers"
+    , "\n\nDE of oRG (cluster 7) vs vRG, neuron, IPC clusters (clusters 0,1,2,3,4,5,6,9,12,14)"
+    , "\nLog fold change (oRG vs vRG)"
+    , "\nText indicates pvalue"
+    , "\nHuman specific: Allen list")
+)
+ggsave(paste0(outGraph, "DE_oRGvsvRGneuronIPC_intersect_oRGknownMarkers.pdf")
+  , width = 7, height = 6)
 
-genes <- intersect(row.names(deLM1$coefmat)[deLM1$coefmat[ ,"clusterTRUE"] > 0.3]
-  , row.names(deLM2$coefmat)[deLM2$coefmat[ ,"clusterTRUE"] > 0.3]
-  )
+DE_oRG_vs_vRG_Neuron_IPC_Boxplot(
+  genes = kmDF$Gene.Symbol[kmDF$Grouping == "oRG-PollenS3"]
+  , title = paste0(graphCodeTitle
+    , "\n\noRG Pollen Table S3 markers"
+    , "\n\nDE of oRG (cluster 7) vs vRG, neuron, IPC clusters (clusters 0,1,2,3,4,5,6,9,12,14)"
+    , "\nLog fold change (oRG vs vRG)"
+    , "\nText indicates pvalue"
+    , "\nHuman specific: Allen list")
+)
+ggsave(paste0(outGraph, "DE_oRGvsvRGneuronIPC_intersect_oRGPollenS3.pdf")
+  , width = 11, height = 7)
 
-# Subset to human specific
-intersect(row.names(deLM1$coefmat)[deLM1$coefmat[ ,"clusterTRUE"] > 0.2]
-  , hsDF$Gene[hsDF$Set == "Human-specific"])
-intersect(row.names(deLM2$coefmat)[deLM1$coefmat[ ,"clusterTRUE"] > 0.2]
-  , hsDF$Gene[hsDF$Set == "Human-specific"])
-intersect(genes, hsDF$Gene[hsDF$Set == "Human-specific"])
-genes
+DE_oRG_vs_vRG_Neuron_IPC_Boxplot(
+  genes = c("ITGA6", "LGALS1", "LYN", "NPC2")
+  , title = paste0(graphCodeTitle
+    , "\n\noRG Pollen Table S3 markers"
+    , "\n\nDE of oRG (cluster 7) vs vRG, neuron, IPC clusters (clusters 0,1,2,3,4,5,6,9,12,14)"
+    , "\nLog fold change (oRG vs vRG)"
+    , "\nText indicates pvalue"
+    , "\nHuman specific: Allen list")
+)
+ggsave(paste0(outGraph, "DE_oRGvsvRGneuronIPC_intersect_ITGA6_LGALS1_LYN_NPC2.pdf")
+  , width = 4, height = 7)
+
+DE_oRG_vs_vRG_Neuron_IPC_Boxplot(
+  genes = deOnivDF$Gene[deOnivDF$Human_specific == TRUE]
+  , title = paste0(graphCodeTitle
+    , "\n\noRG Pollen Table S3 markers"
+    , "\n\nDE of oRG (cluster 7) vs vRG, neuron, IPC clusters (clusters 0,1,2,3,4,5,6,9,12,14)"
+    , "\nLog fold change (oRG vs vRG)"
+    , "\nText indicates pvalue"
+    , "\nHuman specific: Allen list")
+)
+ggsave(paste0(outGraph, "DE_oRGvsvRGneuronIPC_intersect_HumanSpecific.pdf")
+  , width = 28, height = 7)
+
+# Intersect DE oRG vs vRG, DE oRG vs neuron IPC vRG, and human specific genes
+genes <- intersect(row.names(deOvDF)[deOvDF$Log_Fold_Change_oRGvsvRG > 0.15]
+  , row.names(deOnivDF)[deOnivDF$Log_Fold_Change_oRG_vs_vRG_Neuron_IPC > 0.3]
+)
+genes <- intersect(genes, hsDF$Gene[hsDF$Set == "Human-specific"])
 
 # Heatmap
 # Normalized, mean centering scaling
@@ -452,15 +603,144 @@ ggL <- Heatmaps_By_Cluster_Combined(
   , geneOrder = genes)
 Plot_Grid(ggPlotsL = ggL, ncol = 3, rel_height = 0.3, align = 'h', axis = 'b'
   , title = paste0(graphCodeTitle
-    , "\n\nExpression of Allen human specific differentially expressed in RG clusters"
+    , "\n\nExpression of Allen human specific differentially expressed in oRG cluster"
     , "\nExpressed in oRG, and may be in cycling cells, endo, OPCs, pericytes, microglia"
     , "\nx-axis: Genes"
     , "\ny-axis: Cells ordered by cluster"
     , "\nNormalized expression, mean centered, variance scaled"
-    , "\nDE filters: > 0.2 log fold change in cluster; < 0.1 for other clusters"
+    , "\nDE filters:"
+    , "\n> 0.15 log fold change oRG vs vRG cluster"
+    , "\n> 0.3 log fold change oRG vs vRG, neuron, IPC clusters"
+    , "\n")
+)
+ggsave(paste0(
+  outGraph, "DeRGspecific015_Heatmap_NormalizedCenteredScaled.png")
+  , width = 12, height = 15, limitsize = FALSE)
+
+# Intersect DE oRG vs vRG, DE oRG vs neuron IPC vRG, and human specific genes
+genes <- intersect(row.names(deOvDF)[deOvDF$Log_Fold_Change_oRGvsvRG > 0.3]
+  , row.names(deOnivDF)[deOnivDF$Log_Fold_Change_oRG_vs_vRG_Neuron_IPC > 0.3]
+  )
+genes <- intersect(genes, hsDF$Gene[hsDF$Set == "Human-specific"])
+
+# Heatmap
+# Normalized, mean centering scaling
+geneGroupDF <- data.frame(GENE = genes, GROUP = "")
+ggL <- Heatmaps_By_Cluster_Combined(
+  geneGroupDF = geneGroupDF
+  , exprM = as.matrix(centSO@scale.data)
+  , seuratO = centSO
+  , clusters1 = c(0:1)
+  , clusters2 = c(2:10)
+  , clusters3 = c(11:17)
+  , lowerLimit = -1.5
+  , upperLimit = 1.5
+  , geneOrder = genes)
+Plot_Grid(ggPlotsL = ggL, ncol = 3, rel_height = 0.3, align = 'h', axis = 'b'
+  , title = paste0(graphCodeTitle
+    , "\n\nExpression of Allen human specific differentially expressed in oRG cluster"
+    , "\nExpressed in oRG, and may be in cycling cells, endo, OPCs, pericytes, microglia"
+    , "\nx-axis: Genes"
+    , "\ny-axis: Cells ordered by cluster"
+    , "\nNormalized expression, mean centered, variance scaled"
+    , "\nDE filters:"
+    , "\n> 0.3 log fold change oRG vs vRG cluster"
+    , "\n> 0.3 log fold change oRG vs vRG, neuron, IPC clusters"
     , "\n")
 )
 ggsave(paste0(
   outGraph, "DeRGspecific_Heatmap_NormalizedCenteredScaled.png")
-  , width = 12, height = 10, limitsize = FALSE)
+  , width = 12, height = 15, limitsize = FALSE)
+
+
+# Feature plot
+
+# Collect tSNE values for ggplot
+tsneDF <- as.data.frame(centSO@dr$tsne@cell.embeddings)
+
+# Normalized
+ggL <- FeaturePlot(
+  genes = genes
+  , tsneDF = tsneDF
+  , seuratO = centSO
+  , exM = noCentExM
+  , limLow = -1
+  , limHigh = 2
+  , geneGrouping = NULL
+  , centScale = FALSE
+)
+Plot_Grid(
+  ggPlotsL = ggL, ncol = 2, rel_height = 0.2, align = 'v', axis = 'r'
+  , title = paste0(graphCodeTitle
+    , "\n\nExpression of Allen human specific differentially expressed in RG clusters"
+    , "\nExpressed in oRG, and may be in cycling cells, endo, OPCs, pericytes, microglia"
+    , "\nDE filters:"
+    , "\n> 0.3 log fold change oRG vs vRG cluster"
+    , "\n> 0.3 log fold change oRG vs vRG, neuron, IPC clusters"
+    , "\nNormalized expression"
+    , "\n")
+)
+ggsave(paste0(outGraph, "DeRGspecific_FeaturePlot_Normalized.png")
+  , width = 16, height = 16, limitsize = FALSE)
+
+# Normalized centered scaled
+ggL <- FeaturePlot(
+  genes = genes
+  , tsneDF = tsneDF
+  , seuratO = centSO
+  , exM = noCentExM
+  , limLow = -1.5
+  , limHigh = 1.5
+  , geneGrouping = NULL
+  , centScale = TRUE
+)
+Plot_Grid(
+  ggPlotsL = ggL, ncol = 2, rel_height = 0.2, align = 'v', axis = 'r'
+  , title = paste0(graphCodeTitle
+    , "\n\nExpression of Allen human specific differentially expressed in RG clusters"
+    , "\nExpressed in oRG, and may be in cycling cells, endo, OPCs, pericytes, microglia"
+    , "\nDE filters:"
+    , "\n> 0.3 log fold change oRG vs vRG cluster"
+    , "\n> 0.3 log fold change oRG vs vRG, neuron, IPC clusters"
+    , "\nNormalized centered scaled expression"
+    , "\n")
+)
+ggsave(paste0(outGraph, "DeRGspecific_FeaturePlot_NormalizedCenteredScaled.png")
+  , width = 16, height = 16, limitsize = FALSE)
+
+
+## tSNE colored by intersection and heatmap of numbers of intersections
+
+# RG
+genes <- c(genes, "ITGA6", "SOX2", "PAX6", "HOPX", "CRYAB")
+
+# tSNE
+ggL <- Intersection_tSNE_Plots(genes)
+gg1 <- TSNE_Plot(centSO) + theme(legend.position = "none")
+ggL <- append(list(gg1), ggL)
+Plot_Grid(ggPlotsL = ggL, ncol = 3, rel_height = 0.1, align = 'v', axis = 'r'
+  , title = paste0(paste0(graphCodeTitle
+    , "\n\ntSNE plot colored by intersection of expression of gene A and gene B"
+    , "\n(> 0.5 normalized expression)"
+    , "\nRG"))
+)
+ggsave(paste0(outGraph, "DeRGspecific_And_Marker_Intersection_tSNE.png")
+  , width = 20, height = 75, limitsize = FALSE)
+
+# Heatmap
+Number_Of_Cells_Intersection_Heatmap(
+  genes = genes
+  , title = paste0(graphCodeTitle
+    , "\n\nNumber of cells expressing both gene A and gene B"
+    , "\nRG")
+)
+ggsave(paste0(outGraph, "DeRGspecific_And_Markers_NumberIntersect_Heatmap.png")
+  , width = 7, height = 7)
+
+# Violin plot of genes of interest
+Gene_Expression_By_Cluster_ViolinPlot(genes = genes
+  , exprM = noCentExM, clusterIDs = centSO@ident
+  , geneOrder = genes, grouping = NULL)
+ggsave(paste0(outGraph, "DeRGspecific_ExprViolinPlot.png")
+  , width = 13, height = 10)
 ################################################################################
