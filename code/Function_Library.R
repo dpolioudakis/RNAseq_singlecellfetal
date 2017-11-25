@@ -8,6 +8,53 @@
 # Filter expression matrix by:
 # percent of cells in cluster gene is expressed in
 # fold change of gene in cluster versus all other cells
+DE_Filters_ClustersAvsB_ExpMatrix <- function(
+  so
+  , minPercent = NULL
+  , foldChange = NULL
+  , clusterIDs1 = NULL
+  , clusterIDs2 = NULL
+) {
+  
+  if (! is.null(minPercent)) {
+    # Expressed > 0 counts in > X% of cells in cluster
+    if (! is.null(clusterIDs1)) {
+      # Subset expression matrix to cluster
+      cdf <- as.matrix(so@data)[ ,so@ident %in% clusterIDs1]  
+    }
+    # Expressed > 0 counts in > X% of cells in cluster
+    idxp <- (rowSums(cdf > 0) / ncol(cdf)) > (minPercent / 100)
+    print(paste0("Genes expressed in > ", minPercent, "% of cells in cluster"))
+    print(table(idxp))
+  } else {
+    idxp <- rep(TRUE, nrow(so@data))
+  }
+  
+  if (! is.null(foldChange)) {
+    # Fold change > Y of gene in cluster versus all other cells
+    if (! is.null(clusterIDs1)) {
+      # Subset expression matrix to cluster
+      cdf <- noCentExM[ ,so@ident %in% clusterIDs1]
+      # Subset expression matrix to all other cells
+      ndf <- noCentExM[ ,so@ident %in% clusterIDs2]
+    }
+    # Fold change
+    v1 <- rowMeans(cdf) - rowMeans(ndf)
+    idxf <- v1 > foldChange
+    print(paste0("Genes > ", foldChange, " fold change in cluster versus all other cells"))
+    print(table(idxf))
+  } else {
+    idxf <- rep(TRUE, nrow(so@data))
+  }
+  
+  # Filter exDF
+  exDF <- as.matrix(so@data[idxp & idxf, so@ident %in% c(clusterIDs1, clusterIDs2)])
+  return(exDF)
+}
+
+# Filter expression matrix by:
+# percent of cells in cluster gene is expressed in
+# fold change of gene in cluster versus all other cells
 DE_Filters_ExpMatrix <- function(
   so
   , minPercent = NULL
@@ -120,36 +167,66 @@ Format_DE <- function (deLM, so, clusterID) {
 
 ### Expression heatmaps
 
-# Expression heatmap, cells ordered by cluster
-Heatmap_By_Cluster <- function(
-  geneGroupDF, exprM, seuratO, clusters, lowerLimit, upperLimit, geneOrder = NULL) {
+# Format data for expression heatmap, cells ordered by cluster
+Heatmap_By_Cluster_Format_Data <- function(
+  geneGroupDF, exprM, seuratO, clusters, lowerLimit, upperLimit
+  , geneOrder = NULL, clusterOrder = NULL) {
   
   # Subset expression matrix to genes of interest by merging
   ggDF <- merge(geneGroupDF[c("GENE", "GROUP")], exprM
     , by.x = 1, by.y = "row.names", all.x = TRUE)
+  
+  if (! is.null(geneOrder)) {
+    levels <- expand.grid(geneOrder, unique(ggDF$GROUP))
+    levels <- paste0(levels$Var1, "   ", levels$Var2)
+  }
+  
   # Set group factor levels
   ggDF$GROUP <- as.factor(ggDF$GROUP)
   # colnames(ggDF)[1:2] <- c("GENE", "GROUP")
   # Remove blanks
   ggDF <- ggDF[! ggDF$GENE == "", ]
-  # Save order to set levels later
-  if (is.null(geneOrder)) {
-    levels <- paste0(ggDF$GENE, "   ", ggDF$GROUP)
-  } else {
-    levels <- rev(paste0(geneOrder, "   ", ggDF$GROUP))
-  }
+  # Format for ggplot
   ggDF <- melt(ggDF)
   # Add seurat clusters
   idx <- match(ggDF$variable, names(seuratO@ident))
   ggDF$SEURAT_CLUSTERS <- seuratO@ident[idx]
+  # Set cluster levels
+  if (! is.null(clusterOrder)) {
+    ggDF$SEURAT_CLUSTERS <- factor(ggDF$SEURAT_CLUSTERS, levels = clusterOrder)
+  }
   # Subset clusters
   ggDF <- ggDF[ggDF$SEURAT_CLUSTERS %in% clusters, ]
-  # Add group to gene name and order by levels
+  # Add group to gene name
   ggDF$GENE_GROUP <- paste0(ggDF$GENE, "   ", ggDF$GROUP)
-  ggDF$GENE_GROUP <- factor(ggDF$GENE_GROUP, levels = levels)
+  
+  # Order genes by setting levels 
+  if (! is.null(geneOrder)) {
+    ggDF$GENE_GROUP <- factor(ggDF$GENE_GROUP, levels = levels)
+  }
   # Set limits
   ggDF$value[ggDF$value < lowerLimit] <- lowerLimit
   ggDF$value[ggDF$value > upperLimit] <- upperLimit
+  
+  return(ggDF)
+}
+
+# Expression heatmap, cells ordered by cluster
+Heatmap_By_Cluster <- function(
+  geneGroupDF, exprM, seuratO, clusters, lowerLimit, upperLimit
+  , geneOrder = NULL, clusterOrder = NULL) {
+  
+  ggDF <- Heatmap_By_Cluster_Format_Data(
+    geneGroupDF = geneGroupDF
+    , exprM = exprM
+    , seuratO = seuratO
+    , clusters = clusters
+    , lowerLimit = lowerLimit
+    , upperLimit = upperLimit
+    , geneOrder = geneOrder
+    , clusterOrder = clusterOrder
+  )
+  
   # ggplot
   gg <- ggplot(ggDF, aes(x = variable, y = GENE_GROUP, fill = value)) +
     geom_tile() +
@@ -179,7 +256,7 @@ Heatmaps_By_Cluster_Combined <- function(geneGroupDF, exprM, seuratO
   p1 <- Heatmap_By_Cluster(geneGroupDF = geneGroupDF, exprM = exprM
     , seuratO = seuratO, clusters = clusters1
     , lowerLimit = lowerLimit, upperLimit = upperLimit
-    , geneOrder
+    , geneOrder = geneOrder
   )
   p1 <- p1 + theme(
     axis.title.x = element_blank()
@@ -189,7 +266,7 @@ Heatmaps_By_Cluster_Combined <- function(geneGroupDF, exprM, seuratO
   p2 <- Heatmap_By_Cluster(geneGroupDF = geneGroupDF, exprM = exprM
     , seuratO = seuratO, clusters = clusters2
     , lowerLimit = lowerLimit, upperLimit = upperLimit
-    , geneOrder
+    , geneOrder = geneOrder
   )
   p2 <- p2 + theme(
     strip.text.y = element_blank()
@@ -201,7 +278,7 @@ Heatmaps_By_Cluster_Combined <- function(geneGroupDF, exprM, seuratO
   p3 <- Heatmap_By_Cluster(geneGroupDF = geneGroupDF, exprM = exprM
     , seuratO = seuratO, clusters = clusters3
     , lowerLimit = lowerLimit, upperLimit = upperLimit
-    , geneOrder
+    , geneOrder = geneOrder
   )
   p3 <- p3 + theme(
     axis.title.x = element_blank()
@@ -369,22 +446,62 @@ FeaturePlot_CentScale <- function(genes, tsneDF, seuratO, limLow, limHigh) {
   return(ggL)
 }
 # Wrapper function for feature plots
-FeaturePlot <- function(genes, tsneDF, seuratO, exM, limLow, limHigh) {
+FeaturePlot <- function(genes, tsneDF, seuratO, exM, limLow, limHigh
+  , geneGrouping = NULL, centScale = FALSE) {
   # Collect tSNE values for ggplot
-  tsneDF <- as.data.frame(seuratO@dr$tsne@cell.embeddings)
+  # tsneDF <- as.data.frame(seuratO@dr$tsne@cell.embeddings)
+  # tSNE_1    tSNE_2
+  # ACCTAAGGATTA  4.872695 13.282958
+  # CCGTTTGTGATA  6.102554  3.158785
+  # GGCACAAGTGGC  3.886729  7.046055
   # Loop through and plot each group of genes
-  ggL <- lapply(genes, function(gene) {
-    print(gene)
-    tsneDF <- Mean_Expression(tsneDF, gene, exM)
-    tsneDF <- Set_Limits(tsneDF, limLow = limLow, limHigh = limHigh)
-    ggFp <- FeaturePlot_Graph(tsneDF, title = paste0("\n", gene)
-      , limLow = limLow, limHigh = limHigh)
-    return(ggFp)
-  })
+  
+  # Mean expression of gene group if grouping is provided
+  if (! is.null(geneGrouping)) {
+    
+    genesGroupingDF <- data.frame(Gene = genes, Grouping = geneGrouping)
+    
+    ggL <- lapply(unique(genesGroupingDF$Grouping), function(grouping) {
+      print(grouping)
+      genes <- genesGroupingDF$Gene[genesGroupingDF$Grouping == grouping]
+      print(head(genes))
+      tsneDF <- Mean_Expression(tsneDF, genes, exM)
+      tsneDF <- Set_Limits(tsneDF, limLow = limLow, limHigh = limHigh)
+      if (centScale == FALSE) {
+        ggFp <- FeaturePlot_Graph(tsneDF, title = paste0("\n", grouping)
+          , limLow = limLow, limHigh = limHigh)
+      }
+      if (centScale == TRUE) {
+        ggFp <- FeaturePlot_Graph_CentScale(tsneDF, title = paste0("\n", grouping)
+          , limLow = limLow, limHigh = limHigh)
+      }
+      return(ggFp)
+    })
+  }
+  
+  # If grouping is not provided plot each gene individually
+  else {
+    ggL <- lapply(genes, function(gene) {
+      print(gene)
+      tsneDF <- Mean_Expression(tsneDF, gene, exM)
+      tsneDF <- Set_Limits(tsneDF, limLow = limLow, limHigh = limHigh)
+      if (centScale == FALSE) {
+        ggFp <- FeaturePlot_Graph(tsneDF, title = paste0("\n", gene)
+          , limLow = limLow, limHigh = limHigh)
+      }
+      if (centScale == TRUE) {
+        ggFp <- FeaturePlot_Graph_CentScale(tsneDF, title = paste0("\n", gene)
+          , limLow = limLow, limHigh = limHigh)
+      }
+      return(ggFp)
+    })
+  }
+  
   ggTsne <- TSNE_Plot(seuratO) + theme(legend.position = "none")
   ggL <- append(list(ggTsne), ggL)
   return(ggL)
 }
+
 # # Genes to plot
 # genes <- c("PAX6", "EOMES")
 # # FeaturePlot outputs list of ggplots
@@ -408,6 +525,17 @@ FeaturePlot <- function(genes, tsneDF, seuratO, exM, limLow, limHigh) {
 ################################################################################
 
 ### General functions
+
+# Converts vector of gene symbols and ensembl IDs to ensembl IDs
+# Need to load:
+# bmDF <- read.csv("../source/BiomaRt_Compile_GeneInfo_GRCh38_Ensembl87.csv"
+# , header = TRUE)
+Convert_Mixed_GeneSym_EnsID_To_EnsID <- function(ids){
+  idx <- match(ids, bmDF$hgnc_symbol)
+  ens <- bmDF$ensembl_gene_id[idx]
+  ids[! is.na(ens)] <- as.character(ens[! is.na(ens)])
+  return(ids)
+}
 
 # Cowplot plot_grid and add title
 Plot_Grid <- function(ggPlotsL, ncol, title, rel_height, ...) {
