@@ -21,6 +21,7 @@ require(WGCNA)
 require(pheatmap)
 require(RColorBrewer)
 require(viridis)
+require(fdrtool)
 source("Function_Library.R")
 
 options(stringsAsFactors = FALSE)
@@ -1068,8 +1069,9 @@ df1$clusters1 <- df2$value[match(df1$Var1, df2$Var1)]
 genes <- df1$Var1[abs(df1$clusters1 - df1$value) > 0.2]
 
 
+## DE RG vs IP clusters
 
-
+# Subset expression matrix to RG and IP clusters
 clusters1 <- 2
 clusters2 <- c(7,9)
 ids <- names(centSO@ident)[centSO@ident %in% c(clusters1, clusters2)]
@@ -1086,31 +1088,208 @@ deLM <- DE_Linear_Model(
   exDatDF = exM
   , termsDF = termsDF
   , mod = "y ~ clusters+nUMI+librarylab+individual")
+# Format LM DE
+deDF <- data.frame(Log_FC = deLM$coefmat[ ,"clustersclusters2"]
+  , Pvalue = deLM$pvalmat[ ,"clustersclusters2"])
+deDF <- deDF[order(deDF$Log_FC), ]
+deDF$Pvalue[deDF$Pvalue == "NaN"] <- 1
+
+# FDR correct
+# NOTE: p-values are so low that FDR tool is returning FDR of 1 for everything
+corrected <- fdrtool(deDF$Pvalue, statistic = "pvalue", plot = FALSE)
+deDF$FDR <- corrected$lfdr
+# Check
+table(deDF$Pvalue < 0.05)
+table(deDF$FDR < 0.05)
+print(head(deDF))
+
+# Save as csv
+write.csv(deDF, file = paste0(outTable, "DE_RGvsIP.csv")
+  , quote = FALSE)
+deDF <- read.csv(paste0(outTable, "DE_RGvsIP.csv")
+  , header = TRUE, row.names = 1)
 
 
+## Heatmap of RG vs IP DE genes in IP+ and Neuron- or RG+ and Neuron- cells
+
+# S phase cells
+
+# Subset expression matrix to DE genes and IP+ and Neuron- or RG+ and Neuron- cells
+# DE genes
+genes <- row.names(deDF)[deDF$FDR < 0.05]
+# IP+ and Neuron- or RG+ and Neuron- cells
 df1 <- Format_Number_Cell_Types_Cluster_Dataframe(
   exM = noCentExM, seuratO = centSO)
-ids1 <- row.names(df1)[df1$CLUSTER == 8 & df1$RG > 0.5 & df1$IP < 0.25]
-ids2 <- row.names(df1)[df1$CLUSTER == 8 & df1$RG > 0.5 & df1$IP > 0.5]
-exM <- as.matrix(centSO@data)
-exM <- exM[ ,colnames(exM) %in% c(ids1, ids2)]
-# DE Linear model
-termsDF <- centSO@meta.data[
-  row.names(centSO@meta.data) %in% c(ids1, ids2)
-  , c("nUMI", "librarylab", "individual", "res.0.6")]
-# Add term TRUE/FALSE cell is in cluster
-termsDF$groups <- "ids1"
-termsDF$groups[row.names(termsDF) %in% ids2] <- "ids2"
-deLM <- DE_Linear_Model(
-  exDatDF = exM
-  , termsDF = termsDF
-  , mod = "y ~ groups+nUMI+librarylab+individual")
+ids <- row.names(df1)[df1$CLUSTER == 8 & df1$RG > 0.5 & df1$Neuron < 0.25
+  | df1$CLUSTER == 8 & df1$IP > 0.5 & df1$Neuron < 0.25]
+# Subset
+exM <- as.matrix(centSO@scale.data)
+exM <- exM[row.names(exM) %in% genes, colnames(exM) %in% ids]
 
-deLM$coefmat[ ,2]
-deLM$pvalmat[ ,2]
+# Heatmap column color bars
+df2 <- df1[row.names(df1) %in% ids, ]
+annotation_col <- data.frame(Type = rep(NA, nrow(df2)))
+row.names(annotation_col) <- row.names(df2)
+annotation_col$Type[df2$RG > 0.5] <- "RG+"
+annotation_col$Type[df2$IP > 0.5] <- "IP+"
+annotation_col$Type[df2$RG > 0.5 & df2$IP > 0.5] <- "RG+ IP+"
+annotation_col <- annotation_col[! is.na(annotation_col$Type), , drop = FALSE]
 
-corrected <- fdrtool(deDF$PVALUE, statistic = "pvalue", plot = FALSE)
-deDF$FDR <- corrected$lfdr
+# Heatmap row color bars
+annotation_row <- data.frame(DE = rep(NA, nrow(exM)))
+row.names(annotation_row) <- row.names(exM)
+annotation_row$DE[row.names(annotation_row) %in% row.names(deDF)[
+  deDF$FDR < 0.05 & deDF$Log_FC > 0]] <- "RG"
+annotation_row$DE[row.names(annotation_row) %in% row.names(deDF)[
+  deDF$FDR < 0.05 & deDF$Log_FC < -0]] <- "IP"
+
+breaks <- seq(-2, 2, by = 0.1)
+
+png(paste0(outGraph, "DE_RG_IP_S_pheatmap.png")
+  , width = 9, height = 9, units = "in", res = 300)
+pheatmap(exM, 
+  cluster_row = TRUE
+  , cluster_cols = TRUE
+  , annotation_col = annotation_col
+  , annotation_row = annotation_row
+  # , color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdBu")))(length(breaks))
+  # , breaks = breaks
+  , show_rownames = FALSE
+  , show_colnames = FALSE
+)
+dev.off()
+
+# G2M phase cells
+
+# Subset expression matrix to DE genes and IP+ and Neuron- or RG+ and Neuron- cells
+# DE genes
+genes <- row.names(deDF)[deDF$FDR < 0.05]
+# IP+ and Neuron- or RG+ and Neuron- cells
+df1 <- Format_Number_Cell_Types_Cluster_Dataframe(
+  exM = noCentExM, seuratO = centSO)
+ids <- row.names(df1)[df1$CLUSTER == 10 & df1$RG > 0.5 & df1$Neuron < 0.25
+  | df1$CLUSTER == 10 & df1$IP > 0.5 & df1$Neuron < 0.25]
+# Subset
+exM <- as.matrix(centSO@scale.data)
+exM <- exM[row.names(exM) %in% genes, colnames(exM) %in% ids]
+
+# Heatmap column color bars
+df2 <- df1[row.names(df1) %in% ids, ]
+annotation_col <- data.frame(Type = rep(NA, nrow(df2)))
+row.names(annotation_col) <- row.names(df2)
+annotation_col$Type[df2$RG > 0.5] <- "RG+"
+annotation_col$Type[df2$IP > 0.5] <- "IP+"
+annotation_col$Type[df2$RG > 0.5 & df2$IP > 0.5] <- "RG+ IP+"
+annotation_col <- annotation_col[! is.na(annotation_col$Type), , drop = FALSE]
+
+# Heatmap row color bars
+annotation_row <- data.frame(DE = rep(NA, nrow(exM)))
+row.names(annotation_row) <- row.names(exM)
+annotation_row$DE[row.names(annotation_row) %in% row.names(deDF)[
+  deDF$FDR < 0.05 & deDF$Log_FC > 0]] <- "RG"
+annotation_row$DE[row.names(annotation_row) %in% row.names(deDF)[
+  deDF$FDR < 0.05 & deDF$Log_FC < -0]] <- "IP"
+
+breaks <- seq(-2, 2, by = 0.1)
+
+png(paste0(outGraph, "DE_RG_IP_G2M_pheatmap.png")
+  , width = 9, height = 9, units = "in", res = 300)
+pheatmap(exM, 
+  cluster_row = TRUE
+  , cluster_cols = TRUE
+  , annotation_col = annotation_col
+  , annotation_row = annotation_row
+  # , color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdBu")))(length(breaks))
+  # , breaks = breaks
+  , show_rownames = FALSE
+  , show_colnames = FALSE
+)
+dev.off()
+
+
+## DE RG+ vs RG+ IP+ S phase
+
+DE_CellGroup1_Vs_CellGroup2 <- function(ids1, ids2) {
+  
+  # Subset expression matrix
+  exM <- as.matrix(centSO@data)
+  exM <- exM[ ,colnames(exM) %in% c(ids1, ids2)]
+  # DE Linear model
+  termsDF <- centSO@meta.data[
+    row.names(centSO@meta.data) %in% c(ids1, ids2)
+    , c("nUMI", "librarylab", "individual", "res.0.6")]
+  # Add term TRUE/FALSE cell is in cluster
+  termsDF$groups <- "ids1"
+  termsDF$groups[row.names(termsDF) %in% ids2] <- "ids2"
+  deLM <- DE_Linear_Model(
+    exDatDF = exM
+    , termsDF = termsDF
+    , mod = "y ~ groups+nUMI+librarylab+individual")
+  
+  print(head(deLM$coefmat))
+  
+  # Format LM DE
+  deDF <- data.frame(Log_FC = deLM$coefmat[ ,2]
+    , Pvalue = deLM$pvalmat[ ,2])
+  deDF <- deDF[order(deDF$Log_FC), ]
+  deDF$Pvalue[deDF$Pvalue == "NaN"] <- 1
+  
+  # FDR correct
+  # NOTE: p-values are so low that FDR tool is returning FDR of 1 for everything
+  corrected <- fdrtool(deDF$Pvalue, statistic = "pvalue", plot = FALSE)
+  deDF$FDR <- corrected$lfdr
+  # Check
+  table(deDF$Pvalue < 0.05)
+  table(deDF$FDR < 0.05)
+  print(head(deDF))
+  
+  return(deDF)
+}
+
+# Mean expression of marker genes to use to subset groups of cells
+df1 <- Format_Number_Cell_Types_Cluster_Dataframe(
+  exM = noCentExM, seuratO = centSO)
+
+# S phase RG+ Neuron- vs RG+ IP+ Neuron-
+ids1 <- row.names(df1)[df1$CLUSTER == 8 & df1$RG > 0.5 & df1$IP > 0.5 & df1$Neuron < 0.25]
+ids2 <- row.names(df1)[df1$CLUSTER == 8 & df1$RG > 0.5 & df1$IP < 0.25 & df1$Neuron < 0.25]
+# DE
+deRGvsRgIpDF <- DE_CellGroup1_Vs_CellGroup2(ids1, ids2)
+# Save as csv
+write.csv(deRGvsRgIpDF, file = paste0(outTable, "DE_RGvsRGIP_S.csv")
+  , quote = FALSE)
+deRGvsRgIpDF <- read.csv(paste0(outTable, "DE_RGvsRGIP_S.csv")
+  , header = TRUE, row.names = 1)
+
+
+# S phase RG+ Neuron- vs RG+ IP+ Neuron-
+ids1 <- row.names(df1)[df1$CLUSTER == 8 & df1$RG > 0.5 & df1$IP > 0.5 & df1$Neuron < 0.25]
+ids2 <- row.names(df1)[df1$CLUSTER == 8 & df1$IP > 0.5 & df1$RG < 0.25 & df1$Neuron < 0.25]
+# DE
+deIPvsRgIpDF <- DE_CellGroup1_Vs_CellGroup2(ids1, ids2)
+# Save as csv
+write.csv(deIPvsRgIpDF, file = paste0(outTable, "DE_IPvsRGIP_S.csv")
+  , quote = FALSE)
+deIPvsRgIpDF <- read.csv(paste0(outTable, "DE_IPvsRGIP_S.csv")
+  , header = TRUE, row.names = 1)
+
+
+intersect(
+  row.names(deDF)[deDF$Log_FC > 0 & deDF$FDR < 0.05]
+  , row.names(deRGvsRgIpDF)[deRGvsRgIpDF$Log_FC > 0 & deDF$FDR < 0.05]
+)
+
+intersect(
+  row.names(deDF)[deDF$Log_FC < 0 & deDF$FDR < 0.05]
+  , row.names(deRGvsRgIpDF)[deRGvsRgIpDF$Log_FC < 0 & deDF$FDR < 0.05]
+)
+
+intersect(
+  row.names(deDF)[deDF$Log_FC > 0 & deDF$FDR < 0.05]
+  , row.names(deRGvsRgIpDF)[deRGvsRgIpDF$Log_FC < 0 & deDF$FDR < 0.05]
+)
+
+
 
 intersect(names(deLM1$coefmat[ ,"clustersclusters2"])[deLM1$coefmat[ ,"clustersclusters2"] < 0.5]
 , names(deLM$coefmat[,"groupsids2"])[deLM$coefmat[,"groupsids2"] > 0.5])
