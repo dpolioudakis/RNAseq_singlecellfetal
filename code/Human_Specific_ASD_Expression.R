@@ -20,6 +20,7 @@ require(gridExtra)
 require(ggplot2)
 require(cowplot)
 require(fdrtool)
+require(ggdendro)
 source("Function_Library.R")
 
 # Set variable to gene of interest
@@ -63,6 +64,10 @@ iosDF <- read.csv(
 rubDF <- read.table(
   "../source/metaMat/Gene_Lists/geschwindlabshares/Hi-C/traitsenrichment/data/Lists/deRubeis_mutationlist.txt"
   , header = TRUE, sep = "\t")
+
+# TADA Sanders 2015 = from Luis metaMat
+tadaDF <- read.csv(
+  "../source/metaMat/Gene_Lists/geschwindlabshares/Hi-C/traitsenrichment/data/Lists/Sanders_2015_TADA.csv")
 
 # Known marker Luis table
 kmDF <- read.csv("../source/MarkersforSingleCell_2017-10-11_Markers.csv")
@@ -209,9 +214,95 @@ Number_Of_Cells_Intersection_Heatmap <- function(genes, title){
   
   return(gg)
 }
+
+Seurat_Heatmap_By_Cluster_Hclust_Genes <- function(genes) {
+  
+  # Subset expression matrix
+  exM <- centSO@scale.data
+  exM <- exM[row.names(exM) %in% genes, ]
+  
+  # Obtain the dendrogram
+  dend <- as.dendrogram(hclust(dist(exM)))
+  dend_data <- dendro_data(dend)
+  # Setup the data, so that the layout is inverted (this is more 
+  # "clear" than simply using coord_flip())
+  segment_data <- with(
+    segment(dend_data), 
+    data.frame(x = y, y = x, xend = yend, yend = xend))
+  # Use the dendrogram label data to position the gene labels
+  gene_pos_table <- with(
+    dend_data$labels, 
+    data.frame(y_center = x, gene = as.character(label), height = 1))
+  # Limits for the vertical axes
+  gene_axis_limits <- with(
+    gene_pos_table,
+    c(min(y_center - 0.5 * height), max(y_center + 0.5 * height))) + 0.1 * c(-1, 1) # extra spacing: 0.1
+  # Facet dendrogram so it lines up with faceted heatmaps
+  segment_data$Facet <- ""
+  
+  # Dendrogram plot
+  plt_dendr <- ggplot(segment_data) + 
+    geom_segment(aes(x = x, y = y, xend = xend, yend = yend)) + 
+    scale_x_reverse(expand = c(0, 0.5)) + 
+    scale_y_continuous(breaks = gene_pos_table$y_center, 
+      labels = gene_pos_table$gene, 
+      limits = gene_axis_limits,
+      expand = c(0, 0)) + 
+    facet_wrap(~Facet) +
+    labs(x = "Distance", y = "", colour = "", size = "") +
+    theme_bw() + 
+    theme(panel.grid.minor = element_blank()) +
+    theme(strip.background = element_blank())
+  
+  # Heatmap plot
+  geneGroupDF <- data.frame(GENE = row.names(exM), GROUP = "")
+  ggL <- lapply(c(0:17), function(cluster){
+    tryCatch(
+      Heatmap_By_Cluster(
+        geneGroupDF = geneGroupDF
+        , exprM = as.matrix(centSO@scale.data)
+        , seuratO = centSO
+        , clusters = cluster
+        , lowerLimit = -1.5
+        , upperLimit = 1.5
+        , geneOrder = gene_pos_table$gene
+      )
+      , error = function(e) NULL)
+  })
+  # Remove nulls from ggplot list
+  ggL <- ggL[! sapply(ggL, is.null)]
+  # Extract legend
+  legend <- get_legend(ggL[[1]])
+  # Format - remove axis labels
+  # ggL[[1]] <- ggL[[1]] + theme(
+  #   axis.title.x = element_blank()
+  #   , legend.position = "none"
+  #   , strip.text.y = element_blank())
+  ggL[1:length(ggL)] <- lapply(ggL[1:length(ggL)], function(gg) {
+    gg + theme(
+      strip.text.y = element_blank()
+      , legend.position = "none"
+      , axis.title.y = element_blank()
+      , axis.text.y = element_blank()
+      , axis.ticks.y = element_blank()
+      , axis.title.x = element_blank()
+      # margin: top, right, bottom, and left
+      , plot.margin = unit(c(1, 0.05, 1, 0.05), "cm")
+    )
+  })
+  
+  # Combine individual heatmaps and dendrogram
+  rel_widths <- as.vector(log((table(centSO@ident) + 1), 10)) + 1
+  rel_widths <- c(20, rel_widths, 1)
+  # Combine
+  pg <- plot_grid(plotlist = append(list(plt_dendr), ggL), ncol = 19
+    , rel_widths = rel_widths, align = 'h', axis = 't')
+  
+  return(pg)
+}
 ################################################################################
 
-### ASD combined de novo proband LOF iossifov + de Rubeis
+### Format
 
 ## Iossifov ASD
 iosDF <- iosDF[!duplicated(iosDF[,1]),]
@@ -230,9 +321,13 @@ colnames(rubDF) = paste0("Rubeis_", colnames(rubDF))
 rubDF = rubDF
 rubDF$gene = rownames(rubDF)
 
-## iossifov + de Rubeis
+## combined de novo proband LOF iossifov + de Rubeis
 asdDF = merge(rubDF, iosDF, by = intersect("gene", "gene"))
 asdDF$combined_dn_prob_LOF = asdDF$dnv_LGDs_prb + asdDF$Rubeis_dn.LoF
+
+## TADA Sanders_TADA0.1_exomedel
+tadaDF <- tadaDF[,1:21]
+tada <- unique(tadaDF[tadaDF$tadaFdrAscSscExomeSscAgpSmallDel<0.1, "RefSeqGeneName"])
 ################################################################################
 
 ### ASD combined de novo proband LOF iossifov + de Rubeis
@@ -241,14 +336,45 @@ asdDF$combined_dn_prob_LOF = asdDF$dnv_LGDs_prb + asdDF$Rubeis_dn.LoF
 genes <- asdDF$gene[asdDF$combined_dn_prob_LOF > 0]
 
 # Genes DE >0.4 in cluster 4 or cluster 14
-df1 <- rbind(data.frame(Gene = deDF$GENE[deDF$LOG_FC > 0.4 & deDF$CLUSTER == 4]
-  , Cluster = 4)
+df1 <- rbind(
+  data.frame(Gene = deDF$GENE[deDF$LOG_FC > 0.4 & deDF$CLUSTER == 3]
+    , Cluster = 3)
+  , data.frame(Gene = deDF$GENE[deDF$LOG_FC > 0.4 & deDF$CLUSTER == 4]
+    , Cluster = 4)
+  , data.frame(Gene = deDF$GENE[deDF$LOG_FC > 0.4 & deDF$CLUSTER == 5]
+    , Cluster = 5)
+  , data.frame(Gene = deDF$GENE[deDF$LOG_FC > 0.4 & deDF$CLUSTER == 6]
+    , Cluster = 6)
   , data.frame(Gene = deDF$GENE[deDF$LOG_FC > 0.4 & deDF$CLUSTER == 14]
     , Cluster = 14)
 )
 
 # Subset to ASD
 df1 <- df1[df1$Gene %in% genes, ]
+
+# Feature plot
+ggL <- FeaturePlot(
+  genes = df1$Gene
+  , tsneDF = as.data.frame(centSO@dr$tsne@cell.embeddings)
+  , seuratO = centSO
+  , exM = centSO@scale.data
+  , limLow = -1.5
+  , limHigh = 1.5
+  , geneGrouping = NULL
+  , centScale = TRUE
+  )
+Plot_Grid(ggPlotsL = ggL, ncol = 3, rel_height = 0.05, align = 'v', axis = 'r'
+  , title = paste0(graphCodeTitle
+    , "\n\nExpression of ASD combined de novo proband LOF iossifov + de Rubeis genes DE in clusters of interest"
+    , "\nClusters: 3, 4, 5, 6, 14"
+    , "\nNormalized expression, mean centered, variance scaled"
+    , "\nDE filters:"
+    , "\n> 0.4 log fold change cluster vs all other cells"
+    , "\n")
+  )
+ggsave(paste0(
+  outGraph, "DE_IossifovRubeis_FeaturePlot_NormalizedCenteredScaled.png")
+  , width = 12, height = 50, limitsize = FALSE)
 
 # Heatmap
 # Normalized, mean centering scaling
@@ -263,9 +389,9 @@ ggL <- Heatmaps_By_Cluster_Combined(
   , lowerLimit = -1.5
   , upperLimit = 1.5
   , geneOrder = genes)
-Plot_Grid(ggPlotsL = ggL, ncol = 3, rel_height = 0.3, align = 'h', axis = 'b'
+Plot_Grid(ggPlotsL = ggL, ncol = 3, rel_height = 0.2, align = 'h', axis = 'b'
   , title = paste0(graphCodeTitle
-    , "\n\nExpression of ASD combined de novo proband LOF iossifov + de Rubeis genes differentially expressed in cluster 4 or 14"
+    , "\n\nExpression of ASD combined de novo proband LOF iossifov + de Rubeis genes genes DE in clusters of interest"
     , "\nx-axis: Genes"
     , "\ny-axis: Cells ordered by cluster"
     , "\nNormalized expression, mean centered, variance scaled"
@@ -275,7 +401,47 @@ Plot_Grid(ggPlotsL = ggL, ncol = 3, rel_height = 0.3, align = 'h', axis = 'b'
 )
 ggsave(paste0(
   outGraph, "DE_IossifovRubeis_Heatmap_NormalizedCenteredScaled.png")
-  , width = 12, height = 10, limitsize = FALSE)
+  , width = 12, height = 16, limitsize = FALSE)
+
+# Heatmap + hclust of genes
+pg <- Seurat_Heatmap_By_Cluster_Hclust_Genes(df1$Gene)
+# Title
+title = paste0(graphCodeTitle
+  , "\n\nExpression of ASD combined de novo proband LOF iossifov + de Rubeis genes DE in clusters of interest"
+  , "\nx-axis: Genes"
+  , "\ny-axis: Cells ordered by cluster"
+  , "\nNormalized expression, mean centered, variance scaled"
+  , "\nDE filters:"
+  , "\n> 0.4 log fold change cluster vs all other cells"
+  , "\n")
+# now add the title
+title <- ggdraw() + draw_label(title)
+# rel_heights values control title margins
+plot_grid(title, pg, ncol = 1, rel_heights = c(0.2, 1))
+# Save
+ggsave(paste0(
+  outGraph, "DE_IossifovRubeis_HeatmapDend_NormalizedCenteredScaled.png")
+  , width = 12, height = 13, limitsize = FALSE)
+
+# Heatmap + hclust of ASD combined de novo proband LOF iossifov + de Rubeis genes
+pg <- Seurat_Heatmap_By_Cluster_Hclust_Genes(genes)
+# Title
+title = paste0(graphCodeTitle
+  , "\n\nExpression of ASD combined de novo proband LOF iossifov + de Rubeis genes"
+  , "\nx-axis: Genes"
+  , "\ny-axis: Cells ordered by cluster"
+  , "\nNormalized expression, mean centered, variance scaled"
+  , "\nDE filters:"
+  , "\n> 0.4 log fold change cluster vs all other cells"
+  , "\n")
+# now add the title
+title <- ggdraw() + draw_label(title)
+# rel_heights values control title margins
+plot_grid(title, pg, ncol = 1, rel_heights = c(0.03, 1))
+# Save
+ggsave(paste0(
+  outGraph, "IossifovRubeis_HeatmapDend_NormalizedCenteredScaled.png")
+  , width = 12, height = 50, limitsize = FALSE)
 ################################################################################
 
 ### Human specific ASD combined de novo proband LOF iossifov + de Rubeis
@@ -286,15 +452,98 @@ genes <- asdDF$gene[asdDF$combined_dn_prob_LOF > 0]
 # Allen human specific
 genes <- genes[genes %in% hsDF$Gene[hsDF$Set == "Human-specific"]]
 
+# Feature plot
+ggL <- FeaturePlot(
+  genes = genes
+  , tsneDF = as.data.frame(centSO@dr$tsne@cell.embeddings)
+  , seuratO = centSO
+  , exM = centSO@scale.data
+  , limLow = -1.5
+  , limHigh = 1.5
+  , geneGrouping = NULL
+  , centScale = TRUE
+)
+Plot_Grid(ggPlotsL = ggL, ncol = 3, rel_height = 0.2, align = 'v', axis = 'r'
+  , title = paste0(graphCodeTitle
+    , "\n\nExpression of Allen human specific + ASD combined de novo proband LOF iossifov + de Rubeis genes"
+    , "\nNormalized expression, mean centered, variance scaled"
+    , "\n")
+)
+ggsave(paste0(
+  outGraph, "HumanSpecific_IossifovRubeis_FeaturePlot_NormalizedCenteredScaled.png")
+  , width = 12, height = 6, limitsize = FALSE)
+
+# Heatmap
+# Normalized, mean centering scaling
+geneGroupDF <- data.frame(GENE = genes, GROUP = "")
+ggL <- Heatmaps_By_Cluster_Combined(
+  geneGroupDF = geneGroupDF
+  , exprM = as.matrix(centSO@scale.data)
+  , seuratO = centSO
+  , clusters1 = c(0:1)
+  , clusters2 = c(2:10)
+  , clusters3 = c(11:17)
+  , lowerLimit = -1.5
+  , upperLimit = 1.5
+  , geneOrder = genes)
+Plot_Grid(ggPlotsL = ggL, ncol = 3, rel_height = 0.4, align = 'h', axis = 'b'
+  , title = paste0(graphCodeTitle
+    , "\n\nExpression of Allen human specific + ASD combined de novo proband LOF iossifov + de Rubeis genes"
+    , "\nx-axis: Genes"
+    , "\ny-axis: Cells ordered by cluster"
+    , "\nNormalized expression, mean centered, variance scaled"
+    , "\n")
+)
+ggsave(paste0(
+  outGraph, "HumanSpecific_IossifovRubeis_Heatmap_NormalizedCenteredScaled.png")
+  , width = 12, height = 5, limitsize = FALSE)
+################################################################################
+
+### ASD TADA
+
+# ASD combined de novo proband LOF iossifov + de Rubeis
+genes <- tada
+
 # Genes DE >0.4 in cluster 4 or cluster 14
-df1 <- rbind(data.frame(Gene = deDF$GENE[deDF$LOG_FC > 0.4 & deDF$CLUSTER == 4]
-  , Cluster = 4)
+df1 <- rbind(
+  data.frame(Gene = deDF$GENE[deDF$LOG_FC > 0.4 & deDF$CLUSTER == 3]
+    , Cluster = 3)
+  , data.frame(Gene = deDF$GENE[deDF$LOG_FC > 0.4 & deDF$CLUSTER == 4]
+    , Cluster = 4)
+  , data.frame(Gene = deDF$GENE[deDF$LOG_FC > 0.4 & deDF$CLUSTER == 5]
+    , Cluster = 5)
+  , data.frame(Gene = deDF$GENE[deDF$LOG_FC > 0.4 & deDF$CLUSTER == 6]
+    , Cluster = 6)
   , data.frame(Gene = deDF$GENE[deDF$LOG_FC > 0.4 & deDF$CLUSTER == 14]
     , Cluster = 14)
 )
 
-# Subset to human specific + ASD
+# Subset to ASD
 df1 <- df1[df1$Gene %in% genes, ]
+
+# Feature plot
+ggL <- FeaturePlot(
+  genes = df1$Gene
+  , tsneDF = as.data.frame(centSO@dr$tsne@cell.embeddings)
+  , seuratO = centSO
+  , exM = centSO@scale.data
+  , limLow = -1.5
+  , limHigh = 1.5
+  , geneGrouping = NULL
+  , centScale = TRUE
+)
+Plot_Grid(ggPlotsL = ggL, ncol = 3, rel_height = 0.1, align = 'v', axis = 'r'
+  , title = paste0(graphCodeTitle
+    , "\n\nExpression of ASD TADA genes DE in clusters of interest"
+    , "\nClusters: 3, 4, 5, 6, 14"
+    , "\nNormalized expression, mean centered, variance scaled"
+    , "\nDE filters:"
+    , "\n> 0.4 log fold change cluster vs all other cells"
+    , "\n")
+)
+ggsave(paste0(
+  outGraph, "DE_TADA_FeaturePlot_NormalizedCenteredScaled.png")
+  , width = 12, height = 20, limitsize = FALSE)
 
 # Heatmap
 # Normalized, mean centering scaling
@@ -309,9 +558,9 @@ ggL <- Heatmaps_By_Cluster_Combined(
   , lowerLimit = -1.5
   , upperLimit = 1.5
   , geneOrder = genes)
-Plot_Grid(ggPlotsL = ggL, ncol = 3, rel_height = 0.5, align = 'h', axis = 'b'
+Plot_Grid(ggPlotsL = ggL, ncol = 3, rel_height = 0.2, align = 'h', axis = 'b'
   , title = paste0(graphCodeTitle
-    , "\n\nExpression of human specific ASD combined de novo proband LOF iossifov + de Rubeis genes differentially expressed in cluster 4 or 14"
+    , "\n\nExpression of ASD TADA genes genes DE in clusters of interest"
     , "\nx-axis: Genes"
     , "\ny-axis: Cells ordered by cluster"
     , "\nNormalized expression, mean centered, variance scaled"
@@ -320,6 +569,107 @@ Plot_Grid(ggPlotsL = ggL, ncol = 3, rel_height = 0.5, align = 'h', axis = 'b'
     , "\n")
 )
 ggsave(paste0(
-  outGraph, "DE_HumanSpecific_IossifovRubeis_Heatmap_NormalizedCenteredScaled.png")
+  outGraph, "DE_TADA_Heatmap_NormalizedCenteredScaled.png")
+  , width = 12, height = 14, limitsize = FALSE)
+
+# Heatmap + hclust of genes
+pg <- Seurat_Heatmap_By_Cluster_Hclust_Genes(df1$Gene)
+# Title
+title = paste0(graphCodeTitle
+  , "\n\nExpression of ASD TADA genes DE in clusters of interest"
+  , "\nx-axis: Genes"
+  , "\ny-axis: Cells ordered by cluster"
+  , "\nNormalized expression, mean centered, variance scaled"
+  , "\nDE filters:"
+  , "\n> 0.4 log fold change cluster vs all other cells"
+  , "\n")
+# now add the title
+title <- ggdraw() + draw_label(title)
+# rel_heights values control title margins
+plot_grid(title, pg, ncol = 1, rel_heights = c(0.2, 1))
+# Save
+ggsave(paste0(
+  outGraph, "DE_TADA_HeatmapDend_NormalizedCenteredScaled.png")
+  , width = 12, height = 12, limitsize = FALSE)
+
+# Heatmap + hclust of ASD combined de novo proband LOF iossifov + de Rubeis genes
+pg <- Seurat_Heatmap_By_Cluster_Hclust_Genes(genes)
+# Title
+title = paste0(graphCodeTitle
+  , "\n\nExpression of ASD TADA genes"
+  , "\nx-axis: Genes"
+  , "\ny-axis: Cells ordered by cluster"
+  , "\nNormalized expression, mean centered, variance scaled"
+  , "\nDE filters:"
+  , "\n> 0.4 log fold change cluster vs all other cells"
+  , "\n")
+# now add the title
+title <- ggdraw() + draw_label(title)
+# rel_heights values control title margins
+plot_grid(title, pg, ncol = 1, rel_heights = c(0.12, 1))
+# Save
+ggsave(paste0(
+  outGraph, "TADA_HeatmapDend_NormalizedCenteredScaled.png")
+  , width = 12, height = 14, limitsize = FALSE)
+################################################################################
+
+### Human specific or primate specific + TADA
+
+# ASD TADA
+genes <- as.character(tada)
+
+# Allen human specific
+# No intersection of TADA and Allen human specific
+table(genes %in% as.character(hsDF$Gene[hsDF$Set == "Human-specific"]))
+# FALSE
+# 66
+
+# Allen primate specific
+genes <- genes[genes %in% as.character(hsDF$Gene[hsDF$Set == "Primate-specific"])]
+
+# Feature plot
+ggL <- FeaturePlot(
+  genes = genes
+  , tsneDF = as.data.frame(centSO@dr$tsne@cell.embeddings)
+  , seuratO = centSO
+  , exM = centSO@scale.data
+  , limLow = -1.5
+  , limHigh = 1.5
+  , geneGrouping = NULL
+  , centScale = TRUE
+)
+Plot_Grid(ggPlotsL = ggL, ncol = 3, rel_height = 0.2, align = 'v', axis = 'r'
+  , title = paste0(graphCodeTitle
+    , "\n\nExpression of Allen primate specific + ASD TADA genes"
+    , "\nNormalized expression, mean centered, variance scaled"
+    , "\n")
+)
+ggsave(paste0(
+  outGraph, "PrimateSpecific_TADA_FeaturePlot_NormalizedCenteredScaled.png")
   , width = 12, height = 6, limitsize = FALSE)
+
+# Heatmap
+# Normalized, mean centering scaling
+geneGroupDF <- data.frame(GENE = genes, GROUP = "")
+ggL <- Heatmaps_By_Cluster_Combined(
+  geneGroupDF = geneGroupDF
+  , exprM = as.matrix(centSO@scale.data)
+  , seuratO = centSO
+  , clusters1 = c(0:1)
+  , clusters2 = c(2:10)
+  , clusters3 = c(11:17)
+  , lowerLimit = -1.5
+  , upperLimit = 1.5
+  , geneOrder = genes)
+Plot_Grid(ggPlotsL = ggL, ncol = 3, rel_height = 0.4, align = 'h', axis = 'b'
+  , title = paste0(graphCodeTitle
+    , "\n\nExpression of Allen primate specific + ASD TADA genes"
+    , "\nx-axis: Genes"
+    , "\ny-axis: Cells ordered by cluster"
+    , "\nNormalized expression, mean centered, variance scaled"
+    , "\n")
+)
+ggsave(paste0(
+  outGraph, "PrimateSpecific_TADA_Heatmap_NormalizedCenteredScaled.png")
+  , width = 12, height = 5, limitsize = FALSE)
 ################################################################################
