@@ -120,8 +120,11 @@ Format_Number_Cell_Types_Cluster_Dataframe <- function (exM, seuratO) {
   
   mnExDF <- data.frame(
     vRG = Mean_Gene_Group_Expression(exM = exM, grouping = "vRG")
+    , vRG_PollenS3 = Mean_Gene_Group_Expression(exM = exM, grouping = "vRG-PollenS3")
     , oRG = Mean_Gene_Group_Expression(exM = exM, grouping = "oRG")
+    , oRG_PollenS3 = Mean_Gene_Group_Expression(exM = exM, grouping = "oRG-PollenS3")
     , RG = Mean_Gene_Group_Expression(exM = exM, grouping = "RG")
+    , RG_PollenS3 = Mean_Gene_Group_Expression(exM = exM, grouping = "RG-PollenS3")
     , IP = Mean_Gene_Group_Expression(exM = exM, grouping = "IP")
     , Endothelial = Mean_Gene_Group_Expression(exM = exM, grouping = "Endothelial Cell")
     , Neuron = Mean_Gene_Group_Expression(exM = exM, grouping = "Neuron")
@@ -215,22 +218,38 @@ PCA_Format_For_GGplot <- function(pca) {
   
   df <- as.data.frame(pca$x)
   
+  varExpL <- (pca$sdev)^2 / sum(pca$sdev^2)
+  names(varExpL) <- paste0("PC", 1:length(varExpL))
+  
   df1 <- Format_Number_Cell_Types_Cluster_Dataframe(
     exM = noCentExM, seuratO = centSO)
   
   # Flag RG+, IP+, and RG+ IP+
+  df$Cell_Subset_075 <- NA
+  df$Cell_Subset_075[rownames(df) %in% row.names(df1)[df1$Neuron > 0.75]] <- "Neuron"
+  df$Cell_Subset_075[rownames(df) %in% row.names(df1)[df1$RG > 0.75]] <- "RG"
+  df$Cell_Subset_075[rownames(df) %in% row.names(df1)[df1$IP > 0.75]] <- "IP"
+  df$Cell_Subset_075[rownames(df) %in% row.names(df1)[df1$RG > 0.75 & df1$Neuron > 0.75]] <- "RG Neuron"
+  df$Cell_Subset_075[rownames(df) %in% row.names(df1)[df1$RG > 0.75 & df1$IP > 0.75]] <- "RG IP"
+  df$Cell_Subset_075[rownames(df) %in% row.names(df1)[df1$IP > 0.75 & df1$Neuron > 0.75]] <- "IP Neuron"
+  df$Cell_Subset_075[rownames(df) %in% row.names(df1)[df1$RG > 0.75 & df1$IP > 0.75 & df1$Neuron > 0.75]] <- "RG IP Neuron"
+  
   df$Cell_Subset <- NA
+  df$Cell_Subset[rownames(df) %in% row.names(df1)[df1$Neuron > 0.5]] <- "Neuron"
   df$Cell_Subset[rownames(df) %in% row.names(df1)[df1$RG > 0.5]] <- "RG"
   df$Cell_Subset[rownames(df) %in% row.names(df1)[df1$IP > 0.5]] <- "IP"
-  df$Cell_Subset[rownames(df) %in% row.names(df1)[df1$RG > 0.5 & df1$IP > 0.5]] <- "RG IP"
   df$Cell_Subset[rownames(df) %in% row.names(df1)[df1$RG > 0.5 & df1$Neuron > 0.5]] <- "RG Neuron"
+  df$Cell_Subset[rownames(df) %in% row.names(df1)[df1$RG > 0.5 & df1$IP > 0.5]] <- "RG IP"
+  df$Cell_Subset[rownames(df) %in% row.names(df1)[df1$IP > 0.5 & df1$Neuron > 0.5]] <- "IP Neuron"
   df$Cell_Subset[rownames(df) %in% row.names(df1)[df1$RG > 0.5 & df1$IP > 0.5 & df1$Neuron > 0.5]] <- "RG IP Neuron"
   
   df$Cell_Subset_025 <- NA
+  df$Cell_Subset_025[rownames(df) %in% row.names(df1)[df1$Neuron > 0.25]] <- "Neuron"
   df$Cell_Subset_025[rownames(df) %in% row.names(df1)[df1$RG > 0.25]] <- "RG"
   df$Cell_Subset_025[rownames(df) %in% row.names(df1)[df1$IP > 0.25]] <- "IP"
-  df$Cell_Subset_025[rownames(df) %in% row.names(df1)[df1$RG > 0.25 & df1$IP > 0.25]] <- "RG IP"
   df$Cell_Subset_025[rownames(df) %in% row.names(df1)[df1$RG > 0.25 & df1$Neuron > 0.25]] <- "RG Neuron"
+  df$Cell_Subset_025[rownames(df) %in% row.names(df1)[df1$RG > 0.25 & df1$IP > 0.25]] <- "RG IP"
+  df$Cell_Subset_025[rownames(df) %in% row.names(df1)[df1$IP > 0.25 & df1$Neuron > 0.25]] <- "IP Neuron"
   df$Cell_Subset_025[rownames(df) %in% row.names(df1)[df1$RG > 0.25 & df1$IP > 0.25 & df1$Neuron > 0.25]] <- "RG IP Neuron"
   
   # Flag vRG+, oRG+, and vRG+ oRG+
@@ -244,10 +263,13 @@ PCA_Format_For_GGplot <- function(pca) {
   idx <- match(rownames(df), row.names(df1))
   df$vRG <- df1$vRG[idx]
   df$oRG <- df1$oRG[idx]
+  df$vRG_PollenS3 <- df1$vRG_PollenS3[idx]
+  df$oRG_PollenS3 <- df1$oRG_PollenS3[idx]
   
   # RG IP Neuron marker expression
   idx <- match(rownames(df), row.names(df1))
   df$RG <- df1$RG[idx]
+  df$RG_PollenS3 <- df1$RG_PollenS3[idx]
   df$IP <- df1$IP[idx]
   df$Neuron <- df1$Neuron[idx]
   
@@ -256,15 +278,28 @@ PCA_Format_For_GGplot <- function(pca) {
   df$G2M_Score <- centSO@meta.data$G2M.Score[idx]
   df$S_Score <- centSO@meta.data$S.Score[idx]
   
-  return(df)
+  pcaL <- list(PCA_for_ggplot = df, Variance_Explained = varExpL)
+  
+  return(pcaL)
 }
 
-PCA_Plot_PC1to8 <- function (pcaDF, colorBy, limLow = NULL, limHigh = NULL) {
+PCA_Plot <- function(ggDF, varExpL, PCx, PCy){
+  gg <- ggplot(ggDF, aes(x = ggDF[[PCx]], y = ggDF[[PCy]], color = colorBy)) +
+    geom_point() +
+    xlab(paste0(PCx, " (", round(varExpL[[PCx]]*100, 2), "%)")) +
+    ylab(paste0(PCy, " (", round(varExpL[[PCy]]*100, 2), "%)"))
+  return(gg)
+}
+
+PCA_Plot_PC1to8 <- function(pcaL, colorBy, limLow = NULL, limHigh = NULL) {
   
-  # Column to color by
-  ggDF <- pcaDF
+  # PCA data frame for ggplot
+  ggDF <- pcaL[["PCA_for_ggplot"]]
+  
+  varExpL <- pcaL[["Variance_Explained"]]
+  
   # Color by
-  ggDF$colorBy = pcaDF[ ,colnames(pcaDF) %in% colorBy]
+  ggDF$colorBy = ggDF[ ,colnames(ggDF) %in% colorBy]
   # Set expression limits
   if (class(ggDF$colorBy) == "numeric" & ! is.null(limLow) & ! is.null(limHigh)) {
     ggDF$colorBy[ggDF$colorBy < limLow] <- limLow
@@ -273,34 +308,24 @@ PCA_Plot_PC1to8 <- function (pcaDF, colorBy, limLow = NULL, limHigh = NULL) {
   
   # Plot
   ggL <- list(
-    ggplot(ggDF, aes(x = PC1, y = PC2, color = colorBy)) +
-      geom_point()
-    , ggplot(ggDF, aes(x = PC1, y = PC3, color = colorBy)) +
-      geom_point()
-    , ggplot(ggDF, aes(x = PC1, y = PC4, color = colorBy)) +
-      geom_point()
-    , ggplot(ggDF, aes(x = PC2, y = PC3, color = colorBy)) +
-      geom_point()
-    , ggplot(ggDF, aes(x = PC2, y = PC4, color = colorBy)) +
-      geom_point()
-    , ggplot(ggDF, aes(x = PC3, y = PC4, color = colorBy)) +
-      geom_point()
-    , ggplot(ggDF, aes(x = PC1, y = PC5, color = colorBy)) +
-      geom_point()
-    , ggplot(ggDF, aes(x = PC1, y = PC6, color = colorBy)) +
-      geom_point()
-    , ggplot(ggDF, aes(x = PC1, y = PC7, color = colorBy)) +
-      geom_point()
-    , ggplot(ggDF, aes(x = PC1, y = PC8, color = colorBy)) +
-      geom_point()
-  )
+    PCA_Plot(ggDF = ggDF, varExpL = varExpL, PCx = "PC1", PCy = "PC2")
+    , PCA_Plot(ggDF = ggDF, varExpL = varExpL, PCx = "PC1", PCy = "PC3")
+    , PCA_Plot(ggDF = ggDF, varExpL = varExpL, PCx = "PC1", PCy = "PC4")
+    , PCA_Plot(ggDF = ggDF, varExpL = varExpL, PCx = "PC2", PCy = "PC3")
+    , PCA_Plot(ggDF = ggDF, varExpL = varExpL, PCx = "PC2", PCy = "PC4")
+    , PCA_Plot(ggDF = ggDF, varExpL = varExpL, PCx = "PC3", PCy = "PC4")
+    , PCA_Plot(ggDF = ggDF, varExpL = varExpL, PCx = "PC1", PCy = "PC5")
+    , PCA_Plot(ggDF = ggDF, varExpL = varExpL, PCx = "PC1", PCy = "PC6")
+    , PCA_Plot(ggDF = ggDF, varExpL = varExpL, PCx = "PC1", PCy = "PC7")
+    )
+  # Use continuous color scale if value to color by is continuous
   if (class(ggDF$colorBy) == "numeric") {
     # ggL <- lapply(ggL, function(gg) {gg + scale_color_viridis()})
     ggL <- lapply(ggL, function(gg) {
       gg <- gg +
         scale_color_distiller(name = "Normalized\nexpression"
           , type = "div", palette = 5, direction = -1, limits = c(limLow, limHigh)) +
-        geom_point(size = 0.5)
+        geom_point(size = 0.05)
       return(gg)})
   }
   return(ggL)
@@ -741,14 +766,14 @@ df1 <- Format_Number_Cell_Types_Cluster_Dataframe(
   exM = noCentExM, seuratO = centSO)
 cellIDs <- row.names(df1)[df1$RG > 0.5 & df1$IP < 0.25 | df1$Neuron > 0.5 & df1$IP < 0.25]
 cellIDs <- intersect(cellIDs, names(centSO@ident[centSO@ident == 8]))
-exLM[["RG_IP_Neuronn_Cluster8"]] <- centSO@scale.data[ ,colnames(centSO@scale.data) %in% cellIDs]
+exLM[["RG_IPn_Neuron_Cluster8"]] <- centSO@scale.data[ ,colnames(centSO@scale.data) %in% cellIDs]
 
 # Identify RG+ and / or Neuron+ but IP- cluster 10 cells
 df1 <- Format_Number_Cell_Types_Cluster_Dataframe(
   exM = noCentExM, seuratO = centSO)
 cellIDs <- row.names(df1)[df1$RG > 0.5 & df1$IP < 0.25 | df1$Neuron > 0.5 & df1$IP < 0.25]
 cellIDs <- intersect(cellIDs, names(centSO@ident[centSO@ident == 10]))
-exLM[["RG_IP_Neuronn_Cluster10"]] <- centSO@scale.data[ ,colnames(centSO@scale.data) %in% cellIDs]
+exLM[["RG_IPn_Neuron_Cluster10"]] <- centSO@scale.data[ ,colnames(centSO@scale.data) %in% cellIDs]
 
 # Identify RG+ IP- Neuron- cluster 8 cells
 df1 <- Format_Number_Cell_Types_Cluster_Dataframe(
@@ -871,9 +896,9 @@ ldf <- lapply(pcaL, function(pca){
 # PCA plots
 lapply(names(ldf), function(name){
   
-  df <- ldf[[name]]
+  pcaL <- ldf[[name]]
   
-  ggL <- PCA_Plot_PC1to8(pcaDF = df, colorBy = "Cell_Subset")
+  ggL <- PCA_Plot_PC1to8(pcaL = pcaL, colorBy = "Cell_Subset")
   Plot_Grid(ggPlotsL = ggL
     , ncol = 3
     , rel_height = 0.1
@@ -882,7 +907,7 @@ lapply(names(ldf), function(name){
       , "\nColored by RG+ and / or IP+"
       , "\n+ = > 0.5 log normalized expression")
   )
-  ggsave(paste0(outGraph, name, "_PCA_RgIpNeuron.png"), width = 14, height = 14)
+  ggsave(paste0(outGraph, name, "_PCA_MarkerLabel05.png"), width = 14, height = 14)
   
   ggL <- PCA_Plot_PC1to8(pcaDF = df, colorBy = "Cell_Subset_025")
   Plot_Grid(ggPlotsL = ggL
@@ -893,7 +918,18 @@ lapply(names(ldf), function(name){
       , "\nColored by RG+ and / or IP+"
       , "\n+ = > 0.25 log normalized expression")
   )
-  ggsave(paste0(outGraph, name, "_PCA_RgIp025.png"), width = 14, height = 14)
+  ggsave(paste0(outGraph, name, "_PCA_MarkerLabel025.png"), width = 14, height = 14)
+  
+  ggL <- PCA_Plot_PC1to8(pcaDF = df, colorBy = "Cell_Subset_075")
+  Plot_Grid(ggPlotsL = ggL
+    , ncol = 3
+    , rel_height = 0.1
+    , title = paste0(graphCodeTitle
+      , "\n\n", name, " PCA"
+      , "\nColored by RG+ and / or IP+"
+      , "\n+ = > 0.75 log normalized expression")
+  )
+  ggsave(paste0(outGraph, name, "_PCA_MarkerLabel075.png"), width = 14, height = 14)
   
   ggL <- PCA_Plot_PC1to8(pcaDF = df, colorBy = "vRG_oRG_Subset")
   Plot_Grid(ggPlotsL = ggL
@@ -939,6 +975,17 @@ lapply(names(ldf), function(name){
   )
   ggsave(paste0(outGraph, name, "_PCA_vRG.png"), width = 14, height = 14)
   
+  ggL <- PCA_Plot_PC1to8(pcaDF = df, colorBy = "vRG_PollenS3", limLow = 0, limHigh = 1)
+  Plot_Grid(ggPlotsL = ggL
+    , ncol = 3
+    , rel_height = 0.1
+    , title = paste0(graphCodeTitle
+      , "\n\n", name, " PCA"
+      , "\nColored by vRG Pollen S3 expression"
+      , "\n+ = > 0.5 log normalized expression")
+  )
+  ggsave(paste0(outGraph, name, "_PCA_vRGPollenS3.png"), width = 14, height = 14)
+  
   ggL <- PCA_Plot_PC1to8(pcaDF = df, colorBy = "oRG", limLow = 0, limHigh = 1)
   Plot_Grid(ggPlotsL = ggL
     , ncol = 3
@@ -950,6 +997,16 @@ lapply(names(ldf), function(name){
   )
   ggsave(paste0(outGraph, name, "_PCA_oRG.png"), width = 14, height = 14)
   
+  ggL <- PCA_Plot_PC1to8(pcaDF = df, colorBy = "oRG_PollenS3", limLow = 0, limHigh = 1)
+  Plot_Grid(ggPlotsL = ggL
+    , ncol = 3
+    , rel_height = 0.1
+    , title = paste0(graphCodeTitle
+      , "\n\n", name, " PCA"
+      , "\nColored by oRG Pollen S3 expression"
+      , "\n+ = > 0.5 log normalized expression")
+  )
+  ggsave(paste0(outGraph, name, "_PCA_oRGPollenS3.png"), width = 14, height = 14)
   
   ggL <- PCA_Plot_PC1to8(pcaDF = df, colorBy = "RG", limLow = 0, limHigh = 1)
   Plot_Grid(ggPlotsL = ggL
@@ -961,6 +1018,17 @@ lapply(names(ldf), function(name){
       , "\n+ = > 0.5 log normalized expression")
   )
   ggsave(paste0(outGraph, name, "_PCA_RG.png"), width = 14, height = 14)
+  
+  ggL <- PCA_Plot_PC1to8(pcaDF = df, colorBy = "RG_PollenS3", limLow = 0, limHigh = 1)
+  Plot_Grid(ggPlotsL = ggL
+    , ncol = 3
+    , rel_height = 0.1
+    , title = paste0(graphCodeTitle
+      , "\n\n", name, " PCA"
+      , "\nColored by RG Pollen S3 expression"
+      , "\n+ = > 0.5 log normalized expression")
+  )
+  ggsave(paste0(outGraph, name, "_PCA_RGPollenS3.png"), width = 14, height = 14)
   
   ggL <- PCA_Plot_PC1to8(pcaDF = df, colorBy = "IP", limLow = 0, limHigh = 1)
   Plot_Grid(ggPlotsL = ggL
@@ -979,10 +1047,32 @@ lapply(names(ldf), function(name){
     , rel_height = 0.1
     , title = paste0(graphCodeTitle
       , "\n\n", name, " PCA"
-      , "\nColored by RG expression"
+      , "\nColored by Neuron expression"
       , "\n+ = > 0.5 log normalized expression")
   )
   ggsave(paste0(outGraph, name, "_PCA_Neuron.png"), width = 14, height = 14)
+  
+  ggL <- PCA_Plot_PC1to8(pcaDF = df, colorBy = "IP", limLow = 0, limHigh = 0.25)
+  Plot_Grid(ggPlotsL = ggL
+    , ncol = 3
+    , rel_height = 0.1
+    , title = paste0(graphCodeTitle
+      , "\n\n", name, " PCA"
+      , "\nColored by IP expression"
+      , "\n+ = > 0.5 log normalized expression")
+  )
+  ggsave(paste0(outGraph, name, "_PCA_IP025scale.png"), width = 14, height = 14)
+  
+  ggL <- PCA_Plot_PC1to8(pcaDF = df, colorBy = "Neuron", limLow = 0, limHigh = 0.25)
+  Plot_Grid(ggPlotsL = ggL
+    , ncol = 3
+    , rel_height = 0.1
+    , title = paste0(graphCodeTitle
+      , "\n\n", name, " PCA"
+      , "\nColored by Neuron expression"
+      , "\n+ = > 0.5 log normalized expression")
+  )
+  ggsave(paste0(outGraph, name, "_PCA_Neuron025scale.png"), width = 14, height = 14)
   
   # # PCA plots
   # lapply(names(ldf), function(name){
@@ -1017,7 +1107,29 @@ lapply(names(ldf), function(name){
 ### Expression of vRG, oRG, RG markers versus cell cycle score
 print("### Expression of vRG, oRG, RG markers by cell cycle phase")
 
-df <- data.frame(Phase = centSO@meta.data$Phase)
+# Violin plots of Seurat cell cycle scores
+df1 <- centSO@meta.data[c("S.Score", "G2M.Score", "res.0.6")]
+df1$res.0.6 <- factor(df1$res.0.6, levels = sort(as.numeric(unique(df1$res.0.6))))
+ggplot(df1, aes(x = res.0.6, y = S.Score)) +
+  geom_violin() +
+  geom_jitter(size = 0.01, alpha = 0.25) +
+  xlab("Cluster") +
+  ggtitle(paste0(graphCodeTitle
+    , "\n\nS phase score by cluster"))
+ggsave(paste0(outGraph, "CellCycleSphaseScore_By_Cluster_Violin.png")
+  , width = 7, height = 6)
+ggplot(df1, aes(x = res.0.6, y = G2M.Score)) +
+  geom_violin() +
+  geom_jitter(size = 0.01, alpha = 0.25) +
+  xlab("Cluster") +
+  ggtitle(paste0(graphCodeTitle
+    , "\n\nG2M phase score by cluster"))
+ggsave(paste0(outGraph, "CellCycleG2MScore_By_Cluster_Violin.png")
+  , width = 7, height = 6)
+
+df <- data.frame(Phase = rep("G0", ncol(noCentExM)))
+df$Phase[centSO@meta.data["S.Score"] > 0.2] <- "S phase"
+df$Phase[centSO@meta.data["G2M.Score"] > 0.5] <- "G2/M"
 
 genes <- kmDF$Gene.Symbol[kmDF$Grouping %in% "RG"]
 exM <- noCentExM[row.names(noCentExM) %in% genes, ]
@@ -1039,7 +1151,7 @@ df <- df[df$RG > 0.5, ]
 
 # Format for ggplot
 df <- melt(df)
-df$Phase <- factor(df$Phase, levels = c("G1", "S", "G2M"))
+df$Phase <- factor(df$Phase, levels = c("G0", "S phase", "G2/M"))
 
 # Plot
 ggplot(df, aes(x = variable, y = value, fill = Phase)) +
@@ -1051,23 +1163,21 @@ ggplot(df, aes(x = variable, y = value, fill = Phase)) +
     , "\nSubset to cells to > 0.5 mean normalized expression of RG markers")
   )
 ggsave(paste0(outGraph, "RGexpr_By_CellCycle.png"), width = 7, height = 6)
+
+# Plot
+ggplot(df, aes(x = variable, y = value, fill = Phase)) +
+  geom_violin() +
+  geom_jitter(size = 0.25, alpha = 0.25) +
+  xlab("Marker gene group") +
+  ylab("Mean normalized expression") +
+  ggtitle(paste0(graphCodeTitle
+    , "\n\nMean expression of vRG, oRG, or RG markers in RG+ cells by cell cycle"
+    , "\nSubset to cells to > 0.5 mean normalized expression of RG markers")
+  )
+ggsave(paste0(outGraph, "RGexpr_By_CellCycle_Violin.png"), width = 7, height = 6)
 ################################################################################
 
 ### DE RG vs IP vs IP+ RG+
-
-
-ids <- names(centSO@ident)[centSO@ident %in% c(clusters1, clusters2)]
-exDF <- noCentExM[ ,colnames(noCentExM) %in% ids]
-exDF <- melt(exDF)
-exDF$Cluster <- centSO@ident[match(exDF$Var2, names(centSO@ident))]
-exDF$Class <- "clusters1"
-exDF$Class[exDF$Cluster %in% clusters2] <- "clusters2"
-exDF <- aggregate(value~Class+Var1, exDF, mean)
-df1 <- exDF[exDF$Class == "clusters1", ]
-df2 <- exDF[exDF$Class == "clusters2", ]
-df1$clusters1 <- df2$value[match(df1$Var1, df2$Var1)]
-genes <- df1$Var1[abs(df1$clusters1 - df1$value) > 0.2]
-
 
 ## DE RG vs IP clusters
 
@@ -1152,8 +1262,8 @@ pheatmap(exM,
   , cluster_cols = TRUE
   , annotation_col = annotation_col
   , annotation_row = annotation_row
-  # , color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdBu")))(length(breaks))
-  # , breaks = breaks
+  , color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdBu")))(length(breaks))
+  , breaks = breaks
   , show_rownames = FALSE
   , show_colnames = FALSE
 )
@@ -1199,8 +1309,8 @@ pheatmap(exM,
   , cluster_cols = TRUE
   , annotation_col = annotation_col
   , annotation_row = annotation_row
-  # , color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdBu")))(length(breaks))
-  # , breaks = breaks
+  , color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdBu")))(length(breaks))
+  , breaks = breaks
   , show_rownames = FALSE
   , show_colnames = FALSE
 )
