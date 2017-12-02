@@ -909,7 +909,7 @@ lapply(names(ldf), function(name){
   )
   ggsave(paste0(outGraph, name, "_PCA_MarkerLabel05.png"), width = 14, height = 14)
   
-  ggL <- PCA_Plot_PC1to8(pcaDF = df, colorBy = "Cell_Subset_025")
+  ggL <- PCA_Plot_PC1to8(pcaDF = pcaL, colorBy = "Cell_Subset_025")
   Plot_Grid(ggPlotsL = ggL
     , ncol = 3
     , rel_height = 0.1
@@ -920,7 +920,7 @@ lapply(names(ldf), function(name){
   )
   ggsave(paste0(outGraph, name, "_PCA_MarkerLabel025.png"), width = 14, height = 14)
   
-  ggL <- PCA_Plot_PC1to8(pcaDF = df, colorBy = "Cell_Subset_075")
+  ggL <- PCA_Plot_PC1to8(pcaDF = pcaL, colorBy = "Cell_Subset_075")
   Plot_Grid(ggPlotsL = ggL
     , ncol = 3
     , rel_height = 0.1
@@ -931,7 +931,7 @@ lapply(names(ldf), function(name){
   )
   ggsave(paste0(outGraph, name, "_PCA_MarkerLabel075.png"), width = 14, height = 14)
   
-  ggL <- PCA_Plot_PC1to8(pcaDF = df, colorBy = "vRG_oRG_Subset")
+  ggL <- PCA_Plot_PC1to8(pcaDF = pcaL, colorBy = "vRG_oRG_Subset")
   Plot_Grid(ggPlotsL = ggL
     , ncol = 3
     , rel_height = 0.1
@@ -942,7 +942,7 @@ lapply(names(ldf), function(name){
   )
   ggsave(paste0(outGraph, name, "_PCA_vRGoRG.png"), width = 14, height = 14)
   
-  ggL <- PCA_Plot_PC1to8(pcaDF = df, colorBy = "S_Score")
+  ggL <- PCA_Plot_PC1to8(pcaDF = pcaL, colorBy = "S_Score")
   Plot_Grid(ggPlotsL = ggL
     , ncol = 3
     , rel_height = 0.1
@@ -953,7 +953,7 @@ lapply(names(ldf), function(name){
   )
   ggsave(paste0(outGraph, name, "_PCA_Sscore.png"), width = 14, height = 14)
   
-  ggL <- PCA_Plot_PC1to8(pcaDF = df, colorBy = "G2M_Score")
+  ggL <- PCA_Plot_PC1to8(pcaDF = pcaL, colorBy = "G2M_Score")
   Plot_Grid(ggPlotsL = ggL
     , ncol = 3
     , rel_height = 0.1
@@ -964,7 +964,7 @@ lapply(names(ldf), function(name){
   )
   ggsave(paste0(outGraph, name, "_PCA_G2Mscore.png"), width = 14, height = 14)
   
-  ggL <- PCA_Plot_PC1to8(pcaDF = df, colorBy = "vRG", limLow = 0, limHigh = 1)
+  ggL <- PCA_Plot_PC1to8(pcaDF = pcaL, colorBy = "vRG", limLow = 0, limHigh = 1)
   Plot_Grid(ggPlotsL = ggL
     , ncol = 3
     , rel_height = 0.1
@@ -975,7 +975,7 @@ lapply(names(ldf), function(name){
   )
   ggsave(paste0(outGraph, name, "_PCA_vRG.png"), width = 14, height = 14)
   
-  ggL <- PCA_Plot_PC1to8(pcaDF = df, colorBy = "vRG_PollenS3", limLow = 0, limHigh = 1)
+  ggL <- PCA_Plot_PC1to8(pcaDF = pcaL, colorBy = "vRG_PollenS3", limLow = 0, limHigh = 1)
   Plot_Grid(ggPlotsL = ggL
     , ncol = 3
     , rel_height = 0.1
@@ -986,7 +986,7 @@ lapply(names(ldf), function(name){
   )
   ggsave(paste0(outGraph, name, "_PCA_vRGPollenS3.png"), width = 14, height = 14)
   
-  ggL <- PCA_Plot_PC1to8(pcaDF = df, colorBy = "oRG", limLow = 0, limHigh = 1)
+  ggL <- PCA_Plot_PC1to8(pcaDF = pcaL, colorBy = "oRG", limLow = 0, limHigh = 1)
   Plot_Grid(ggPlotsL = ggL
     , ncol = 3
     , rel_height = 0.1
@@ -997,7 +997,7 @@ lapply(names(ldf), function(name){
   )
   ggsave(paste0(outGraph, name, "_PCA_oRG.png"), width = 14, height = 14)
   
-  ggL <- PCA_Plot_PC1to8(pcaDF = df, colorBy = "oRG_PollenS3", limLow = 0, limHigh = 1)
+  ggL <- PCA_Plot_PC1to8(pcaDF = pcaL, colorBy = "oRG_PollenS3", limLow = 0, limHigh = 1)
   Plot_Grid(ggPlotsL = ggL
     , ncol = 3
     , rel_height = 0.1
@@ -1008,7 +1008,7 @@ lapply(names(ldf), function(name){
   )
   ggsave(paste0(outGraph, name, "_PCA_oRGPollenS3.png"), width = 14, height = 14)
   
-  ggL <- PCA_Plot_PC1to8(pcaDF = df, colorBy = "RG", limLow = 0, limHigh = 1)
+  ggL <- PCA_Plot_PC1to8(pcaDF = pcaL, colorBy = "RG", limLow = 0, limHigh = 1)
   Plot_Grid(ggPlotsL = ggL
     , ncol = 3
     , rel_height = 0.1
@@ -1019,7 +1019,7 @@ lapply(names(ldf), function(name){
   )
   ggsave(paste0(outGraph, name, "_PCA_RG.png"), width = 14, height = 14)
   
-  ggL <- PCA_Plot_PC1to8(pcaDF = df, colorBy = "RG_PollenS3", limLow = 0, limHigh = 1)
+  ggL <- PCA_Plot_PC1to8(pcaDF = pcaL, colorBy = "RG_PollenS3", limLow = 0, limHigh = 1)
   Plot_Grid(ggPlotsL = ggL
     , ncol = 3
     , rel_height = 0.1
@@ -1030,7 +1030,7 @@ lapply(names(ldf), function(name){
   )
   ggsave(paste0(outGraph, name, "_PCA_RGPollenS3.png"), width = 14, height = 14)
   
-  ggL <- PCA_Plot_PC1to8(pcaDF = df, colorBy = "IP", limLow = 0, limHigh = 1)
+  ggL <- PCA_Plot_PC1to8(pcaDF = pcaL, colorBy = "IP", limLow = 0, limHigh = 1)
   Plot_Grid(ggPlotsL = ggL
     , ncol = 3
     , rel_height = 0.1
@@ -1041,7 +1041,7 @@ lapply(names(ldf), function(name){
   )
   ggsave(paste0(outGraph, name, "_PCA_IP.png"), width = 14, height = 14)
   
-  ggL <- PCA_Plot_PC1to8(pcaDF = df, colorBy = "Neuron", limLow = 0, limHigh = 1)
+  ggL <- PCA_Plot_PC1to8(pcaDF = pcaL, colorBy = "Neuron", limLow = 0, limHigh = 1)
   Plot_Grid(ggPlotsL = ggL
     , ncol = 3
     , rel_height = 0.1
@@ -1052,7 +1052,7 @@ lapply(names(ldf), function(name){
   )
   ggsave(paste0(outGraph, name, "_PCA_Neuron.png"), width = 14, height = 14)
   
-  ggL <- PCA_Plot_PC1to8(pcaDF = df, colorBy = "IP", limLow = 0, limHigh = 0.25)
+  ggL <- PCA_Plot_PC1to8(pcaDF = pcaL, colorBy = "IP", limLow = 0, limHigh = 0.25)
   Plot_Grid(ggPlotsL = ggL
     , ncol = 3
     , rel_height = 0.1
@@ -1063,7 +1063,7 @@ lapply(names(ldf), function(name){
   )
   ggsave(paste0(outGraph, name, "_PCA_IP025scale.png"), width = 14, height = 14)
   
-  ggL <- PCA_Plot_PC1to8(pcaDF = df, colorBy = "Neuron", limLow = 0, limHigh = 0.25)
+  ggL <- PCA_Plot_PC1to8(pcaDF = pcaL, colorBy = "Neuron", limLow = 0, limHigh = 0.25)
   Plot_Grid(ggPlotsL = ggL
     , ncol = 3
     , rel_height = 0.1
