@@ -28,17 +28,14 @@ load("../analysis/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_Ke
 
 ## Variables
 graphCodeTitle <- "Monocle_Round2.R"
-outGraph <- "../analysis/graphs/Monocle_Round2/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Monocle_Round2_Comp1-20_"
-outTable <- "../analysis/tables/Monocle_Round2/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Monocle_Round2_Comp1-20_"
-outRdat <- "../analysis/Monocle_Round2/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Monocle_Round2_Comp1-20_"
+outGraph <- "../analysis/graphs/Monocle_Round2/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Comp1-10/Monocle_Round2_"
+outTable <- "../analysis/tables/Monocle_Round2/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Comp1-10/Monocle_Round2_"
+outRdat <- "../analysis/Monocle_Round2/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Comp1-10/Monocle_Round2_"
 
 ## Output Directories
-outDir <- dirname(outGraph)
-dir.create(outDir, recursive = TRUE)
-outTableDir <- dirname(outTable)
-dir.create(outTableDir, recursive = TRUE)
-outRdatDir <- dirname(outRdat)
-dir.create(outRdatDir, recursive = TRUE)
+dir.create(dirname(outGraph), recursive = TRUE)
+dir.create(dirname(outTable), recursive = TRUE)
+dir.create(dirname(outRdat), recursive = TRUE)
 
 ## Set ggplot2 theme
 theme_set(theme_bw())
@@ -59,7 +56,8 @@ clusterIDs <- centSO@ident
 centSO@raw.data <- NULL
 centSO@scale.data <- NULL
 # Add custom cluster ID combinations to ID list
-clustersL <- c(list(c(0, 1, 4, 13), c(0, 1), c(3, 14), c(5, 6), c(7, 9))
+clustersL <- c(list(
+  c(0, 1, 4, 12), c(0, 1, 2), c(0, 1), c(3, 14), c(5, 6), c(7, 9))
   , as.list(sort(as.numeric(as.character(unique(clusterIDs))))))
 # Select ID from list using qsub task ID
 clid <- unlist(clustersL[as.numeric(args[1])])
@@ -113,7 +111,7 @@ if (sum(clusterIDs %in% clid) < 100) {
   print("Reduce data dimensionality")
   # Reduce data dimensionality
   # Use number of genes expressed or total mRNAs?
-  mo_filtered <- reduceDimension(mo_filtered, max_components = 20,
+  mo_filtered <- reduceDimension(mo_filtered, max_components = 10,
     residualModelFormulaStr = "~individual + librarylab + Total_mRNAs"
     , verbose = TRUE)
   

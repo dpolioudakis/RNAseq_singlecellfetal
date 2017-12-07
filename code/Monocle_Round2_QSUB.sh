@@ -16,7 +16,7 @@
 #$ -o logs/Monocle_Round2_QSUB_$JOB_ID_$TASK_ID.log
 #$ -e logs/Monocle_Round2_QSUB_$JOB_ID_$TASK_ID.error
 #$ -l h_data=128G,h_rt=24:00:00,highp
-#$ -t 1-22
+#$ -t 1-23
 ################################################################################
 
 echo ""
