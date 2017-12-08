@@ -22,8 +22,8 @@ args <- commandArgs(trailingOnly = TRUE)
 # Monocle round 2
 
 # How to reorder list of monocle objects for plotting
-toOrder <- c("0-1-4-13", "0-1", "3-14", "5-6", "7-9", "0", "1", "2", "3", "4"
-  , "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15")
+toOrder <- c("0-1-4-12", "0-1-2", "0-1", "3-14", "5-6", "7-9", "0", "1", "2", "3"
+  , "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15")
 
 # Monocle object
 inMo <- list.files("../analysis/Monocle_Round2/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Comp1-10/")
@@ -521,15 +521,15 @@ lapply(names(ptDeL), function(cluster){
   png(paste0(outSubGraph, "_Cluster", cluster, ".png")
     , width = 12, height = 16, units = "in", res = 300)
   tryCatch(plot_pseudotime_heatmap(mo_filtered[sig_gene_names,]
-      , num_clusters = 3
-      , cores = 1
-      , show_rownames = T)
+    , num_clusters = 3
+    , cores = 1
+    , show_rownames = T)
     , error = function(cond) {
-        message(paste0("Error for cluster: ", cluster))
-        message("Error message:")
-        message(cond)
-        # Choose a return value in case of error
-        return(NULL)
+      message(paste0("Error for cluster: ", cluster))
+      message("Error message:")
+      message(cond)
+      # Choose a return value in case of error
+      return(NULL)
     }
   )
   dev.off()
@@ -581,82 +581,6 @@ lapply(names(ptDeL), function(cluster){
     }
   )
   dev.off()
-})
-
-
-## Heatmaps of Telley transcriptional wave genes
-
-# Output Directories
-outDir <- paste0(outGraph, "Pseudotime_Heatmap_TelleyWaves")
-dir.create(outDir, recursive = TRUE)
-outSubGraph <- paste0(outDir, "/", basename(outDir), "_")
-# Plot
-lapply(names(ptDeL), function(cluster){
-  
-  diff_test_res <- ptDeL[[cluster]]
-  mo_filtered <- moL[[cluster]]
-  
-  Convert_MouseGenes_To_HumanGenes <- function(geneList) {
-    geneList <- data.frame(geneList)
-    mart = useEnsembl(biomart = "ensembl", dataset = "mmusculus_gene_ensembl")
-    mart <- useMart("ENSEMBL_MART_ENSEMBL", host = "www.ensembl.org")
-    mart <- useDataset("mmusculus_gene_ensembl", mart = mart)
-    # Look up human orthologs
-    ensemblMmHsDF <- getBM(
-      attributes = c("ensembl_gene_id", "hsapiens_homolog_ensembl_gene"
-        , "hsapiens_homolog_associated_gene_name", "hsapiens_homolog_perc_id")
-      , filters = "mgi_symbol"
-      , values = geneList
-      , mart = mart
-    )
-    # Have to add MGI symbol separately, can't call BM to add both ortholog and MGI
-    # at the same time
-    ensemblMgiSymDF <- getBM(
-      attributes = c("ensembl_gene_id", "mgi_symbol")
-      , filters = "mgi_symbol"
-      , values = geneList
-      , mart = mart
-    )
-    # Merge mouse gene symbols and human
-    genesDF <- merge(ensemblMmHsDF, ensemblMgiSymDF
-      , by.x = "ensembl_gene_id", by.y = "ensembl_gene_id")
-    return(genesDF)
-  }
-  
-  lapply(colnames(tyDF), function(wave) {
-    
-    telleyGenes <- tyDF[ ,wave]
-  
-    # Convert mouse to human
-    df1 <- Convert_MouseGenes_To_HumanGenes(geneList = telleyGenes)
-    telleyGenes <- df1$hsapiens_homolog_associated_gene_name
-    
-    # Subset to TFs, co-factors, chromatin remodelers and by qval
-    diff_test_res <- diff_test_res[diff_test_res$qval < 0.05
-      & diff_test_res$gene_short_name %in% telleyGenes, ]
-    
-    # Order by qval
-    diff_test_res <- diff_test_res[order(diff_test_res$qval), ]
-    
-    genes <- row.names(diff_test_res)
-    
-    png(paste0(outSubGraph, "Cluster", cluster, "_", wave, ".png")
-      , width = 12, height = 16, units = "in", res = 300)
-    tryCatch(plot_pseudotime_heatmap(mo_filtered[genes,]
-      , num_clusters = 3
-      , cores = 1
-      , show_rownames = T)
-      , error = function(cond) {
-        message(paste0("Error for cluster: ", cluster))
-        message("Error message:")
-        message(cond)
-        # Choose a return value in case of error
-        return(NULL)
-      }
-    )
-    dev.off()
-  
-  })
 })
 
 # Heatmap of state DE genes
@@ -723,7 +647,8 @@ plot_genes_branched_heatmap(mo_filtered[row.names(subset(beamDF, qval < 1e-4)),]
   show_rownames = T)
 dev.off()
 ################################################################################
-
-
-
-
+  
+  
+  
+  
+  
