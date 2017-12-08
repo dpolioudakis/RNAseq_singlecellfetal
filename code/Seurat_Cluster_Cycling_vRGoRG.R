@@ -50,12 +50,9 @@ outTable <- "../analysis/tables/Seurat_Cluster_DS2-11_Cycling_vRGoRG/Seurat_Clus
 outData <- "../analysis/Seurat_Cluster_DS2-11_Cycling_vRGoRG/Seurat_Cluster_Cycling_vRGoRG_DS2-11_"
 
 ## Output Directories
-outDir <- dirname(outGraph)
-dir.create(outDir, recursive = TRUE)
-outTableDir <- dirname(outTable)
-dir.create(outTableDir, recursive = TRUE)
-outRdatDir <- dirname(outData)
-dir.create(outRdatDir, recursive = TRUE)
+dir.create(dirname(outGraph), recursive = TRUE)
+dir.create(dirname(outTable), recursive = TRUE)
+dir.create(dirname(outData), recursive = TRUE)
 
 ## Set ggplot2 theme
 theme_set(theme_bw())
@@ -286,8 +283,8 @@ PCA_Format_For_GGplot <- function(pca) {
 PCA_Plot <- function(ggDF, varExpL, PCx, PCy){
   gg <- ggplot(ggDF, aes(x = ggDF[[PCx]], y = ggDF[[PCy]], color = colorBy)) +
     geom_point() +
-    xlab(paste0(PCx, " (", round(varExpL[[PCx]]*100, 2), "%)")) +
-    ylab(paste0(PCy, " (", round(varExpL[[PCy]]*100, 2), "%)"))
+    # xlab(paste0(PCx, " (", round(varExpL[[PCx]]*100, 2), "%)")) +
+    # ylab(paste0(PCy, " (", round(varExpL[[PCy]]*100, 2), "%)"))
   return(gg)
 }
 
@@ -325,7 +322,7 @@ PCA_Plot_PC1to8 <- function(pcaL, colorBy, limLow = NULL, limHigh = NULL) {
       gg <- gg +
         scale_color_distiller(name = "Normalized\nexpression"
           , type = "div", palette = 5, direction = -1, limits = c(limLow, limHigh)) +
-        geom_point(size = 0.05)
+        geom_point(size = 0.01)
       return(gg)})
   }
   return(ggL)
@@ -806,47 +803,6 @@ cellIDs <- row.names(df1)[df1$RG > 0.5 & df1$IP < 0.25 & df1$Neuron < 0.25]
 cellIDs <- intersect(cellIDs, names(centSO@ident[centSO@ident == 10]))
 exLM[["RG_IPn_Neuronn_Cluster10"]] <- centSO@scale.data[ ,colnames(centSO@scale.data) %in% cellIDs]
 
-# # Identify RG+ cluster 8 cells
-# df1 <- Format_Number_Cell_Types_Cluster_Dataframe(
-#   exM = noCentExM, seuratO = centSO)
-# cellIDs <- row.names(df1)[df1$RG > 0.5]
-# cellIDs <- intersect(cellIDs, names(centSO@ident[centSO@ident == 8]))
-# exLM[["RG_Cluster8"]] <- centSO@scale.data[ ,colnames(centSO@scale.data) %in% cellIDs]
-# 
-# # Identify RG+ cluster 10 cells
-# df1 <- Format_Number_Cell_Types_Cluster_Dataframe(
-#   exM = noCentExM, seuratO = centSO)
-# cellIDs <- row.names(df1)[df1$RG > 0.5]
-# cellIDs <- intersect(cellIDs, names(centSO@ident[centSO@ident == 10]))
-# exLM[["RG_Cluster10"]] <- centSO@scale.data[ ,colnames(centSO@scale.data) %in% cellIDs]
-# 
-# # Identify RG+ and / or IP+ G2M cells
-# df1 <- Format_Number_Cell_Types_Cluster_Dataframe(
-#   exM = noCentExM, seuratO = centSO)
-# cellIDs <- row.names(df1)[df1$RG > 0.5 | df1$IP > 0.5]
-# cellIDs <- intersect(cellIDs, row.names(df1)[df1$PHASE == "G2M"])
-# exLM[["RG_IP_G2M"]] <- centSO@scale.data[ ,colnames(centSO@scale.data) %in% cellIDs]
-# 
-# # Identify RG+ and / or IP+ S phase cells
-# df1 <- Format_Number_Cell_Types_Cluster_Dataframe(
-#   exM = noCentExM, seuratO = centSO)
-# cellIDs <- row.names(df1)[df1$RG > 0.5 | df1$IP > 0.5]
-# cellIDs <- intersect(cellIDs, row.names(df1)[df1$PHASE == "S"])
-# exLM[["RG_IP_Sphase"]] <- centSO@scale.data[ ,colnames(centSO@scale.data) %in% cellIDs]
-# 
-# # Identify RG+ G2M cells
-# df1 <- Format_Number_Cell_Types_Cluster_Dataframe(
-#   exM = noCentExM, seuratO = centSO)
-# cellIDs <- row.names(df1)[df1$RG > 0.5]
-# cellIDs <- intersect(cellIDs, row.names(df1)[df1$PHASE == "G2M"])
-# exLM[["RG_G2M"]] <- centSO@scale.data[ ,colnames(centSO@scale.data) %in% cellIDs]
-# 
-# # Identify RG+ S phase cells
-# df1 <- Format_Number_Cell_Types_Cluster_Dataframe(
-#   exM = noCentExM, seuratO = centSO)
-# cellIDs <- row.names(df1)[df1$RG > 0.5]
-# cellIDs <- intersect(cellIDs, row.names(df1)[df1$PHASE == "S"])
-# exLM[["RG_Sphase"]] <- centSO@scale.data[ ,colnames(centSO@scale.data) %in% cellIDs]
 
 # Plot mean expression rank, standard deviation, and variance
 pgL <- lapply(names(exLM), function(name) {
@@ -863,28 +819,46 @@ Plot_Grid(ggPlotsL = pgL, ncol = 1, rel_height = 0.1
     , "\n\nSubset cells by RG+ and / or IP+ expression and G2M or S phase"))
 ggsave(paste0(outGraph, "RG_IP_MeanExpr_StdDev.png"), width = 13, height = 20)
 
-# Subset to top 2500 expressed genes
+# Subset to top expressed genes
 exLM <- lapply(exLM, function(exM){
   mns <- rowMeans(exM)
-  genes <- names(sort(mns, decreasing = TRUE))[1:2500]
+  genes <- names(sort(mns, decreasing = TRUE))[1:10000]
+  # genes <- names(sort(mns, decreasing = TRUE))[1:1000]
   exM <- exM[row.names(exM) %in% genes, ]
+  return(exM)
+})
+# Subset to high variance genes
+exLM <- lapply(exLM, function(exM){
+  varDF <- data.frame(apply(exM, 1, var))
+  # ggplot(varDF, aes(x = varDF[,1])) +
+  #   geom_histogram(binwidth = 0.1)
+  # ggsave(paste0(outGraph, "VarHist.png"))
+  exM <- exM[row.names(exM) %in% row.names(varDF)[varDF > 0.3], ]
   return(exM)
 })
 
 # PCA
 pcaL <- lapply(exLM, function(exM){
-  pca <- prcomp(t(exM))
+  pca <- prcomp(t(exM), center = FALSE)
+  print(head((pca$sdev)^2 / sum(pca$sdev^2)*100))
   return(pca)
 })
 
 # Plot PCA
+
+outGraphPCA <- paste0(
+  dirname(outGraph)
+  , "/PCA_Top10000_Var03_NoCent/"
+  , basename(outGraph)
+)
+dir.create(dirname(outGraphPCA), recursive = TRUE)
 
 # Plot PCA loadings
 lapply(names(pcaL), function(name){
   pca <- pcaL[[name]]
   Prcomp_Loadings_Plot(pca = pca, nGenes = c(1:20), nPCs = c(1:8)
     , title = paste0(graphCodeTitle, "\n\n", name, "\nGenes with highest PC loadings"))
-  ggsave(paste0(outGraph, name, "_PCAloadings.pdf"), width = 13
+  ggsave(paste0(outGraphPCA, name, "_PCAloadings.pdf"), width = 13
     , height = 20, limitsize = FALSE)
 })
 
@@ -924,7 +898,7 @@ lapply(names(ldf), function(name){
       , "\nColored by RG+ and / or IP+"
       , "\n+ = > 0.5 log normalized expression")
   )
-  ggsave(paste0(outGraph, name, "_PCA_MarkerLabel05.png"), width = 14, height = 14)
+  ggsave(paste0(outGraphPCA, name, "_PCA_MarkerLabel05.png"), width = 14, height = 12)
   
   ggL <- PCA_Plot_PC1to8(pcaL = pcaL, colorBy = "Cell_Subset_025")
   Plot_Grid(ggPlotsL = ggL
@@ -935,7 +909,7 @@ lapply(names(ldf), function(name){
       , "\nColored by RG+ and / or IP+"
       , "\n+ = > 0.25 log normalized expression")
   )
-  ggsave(paste0(outGraph, name, "_PCA_MarkerLabel025.png"), width = 14, height = 14)
+  ggsave(paste0(outGraphPCA, name, "_PCA_MarkerLabel025.png"), width = 14, height = 12)
   
   ggL <- PCA_Plot_PC1to8(pcaL = pcaL, colorBy = "Cell_Subset_075")
   Plot_Grid(ggPlotsL = ggL
@@ -946,7 +920,7 @@ lapply(names(ldf), function(name){
       , "\nColored by RG+ and / or IP+"
       , "\n+ = > 0.75 log normalized expression")
   )
-  ggsave(paste0(outGraph, name, "_PCA_MarkerLabel075.png"), width = 14, height = 14)
+  ggsave(paste0(outGraphPCA, name, "_PCA_MarkerLabel075.png"), width = 14, height = 12)
   
   ggL <- PCA_Plot_PC1to8(pcaL = pcaL, colorBy = "vRG_oRG_Subset")
   Plot_Grid(ggPlotsL = ggL
@@ -957,7 +931,7 @@ lapply(names(ldf), function(name){
       , "\nColored by vRG+ and / or oRG+"
       , "\n+ = > 0.5 log normalized expression")
   )
-  ggsave(paste0(outGraph, name, "_PCA_vRGoRG.png"), width = 14, height = 14)
+  ggsave(paste0(outGraphPCA, name, "_PCA_vRGoRG.png"), width = 14, height = 12)
   
   ggL <- PCA_Plot_PC1to8(pcaL = pcaL, colorBy = "S_Score")
   Plot_Grid(ggPlotsL = ggL
@@ -968,7 +942,7 @@ lapply(names(ldf), function(name){
       , "\nColored by S phase score"
       , "\n+ = > 0.5 log normalized expression")
   )
-  ggsave(paste0(outGraph, name, "_PCA_Sscore.png"), width = 14, height = 14)
+  ggsave(paste0(outGraphPCA, name, "_PCA_Sscore.png"), width = 14, height = 12)
   
   ggL <- PCA_Plot_PC1to8(pcaL = pcaL, colorBy = "G2M_Score")
   Plot_Grid(ggPlotsL = ggL
@@ -979,7 +953,7 @@ lapply(names(ldf), function(name){
       , "\nColored by G2M phase score"
       , "\n+ = > 0.5 log normalized expression")
   )
-  ggsave(paste0(outGraph, name, "_PCA_G2Mscore.png"), width = 14, height = 14)
+  ggsave(paste0(outGraphPCA, name, "_PCA_G2Mscore.png"), width = 14, height = 12)
   
   ggL <- PCA_Plot_PC1to8(pcaL = pcaL, colorBy = "vRG", limLow = 0, limHigh = 1)
   Plot_Grid(ggPlotsL = ggL
@@ -990,7 +964,7 @@ lapply(names(ldf), function(name){
       , "\nColored by vRG expression"
       , "\n+ = > 0.5 log normalized expression")
   )
-  ggsave(paste0(outGraph, name, "_PCA_vRG.png"), width = 14, height = 14)
+  ggsave(paste0(outGraphPCA, name, "_PCA_vRG.png"), width = 14, height = 12)
   
   ggL <- PCA_Plot_PC1to8(pcaL = pcaL, colorBy = "vRG_PollenS3", limLow = 0, limHigh = 1)
   Plot_Grid(ggPlotsL = ggL
@@ -1001,7 +975,7 @@ lapply(names(ldf), function(name){
       , "\nColored by vRG Pollen S3 expression"
       , "\n+ = > 0.5 log normalized expression")
   )
-  ggsave(paste0(outGraph, name, "_PCA_vRGPollenS3.png"), width = 14, height = 14)
+  ggsave(paste0(outGraphPCA, name, "_PCA_vRGPollenS3.png"), width = 14, height = 12)
   
   ggL <- PCA_Plot_PC1to8(pcaL = pcaL, colorBy = "oRG", limLow = 0, limHigh = 1)
   Plot_Grid(ggPlotsL = ggL
@@ -1012,7 +986,7 @@ lapply(names(ldf), function(name){
       , "\nColored by oRG expression"
       , "\n+ = > 0.5 log normalized expression")
   )
-  ggsave(paste0(outGraph, name, "_PCA_oRG.png"), width = 14, height = 14)
+  ggsave(paste0(outGraphPCA, name, "_PCA_oRG.png"), width = 14, height = 12)
   
   ggL <- PCA_Plot_PC1to8(pcaL = pcaL, colorBy = "oRG_PollenS3", limLow = 0, limHigh = 1)
   Plot_Grid(ggPlotsL = ggL
@@ -1023,7 +997,7 @@ lapply(names(ldf), function(name){
       , "\nColored by oRG Pollen S3 expression"
       , "\n+ = > 0.5 log normalized expression")
   )
-  ggsave(paste0(outGraph, name, "_PCA_oRGPollenS3.png"), width = 14, height = 14)
+  ggsave(paste0(outGraphPCA, name, "_PCA_oRGPollenS3.png"), width = 14, height = 12)
   
   ggL <- PCA_Plot_PC1to8(pcaL = pcaL, colorBy = "RG", limLow = 0, limHigh = 1)
   Plot_Grid(ggPlotsL = ggL
@@ -1034,7 +1008,7 @@ lapply(names(ldf), function(name){
       , "\nColored by RG expression"
       , "\n+ = > 0.5 log normalized expression")
   )
-  ggsave(paste0(outGraph, name, "_PCA_RG.png"), width = 14, height = 14)
+  ggsave(paste0(outGraphPCA, name, "_PCA_RG.png"), width = 14, height = 12)
   
   ggL <- PCA_Plot_PC1to8(pcaL = pcaL, colorBy = "RG_PollenS3", limLow = 0, limHigh = 1)
   Plot_Grid(ggPlotsL = ggL
@@ -1045,7 +1019,7 @@ lapply(names(ldf), function(name){
       , "\nColored by RG Pollen S3 expression"
       , "\n+ = > 0.5 log normalized expression")
   )
-  ggsave(paste0(outGraph, name, "_PCA_RGPollenS3.png"), width = 14, height = 14)
+  ggsave(paste0(outGraphPCA, name, "_PCA_RGPollenS3.png"), width = 14, height = 12)
   
   ggL <- PCA_Plot_PC1to8(pcaL = pcaL, colorBy = "IP", limLow = 0, limHigh = 1)
   Plot_Grid(ggPlotsL = ggL
@@ -1056,7 +1030,7 @@ lapply(names(ldf), function(name){
       , "\nColored by IP expression"
       , "\n+ = > 0.5 log normalized expression")
   )
-  ggsave(paste0(outGraph, name, "_PCA_IP.png"), width = 14, height = 14)
+  ggsave(paste0(outGraphPCA, name, "_PCA_IP.png"), width = 14, height = 12)
   
   ggL <- PCA_Plot_PC1to8(pcaL = pcaL, colorBy = "Neuron", limLow = 0, limHigh = 1)
   Plot_Grid(ggPlotsL = ggL
@@ -1067,7 +1041,7 @@ lapply(names(ldf), function(name){
       , "\nColored by Neuron expression"
       , "\n+ = > 0.5 log normalized expression")
   )
-  ggsave(paste0(outGraph, name, "_PCA_Neuron.png"), width = 14, height = 14)
+  ggsave(paste0(outGraphPCA, name, "_PCA_Neuron.png"), width = 14, height = 12)
   
   ggL <- PCA_Plot_PC1to8(pcaL = pcaL, colorBy = "IP", limLow = 0, limHigh = 0.25)
   Plot_Grid(ggPlotsL = ggL
@@ -1078,7 +1052,7 @@ lapply(names(ldf), function(name){
       , "\nColored by IP expression"
       , "\n+ = > 0.5 log normalized expression")
   )
-  ggsave(paste0(outGraph, name, "_PCA_IP025scale.png"), width = 14, height = 14)
+  ggsave(paste0(outGraphPCA, name, "_PCA_IP025scale.png"), width = 14, height = 12)
   
   ggL <- PCA_Plot_PC1to8(pcaL = pcaL, colorBy = "Neuron", limLow = 0, limHigh = 0.25)
   Plot_Grid(ggPlotsL = ggL
@@ -1089,7 +1063,7 @@ lapply(names(ldf), function(name){
       , "\nColored by Neuron expression"
       , "\n+ = > 0.5 log normalized expression")
   )
-  ggsave(paste0(outGraph, name, "_PCA_Neuron025scale.png"), width = 14, height = 14)
+  ggsave(paste0(outGraphPCA, name, "_PCA_Neuron025scale.png"), width = 14, height = 12)
   
   # # PCA plots
   # lapply(names(ldf), function(name){
@@ -1105,7 +1079,7 @@ lapply(names(ldf), function(name){
   #     , "\nColored by correlation to Cluster 7 (oRG) mean expression profile"
   #     , "\n+ = > 0.5 log normalized expression")
   # )
-  # ggsave(paste0(outGraph, name, "_PCA_CorCluster7.png"), width = 14, height = 14)
+  # ggsave(paste0(outGraphPCA, name, "_PCA_CorCluster7.png"), width = 14, height = 12)
   # 
   # ggL <- PCA_Plot_PC1to8(pcaDF = df, colorBy = "Cor_Cluster9", limLow = -1, limHigh = 1)
   # Plot_Grid(ggPlotsL = ggL
@@ -1116,7 +1090,7 @@ lapply(names(ldf), function(name){
   #     , "\nColored by correlation to Cluster 9 (vRG) mean expression profile"
   #     , "\n+ = > 0.5 log normalized expression")
   # )
-  # ggsave(paste0(outGraph, name, "_PCA_CorCluster9.png"), width = 14, height = 14)
+  # ggsave(paste0(outGraphPCA, name, "_PCA_CorCluster9.png"), width = 14, height = 12)
   
 })
 ################################################################################
