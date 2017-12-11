@@ -170,15 +170,16 @@ Format_DE <- function (deLM, so, clusterID) {
 # Format data for expression heatmap, cells ordered by cluster
 Heatmap_By_Cluster_Format_Data <- function(
   geneGroupDF, exprM, seuratO, clusters, lowerLimit, upperLimit
-  , geneOrder = NULL, clusterOrder = NULL) {
+  , geneOrder = FALSE, clusterOrder = NULL) {
   
   # Subset expression matrix to genes of interest by merging
   ggDF <- merge(geneGroupDF[c("GENE", "GROUP")], exprM
     , by.x = 1, by.y = "row.names", all.x = TRUE)
   
-  if (! is.null(geneOrder)) {
-    levels <- expand.grid(geneOrder, unique(ggDF$GROUP))
-    levels <- paste0(levels$Var1, "   ", levels$Var2)
+  if (geneOrder == TRUE) {
+    # levels <- expand.grid(geneOrder, unique(ggDF$GROUP))
+    # levels <- paste0(levels$Var1, "   ", levels$Var2)
+    levels <- paste0(geneGroupDF$GENE, "   ", geneGroupDF$GROUP)
   }
   
   # Set group factor levels
@@ -259,10 +260,10 @@ Heatmaps_By_Cluster_Combined <- function(geneGroupDF, exprM, seuratO
     , geneOrder = geneOrder
   )
   p1 <- p1 + theme(
-    axis.title.x = element_blank()
+    # axis.title.x = element_blank()
     , strip.text.y = element_blank()
     , legend.position = "none"
-  )
+    )
   p2 <- Heatmap_By_Cluster(geneGroupDF = geneGroupDF, exprM = exprM
     , seuratO = seuratO, clusters = clusters2
     , lowerLimit = lowerLimit, upperLimit = upperLimit
@@ -281,10 +282,11 @@ Heatmaps_By_Cluster_Combined <- function(geneGroupDF, exprM, seuratO
     , geneOrder = geneOrder
   )
   p3 <- p3 + theme(
-    axis.title.x = element_blank()
+    # axis.title.x = element_blank()
     , axis.title.y = element_blank()
     , axis.text.y = element_blank()
-    , axis.ticks.y = element_blank())
+    , axis.ticks.y = element_blank()
+    )
   ggL <- list(p1, p2, p3)
   # # plot_grid combine
   # pg <- plot_grid(plotlist = ggL, ncol = 3, align = 'h', axis = 'b')
