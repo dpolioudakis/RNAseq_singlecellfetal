@@ -56,6 +56,9 @@ mmDF <- read.csv("../source/Molyneaux_LayerMarkers_Format.csv", header = TRUE)
 # Markers from Lake 2016
 lmDF <- read.csv("../source/Lake_2016_ST5.csv", skip = 4, header = TRUE, fill = TRUE)
 
+# Luis metaMat results
+mmapDF <- read.csv("../source/metaMat/Overlapped-Genes.csv", header = TRUE)
+
 ## Variables
 graphCodeTitle <- "Known_Marker_Expression.R"
 outGraph <- "../analysis/graphs/Known_Marker_Expression/DS2-11_FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Known_Marker_Expression_"
@@ -228,7 +231,7 @@ Heatmaps_Combined <- function(ggDF, seuratO, clusters1, clusters2, clusters3
 }
 ################################################################################
 
-### tSNE graph colored by cluster and feature plot
+### Luis marker genes
 
 # ## Assign annotated cluster names to clusters
 # current.cluster.ids <- c(0, 1, 2, 3, 4, 5, 6, 7, 8, 9)
@@ -250,8 +253,6 @@ Heatmaps_Combined <- function(ggDF, seuratO, clusters1, clusters2, clusters3
 
 # Collect tSNE values for ggplot
 ggDF <- as.data.frame(centSO@dr$tsne@cell.embeddings)
-
-## Luis marker genes
 
 # Subset to marker genes of interest for Luis' excel file
 # Cleanup marker data frame
@@ -376,7 +377,7 @@ Heatmaps_Combined(
     , "\nSeurat clustering with PC1-40"
     , "\n"))
 ggsave(paste0(outGraph, "KnownMarks_Heatmap_Normalized.png")
-  , width = 16, height = 41)
+  , width = 16, height = 60, limitsize = FALSE)
 
 # Heatmap
 # Normalized, mean centered and scaled
@@ -399,7 +400,66 @@ Heatmaps_Combined(
     , "\nSeurat clustering with PC1-40"
     , "\n"))
 ggsave(paste0(outGraph, "KnownMarks_Heatmap_NormalizedCenteredScaled.png")
-  , width = 16, height = 41)
+  , width = 16, height = 60, limitsize = FALSE)
+
+
+## Subset of marker genes for paper
+
+genes <- c("FBOX32"
+  , "CRYAB"
+  , "HOPX"
+  , "LGALS3"
+  , "VIM"
+  , "PAX6"
+  , "HES1"
+  , "SOX2"
+  , "EOMES"
+  , "STMN2"
+  , "NEUROD6"
+  , "SATB2"
+  , "DLX1"
+  , "DLX2"
+  , "SST"
+  , "CALB2"
+  , "LXH6"
+  , "PPP1R1B"
+  , "DCX"
+  , "BCL11B"
+  , "TBR1"
+  , "SOX5"
+  , "ITM2A"
+  , "ELTD1"
+  , "BGS5"
+  , "PDBGRB"
+  , "OLIG1"
+  , "OLG2"
+  , "AIF1"
+  , "CX3CR1"
+)
+# Heatmap
+# Normalized, mean centered and scaled
+ssKmDF <- kmDF[c("Gene.Symbol", "Grouping")]
+ssKmDF[ssKmDF$Gene.Symbol %in% genes, ]
+ggDF <- merge(ssKmDF[c("Gene.Symbol", "Grouping")], centSO@scale.data
+  , by.x = 1, by.y = "row.names", all.x = TRUE)
+Heatmaps_Combined(
+  ggDF = ggDF, seuratO = centSO, lowerLimit = -1.5, upperLimit = 1.5
+  , clusters1 = c(0:1), clusters2 = c(2:10), clusters3 = c(11:17)
+  , title = paste0(graphCodeTitle
+    , "\n\nExpression of published marker genes by cluster"
+    , "\nx-axis: Marker genes"
+    , "\ny-axis: Cells ordered by cluster"
+    , "\nNormalized expression, mean centered, variance scaled"
+    , "\n\nRemove cells < 200 genes detected"
+    , "\nRemove cells > 3192 (3 SD) genes detected"
+    , "\nRemove genes detected in < 3 cells"
+    , "\nNormalize expression"
+    , "\nRegress out nUMI, donor, library lab"
+    , "\nMean center variance scale expression"
+    , "\nSeurat clustering with PC1-40"
+    , "\n"))
+ggsave(paste0(outGraph, "KnownMarks_Heatmap_NormalizedCenteredScaled.png")
+  , width = 16, height = 30, limitsize = FALSE)
 ################################################################################
 
 ### Cell cycle genes
