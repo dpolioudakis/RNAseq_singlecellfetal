@@ -22,13 +22,16 @@ require(biomaRt)
 ## Load data
 
 # Digital gene expression and metadata: exDF and metDF
-load("../analysis/Expression_Matrix_Compile_dge_FtMm250_DS-2-3-4-5-6-7-8-9-11.Rdata")
+load("../analysis/Expression_Matrix_Compile/Expression_Matrix_Compile_dge_FtMm250_DS-2-3-4-5-6-7-8-9-11.Rdata")
 # # Subsetting for testing
 # idx <- sample(1:ncol(exDF), 500)
 # exDF <- exDF[idx]
 # metDF <- metDF[idx, ]
 # Seurat object for variable genes and scaled data
-load("../analysis/Seurat_Cluster_DS-2-3-4-5-6-7-8-9-11/Seurat_Cluster_DS-2-3-4-5-6-7-8-9-11_exon_FtMm250_200-3sdgd_Mt5_RegNumiPMtLibBrain_seuratO.Robj")
+load("../analysis/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_seuratO.Robj")
+# load("../analysis/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_TEST_seuratO.Robj")
+# centSO <- ssCentSO
+# noCentExM <- ssNoCentExM
 
 # CDS length and GC
 geneInfoDF <- read.csv("../source/BiomaRt_Compile_GeneInfo_GRCh38_Ensembl87.csv"
@@ -39,11 +42,12 @@ geneInfoDF <- read.csv("../source/BiomaRt_Compile_GeneInfo_GRCh38_Ensembl87.csv"
 
 # Output
 # Graphs
-outGraphs <- "../analysis/graphs/Covariates_DS-2-3-4-5-6-7-8-9-11_"
+outGraphs <- "../analysis/graphs/Covariates/Covariates_DS-2-3-4-5-6-7-8-9-11_"
 dir.create(dirname(outGraphs), recursive = TRUE)
 graphsTitle <- "Covariates_DS-2-3-4-5-6-7-8-9-11.R"
 # Data
-outData <- "../analysis/Covariates_DS-2-3-4-5-6-7-8-9-11_"
+outData <- "../analysis/Covariates/Covariates_DS-2-3-4-5-6-7-8-9-11_"
+dir.create(dirname(outData), recursive = TRUE)
 
 ## ggplot2 theme
 theme_set(theme_bw())
@@ -108,6 +112,12 @@ metDF$nUMI <- nUMI[match(metDF$CELL, names(nUMI))]
 nGene <- apply(exDF, 2, function(col) {sum(col  > 0)})
 metDF$nGene <- nGene[match(metDF$CELL, names(nGene))]
 
+## Add sex and age to metadata
+metDF$Age <- "GW17"
+metDF$Age[metDF$BRAIN %in% c(3,5)] <- "GW18"
+metDF$Sex <- "Female"
+metDF$Sex[metDF$BRAIN == 3] <- "Male"
+
 ## Length and GC
 # Convert ensembl ID to gene symbol and subset to ensembl IDs found in biomaRt
 df <- QueryBiomaRt(row.names(exDF), "ensembl_gene_id"
@@ -160,8 +170,9 @@ metDF$GC_CONTENT <- gcDF[match(metDF$CELL, row.names(gcDF)), ]
 ## Covariates
 # cvDF <- metDF[c("BRAIN", "REGION", "LIBRARY", "SEQ_RUN", "nUMI", "nGene"
 #   , "CDS_LENGTH", "GC_CONTENT", "PERCENT_MT")]
-cvDF <- metDF[c("BRAIN", "REGION", "LIBRARY", "SEQ_RUN", "nUMI", "nGene"
+cvDF <- metDF[c("BRAIN", "REGION", "LIBRARY", "SEQ_RUN", "nUMI", "nGene", "Age", "Sex"
   , "CDS_LENGTH", "GC_CONTENT")]
+colnames(cvDF)[colnames(cvDF) == "BRAIN"] <- "DONOR"
 row.names(cvDF) <- metDF$CELL
 ################################################################################
 
@@ -250,8 +261,7 @@ nmVarDF <- centSO@scale.data[row.names(centSO@scale.data) %in% centSO@var.genes,
 idx <- match(colnames(nmVarDF), row.names(cvDF))
 idx <- idx[! is.na(idx)]
 nmCvDF <- cvDF[idx, ]
-# # For testing
-# nmVarDF <- nmVarDF[ ,colnames(nmVarDF) %in% colnames(exDF)]
+nmVarDF <- nmVarDF[ ,colnames(nmVarDF) %in% rownames(cvDF)]
 
 # Centers the mean of all genes - this means the PCA gives us the eigenvectors
 # of the geneXgene covariance matrix, allowing us to assess the proportion of
