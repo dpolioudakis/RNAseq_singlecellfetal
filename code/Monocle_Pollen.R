@@ -50,9 +50,9 @@ theme_update(axis.line = element_line(colour = "black")
 ### Format
 
 # Remove ERCCs and STAR stats from tail
-tail(exDF, 10)
+tail(exDF, 10)[1:10, 1:5]
 exDF <- head(exDF, -97)
-tail(exDF, 5)
+tail(exDF, 5)[1:10, 1:5]
 
 # Move gene names
 row.names(exDF) <- exDF$X
@@ -85,18 +85,21 @@ cell_type_combos <- list(
 
 lapply(cell_type_combos, function(cellTypes) {
   
+  print(paste0("Running monocle for Pollen cell types: ", cellTypes))
+  
   # Subset metadata to cell types of interest
   subMtDF <- mtDF[mtDF$Inferred.Cell.Type %in% cellTypes, ]
   # Subset expression data to cells in metadata
-  subExDF <- exDF[ ,colnames(exDF) %in% as.character(mtDF$Cell)]
+  subExDF <- exDF[ ,colnames(exDF) %in% as.character(subMtDF$Cell)]
   
   # Setup monocle object
-  feature_data = data.frame(gene_short_name = rownames(exDF))
+  print("Initializing Monocle object...")
+  feature_data = data.frame(gene_short_name = rownames(subExDF))
   rownames(feature_data) = feature_data$gene_short_name
-  pd <- new("AnnotatedDataFrame", data = mtDF)
+  pd <- new("AnnotatedDataFrame", data = subMtDF)
   fd <- new("AnnotatedDataFrame", data = feature_data) 
   # Note metadata row order must match expression data column order
-  mo <- newCellDataSet(cellData = as(as.matrix(exDF), "sparseMatrix"), 
+  mo <- newCellDataSet(cellData = as(as.matrix(subExDF), "sparseMatrix"), 
     phenoData = pd, featureData = fd, lowerDetectionLimit = 0.5, 
     expressionFamily = negbinomial.size())
   
@@ -145,13 +148,13 @@ lapply(cell_type_combos, function(cellTypes) {
   plot_ordering_genes(mo_filtered)
   dev.off()
   
-  print("Variance explained by each PC")
-  # Variance explained by each PC
-  png(paste0(outGraph, "PCA_VarianceExplained_Cluster_"
-    , paste0(cellTypes, collapse = '-'), ".png"))
-  plot_pc_variance_explained(mo_filtered, verbose = TRUE
-    , use_existing_pc_variance = TRUE, return_all = FALSE) 
-  dev.off()
+  # print("Variance explained by each PC")
+  # # Variance explained by each PC
+  # png(paste0(outGraph, "PCA_VarianceExplained_Cluster_"
+  #   , paste0(cellTypes, collapse = '-'), ".png"))
+  # plot_pc_variance_explained(mo_filtered, verbose = TRUE
+  #   , use_existing_pc_variance = TRUE, return_all = FALSE) 
+  # dev.off()
   
   print("Reduce data dimensionality")
   # Reduce data dimensionality
