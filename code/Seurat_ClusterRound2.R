@@ -28,8 +28,10 @@ print(args)
 ## Inputs
 
 # Seurat clustering object
-load("../analysis/Seurat_Cluster_DS2-11/Seurat_Cluster_DS2-11_FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_PC1to40_seuratO.Robj")
-# load("../analysis/Seurat_Cluster_DS2-11/Seurat_Cluster_DS2-11_FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_PC1to40_seuratO_TEST.Robj")
+# load("../analysis/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_seuratO.Robj")
+load("../analysis/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_TEST_seuratO.Robj")
+centSO <- ssCentSO
+noCentExM <- ssNoCentExM
 
 # Cell cycle markers from Macosko 2015 Table S2 to remove from variable gene
 # list used for clustering
@@ -38,20 +40,17 @@ ccDF <- read.csv("../source/Macosko_2015_ST2_CellCycle.csv", header = TRUE
 
 ## Variables
 graphCodeTitle <- "Seurat_ClusterRound2.R"
-# outGraph <- "../analysis/graphs/Seurat_ClusterRound2_DS2-11/Seurat_ClusterRound2_DS2-11_VarGenes_RegNumiLibBrain_"
-# outTable <- "../analysis/tables/Seurat_ClusterRound2_DS2-11/Seurat_ClusterRound2_DS2-11_VarGenes_RegNumiLibBrain_"
-# outData <- "../analysis/Seurat_ClusterRound2_DS2-11/Seurat_ClusterRound2_DS2-11_VarGenes_RegNumiLibBrain_PC1-30_"
-outGraph <- "../analysis/graphs/Seurat_ClusterRound2_DS2-11/Seurat_ClusterRound2_DS2-11_AllGenes_RegNumiLibBrain_"
-outTable <- "../analysis/tables/Seurat_ClusterRound2_DS2-11/Seurat_ClusterRound2_DS2-11_AllGenes_RegNumiLibBrain_"
-outData <- "../analysis/Seurat_ClusterRound2_DS2-11/Seurat_ClusterRound2_DS2-11_AllGenes_RegNumiLibBrain_PC1-30_"
+# outGraph <- "../analysis/graphs/Seurat_ClusterRound2_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/AllGenes/RegNumiLibBrain/PC1-30/Seurat_ClusterRound2_DS2-11_"
+# outTable <- "../analysis/tables/Seurat_ClusterRound2_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/AllGenes/RegNumiLibBrain/PC1-30/Seurat_ClusterRound2_DS2-11_"
+# outData <- "../analysis/Seurat_ClusterRound2_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/AllGenes/RegNumiLibBrain/PC1-30/Seurat_ClusterRound2_DS2-11_"
+outGraph <- "../analysis/graphs/Seurat_ClusterRound2_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/AllGenes/PC1-30/Seurat_ClusterRound2_DS2-11_"
+outTable <- "../analysis/tables/Seurat_ClusterRound2_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/AllGenes/PC1-30/Seurat_ClusterRound2_DS2-11_"
+outData <- "../analysis/Seurat_ClusterRound2_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/AllGenes/PC1-30/Seurat_ClusterRound2_DS2-11_"
 
 ## Output Directories
-outDir <- dirname(outGraph)
-dir.create(outDir, recursive = TRUE)
-outTableDir <- dirname(outTable)
-dir.create(outTableDir, recursive = TRUE)
-outRdatDir <- dirname(outData)
-dir.create(outRdatDir, recursive = TRUE)
+dir.create(dirname(outGraph), recursive = TRUE)
+dir.create(dirname(outTable), recursive = TRUE)
+dir.create(dirname(outData), recursive = TRUE)
 
 ## Set ggplot2 theme
 theme_set(theme_bw())
@@ -156,7 +155,7 @@ clids <- centSO@ident
 
 # Initialize Seurat object for each cluster
 # If cluster is less than 100 cells skip by returning NULL
-clustersL <- append(list(c(0, 1, 4, 13), c(0, 1), c(3, 14), c(5, 6), c(7, 9))
+clustersL <- append(list(c(0, 1, 4, 12), c(0, 1), c(3, 14), c(5, 6), c(7, 9))
   , sort(as.numeric(as.character(unique(centSO@ident)))))
 lso <- lapply(clustersL, function(clid){
   print(paste0("Initializing Seurat object for Cluster ID: "
@@ -228,20 +227,20 @@ lso <- lapply(lso, function(so) {
 # # Add names back to list
 # names(lso) <- n
 
-## Remove CC genes from variable genes
-# Number of variable genes before
-sapply(lso, function(so) {length(so@var.genes)})
-# Remove CC genes
-lso <- lapply(lso, function(so) {
-  ccDF <- data.frame(lapply(ccDF, as.character), stringsAsFactors = FALSE)
-  cc <- c(unlist(ccDF))
-  cc <- gsub(" *", "", cc)
-  idx <- so@var.genes %in% cc
-  so@var.genes <- so@var.genes[! idx]
-  return(so)
-})
-# Number of variable genes after
-sapply(lso, function(so) {length(so@var.genes)})
+# ## Remove CC genes from variable genes
+# # Number of variable genes before
+# sapply(lso, function(so) {length(so@var.genes)})
+# # Remove CC genes
+# lso <- lapply(lso, function(so) {
+#   ccDF <- data.frame(lapply(ccDF, as.character), stringsAsFactors = FALSE)
+#   cc <- c(unlist(ccDF))
+#   cc <- gsub(" *", "", cc)
+#   idx <- so@var.genes %in% cc
+#   so@var.genes <- so@var.genes[! idx]
+#   return(so)
+# })
+# # Number of variable genes after
+# sapply(lso, function(so) {length(so@var.genes)})
 ################################################################################
 
 ### Regress out unwanted sources of variation
@@ -262,13 +261,13 @@ print("### Regress out unwanted sources of variation")
 # ScaleData, you can set do.scale=F and do.center=F in the original object to
 # save some time.
 
-# Regress covariates and center scale
-lso <- lapply(lso, function(so) {
-  # Regress covariates and center scale
-  so <- ScaleData(so
-    , vars.to.regress = c("nUMI", "librarylab", "individual"))
-  return(so)
-})
+# # Regress covariates and center scale
+# lso <- lapply(lso, function(so) {
+#   # Regress covariates and center scale
+#   so <- ScaleData(so
+#     , vars.to.regress = c("nUMI", "librarylab", "individual"))
+#   return(so)
+# })
 ################################################################################
 
 ### Perform linear dimensional reduction
@@ -355,7 +354,8 @@ ggL <- lapply(names(lso), function(cl) {
   so <- lso[[cl]]
   gg <- DimElbowPlot(so, reduction.type = "pca", dims.plot = 50)
   gg <- gg + ggtitle(paste0("Cluster: ", cl)) +
-    theme(plot.title = element_text(hjust = 0.5))
+    theme(plot.title = element_text(hjust = 0.5)) +
+    ylim(c(0, max(so@dr$pca@sdev)))
   return(gg)
 })
 # plot_grid combine
