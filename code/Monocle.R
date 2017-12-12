@@ -9,15 +9,19 @@ require(monocle)
 require(Seurat)
 require(cowplot)
 require(ggplot2)
+require(viridis)
 source("Function_Library.R")
 
 # load("../analysis/Monocle/Monocle_monocleO.Robj")
-load("../analysis/Monocle/Monocle_PC1-40_RG_IPC_Neuron_monocleO.Robj")
+# load("../analysis/Monocle/Monocle_PC1-40_RG_IPC_Neuron_monocleO.Robj")
 
 ## Inputs
 
 # Seurat object
-load("../analysis/Seurat_Cluster_DS2-11/Seurat_Cluster_DS2-11_FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_PC1to40_seuratO.Robj")
+load("../analysis/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_seuratO.Robj")
+# load("../analysis/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_TEST_seuratO.Robj")
+# centSO <- ssCentSO
+# noCentExM <- ssNoCentExM
 
 # Known cell type markers from Luis
 kmDF <- read.csv("../source/MarkersforSingleCell_2017-01-05.csv", header = TRUE
@@ -33,12 +37,9 @@ outTable <- "../analysis/tables/Monocle/Monocle_PC1-40_RG_IPC_Neuron_"
 outRdat <- "../analysis/Monocle/Monocle_PC1-40_RG_IPC_Neuron_"
 
 ## Output Directories
-outDir <- dirname(outGraph)
-dir.create(outDir, recursive = TRUE)
-outTableDir <- dirname(outTable)
-dir.create(outTableDir, recursive = TRUE)
-outRdatDir <- dirname(outRdat)
-dir.create(outRdatDir, recursive = TRUE)
+dir.create(dirname(outGraph), recursive = TRUE)
+dir.create(dirname(outTable), recursive = TRUE)
+dir.create(dirname(outRdat), recursive = TRUE)
 
 ## Set ggplot2 theme
 theme_set(theme_bw())
@@ -59,7 +60,7 @@ theme_update(axis.line = element_line(colour = "black")
 # each gene, the geometric mean of all samples.
 
 # Subset Seurat object to specifc columns
-ids <- c(0, 1, 2, 3, 4, 7, 8, 9, 10, 13, 14)
+ids <- c(0, 1, 2, 3, 4, 7, 8, 9, 10, 12, 14)
 cellIDs <- names(centSO@ident)[centSO@ident %in% ids]
 centSO <- FilterCells(object = centSO, subset.names = NULL, cells.use = cellIDs)
 
@@ -130,17 +131,17 @@ png(paste0(outGraph, "OrderingGenesDispersion.png"))
 plot_ordering_genes(mo_filtered)
 dev.off()
 
-print("Variance explained by each PC")
-# Variance explained by each PC
-png(paste0(outGraph, "PCA_VarianceExplained.png"))
-plot_pc_variance_explained(mo_filtered, verbose = TRUE
-  , use_existing_pc_variance = TRUE, return_all = FALSE) 
-dev.off()
+# print("Variance explained by each PC")
+# # Variance explained by each PC
+# png(paste0(outGraph, "PCA_VarianceExplained.png"))
+# plot_pc_variance_explained(mo_filtered, verbose = TRUE, max_components = 20
+#   , use_existing_pc_variance = TRUE, return_all = FALSE) 
+# dev.off()
 
 print("Reduce data dimensionality")
 # Reduce data dimensionality
 # Use number of genes expressed or total mRNAs?
-mo_filtered <- reduceDimension(mo_filtered, max_components = 40,
+mo_filtered <- reduceDimension(mo_filtered, max_components = 20,
   residualModelFormulaStr = "~individual + librarylab + Total_mRNAs"
   , verbose = TRUE)
 
@@ -160,18 +161,18 @@ diff_test_res <- differentialGeneTest(mo_filtered
 
 save(mo, mo_filtered, diff_test_res, file = paste0(outRdat, "monocleO.Robj"))
 
-# Order by qval
-diff_test_res <- diff_test_res[order(diff_test_res$qval), ]
-
-sig_gene_names <- row.names(diff_test_res)[
-  diff_test_res$use_for_ordering == TRUE][1:100]
-png(paste0(outGraph, "Pseudotime_Heatmap_Cluster", cluster, ".png")
-  , width = 12, height = 16, units = "in", res = 300)
-plot_pseudotime_heatmap(mo_filtered[sig_gene_names,],
-  num_clusters = 3,
-  cores = 1,
-  show_rownames = T)
-dev.off()
+# # Order by qval
+# diff_test_res <- diff_test_res[order(diff_test_res$qval), ]
+# 
+# sig_gene_names <- row.names(diff_test_res)[
+#   diff_test_res$use_for_ordering == TRUE][1:100]
+# png(paste0(outGraph, "Pseudotime_Heatmap_Top100.png")
+#   , width = 12, height = 16, units = "in", res = 300)
+# plot_pseudotime_heatmap(mo_filtered[sig_gene_names,],
+#   num_clusters = 3,
+#   cores = 1,
+#   show_rownames = T)
+# dev.off()
 ################################################################################
 
 ### Plots
@@ -322,7 +323,7 @@ title <- ggdraw() + draw_label(paste0(graphCodeTitle
 # rel_heights values control title margins
 pg <- plot_grid(title, pg, ncol = 1, rel_heights = c(0.15, 1))
 # Save
-ggsave(paste0(outGraph, "Trajectory_SeuratClusterGrid_Comp12.png"), width = 16
+ggsave(paste0(outGraph, "Trajectory_SeuratClusterGrid_Comp12.png"), width = 19
   , height = 14)
 
 # Plot Seurat clusters on trajectory split as grid component 1 vs 3
@@ -360,7 +361,7 @@ title <- ggdraw() + draw_label(paste0(graphCodeTitle
 # rel_heights values control title margins
 pg <- plot_grid(title, pg, ncol = 1, rel_heights = c(0.15, 1))
 # Save
-ggsave(paste0(outGraph, "Trajectory_SeuratClusterGrid_Comp13.png"), width = 16
+ggsave(paste0(outGraph, "Trajectory_SeuratClusterGrid_Comp13.png"), width = 19
   , height = 14)
 
 # ## Trajectory colored by pseudotime
@@ -390,6 +391,53 @@ ggsave(paste0(outGraph, "Trajectory_SeuratClusterGrid_Comp13.png"), width = 16
 # pg <- plot_grid(title, pg, ncol = 1, rel_heights = c(0.2, 1))
 # # Save
 # ggsave(paste0(outGraph, "Trajectory_Pseudotime.png"), width = 13, height = 20)
+
+
+## Trajectory colored by pseudotime
+
+# Comp 1 versus Comp 2-5
+ggL <- lapply(c(2:7), function(component) {
+  plot_cell_trajectory(mo_filtered, 1, component, color_by = "Pseudotime"
+    , cell_size = 0.01) +
+    scale_color_viridis() +
+    theme(legend.position = "right")
+})
+# plot grid
+Plot_Grid(ggL, ncol = 2, rel_height = 0.1, align = "v", axis = "l", 
+  title = paste0(graphCodeTitle
+    , "\n\nMonocle trajectory colored by pseudotime"
+    , "\n")
+)
+ggsave(paste0(outGraph, "Trajectory_Pseudotime.png")
+  , width = 13, height = 15, limitsize = FALSE)
+
+
+## Color tSNE by pseudotime
+
+
+df1 <- as.data.frame(centSO@dr$tsne@cell.embeddings)
+df1$Pseudotime <- mo_filtered@phenoData@data$Pseudotime[
+  match(row.names(df1), row.names(mo_filtered@phenoData@data))]
+
+# ggplot Lab library
+gg1 <- ggplot(df1, aes(x = tSNE_1, y = tSNE_2, col = Pseudotime)) +
+  geom_point(size = 0.1, alpha = 0.5) +
+  scale_color_viridis() +
+  # guides(colour = guide_legend(override.aes = list(size = 7))) +
+  ggtitle(paste0("tSNE plot, each point is a cell"
+    , "\nColor indicates pseudotime value"))
+
+# tSNE colored by clustering
+ggTsne <- TSNE_Plot(centSO) + theme(legend.position = "none")
+
+# plot grid
+Plot_Grid(list(ggTsne, gg1), ncol = 2, rel_height = 0.3, align = "v", axis = "r", 
+  title = paste0(graphCodeTitle
+    , "\n\ntSNE colored by Seurat clusters or Monocle pseudotime"
+    , "\nCells from progenitor, IPC, and excitatory neuron Seurat clusters")
+)
+ggsave(paste0(outGraph, "tSNE_Pseudotime.png"), width = 13
+  , height = 7)
 ################################################################################
 
 ## Luis markers
@@ -423,7 +471,7 @@ title <- ggdraw() + draw_label(title)
 # rel_heights values control title margins
 pg <- plot_grid(title, pg, ncol = 1, rel_heights = c(0.2, 1))
 ggsave(paste0(outGraph, "Trajectory_LuisMarkers_NormCentScale.png")
-  , width = 12, height = 6+length(ggL)/2)
+  , width = 12, height = 6+length(ggL)/1.75)
 
 
 ## Molyneaux markers
