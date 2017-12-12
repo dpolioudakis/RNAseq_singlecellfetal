@@ -19,14 +19,14 @@ require(reshape2)
 require(irlba)
 require(gridExtra)
 require(cowplot)
+require("ggdendro")
 # require(xlsx)
 source("Function_Library.R")
 
 args <- commandArgs(trailingOnly = TRUE)
 print(args)
 
-# load("../analysis/Seurat_Cluster_DS2-11/Seurat_Cluster_DS2-11_FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_PC1to40_seuratO.Robj")
-# load("../analysis/Seurat_Cluster_DS2-11/Seurat_Cluster_DS2-11_FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_PC1to40_seuratO_TEST.Robj")
+# load("../analysis/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_seuratO.Robj")
 
 ## Input data
 # Digital gene expression
@@ -266,6 +266,13 @@ print("### Assign Cell-Cycle scores")
 # However, we provide our predicted classifications in case they are of
 # interest.
 
+# Uses AddModuleScore()
+# Calculate the average expression levels of each program (cluster)
+# on single cell level, subtracted by the aggregated expression of
+# control gene sets. All analyzed genes are binned based on averaged
+# expression, and the control genes are randomly selected from each
+# bin.
+
 centSO <- CellCycleScoring(object = centSO, s.genes = s.genes
   , g2m.genes = g2m.genes, set.ident = TRUE)
 
@@ -380,6 +387,12 @@ noCentExM <- RegressCovariates(centSO@data, covDF)
 ### QC plots
 
 print("### QC plots")
+
+# Mean nUMI and mean nGene for filtered data
+df1 <- data.frame(Mean_nGene = mean(centSO@meta.data$nGene)
+  , Mean_nUMI = mean(centSO@meta.data$nUMI)
+)
+write.csv(df1, file = paste0(outTable, "mean_nUMI_nGene.csv"))
 
 # Calculate metadata for all cells (no filters)
 metDF$nGene <- colSums(exDF > 0)
@@ -1186,11 +1199,25 @@ ggsave(paste0(outGraph, "PC1-40_DoHeatmap_HighestLoading_NoCentScale.png")
 ### Cluster QC and statistics
 
 # nUMI and nGene per cluster violin plot
-png(paste0(outGraph, "nUMIperCluster_violinPlot_PC1-40.png")
+png(paste0(outGraph, "nGenenUMIperCluster_violinPlot_PC1-40.png")
   , width = 10, height = 5, units = "in", res = 300)
 VlnPlot(centSO, c("nGene", "nUMI")
   , nCol = 2, point.size.use = 0.02)
 dev.off()
+
+# nGene boxplot
+df <- data.frame(
+  Number_Of_Genes_Detected = centSO@meta.data$nGene
+  , Number_UMI = centSO@meta.data$nUMI
+  , ClusterID = centSO@ident)
+ggplot(df, aes(x = ClusterID, y = Number_Of_Genes_Detected)) +
+  geom_boxplot() +
+  xlab("Number of genes detected") +
+  ylab("Cluster") +
+  ggtitle(paste0(graphCodeTitle
+    , "\n\nNumber of genes detected per cluster"
+    , "\n(> 0 counts)"))
+ggsave(paste0(outGraph, "PC1-40_nGeneCluster_Boxplot.pdf"), width = 5, height = 5)
 
 # Metrics per cluster
 df <- data.frame(
@@ -1201,7 +1228,7 @@ df <- data.frame(
   , MEAN_UMI = tapply(centSO@meta.data$nUMI, centSO@ident, mean)
   , MEAN_GENES_DETECTED = tapply(centSO@meta.data$nGene, centSO@ident, mean)
 )
-write.csv(df, paste0(outTable, "_PC1-40_Cluster_Metrics.csv")
+write.csv(df, paste0(outTable, "PC1-40_Cluster_Metrics.csv")
   , quote = FALSE, row.names = FALSE)
 
 # Number of cells per cluster versus mean genes detected per cluster
@@ -1213,7 +1240,7 @@ ggplot(ggDF, aes(x = nGene, y = Freq)) +
   ylab("Number of cells in cluster") +
   ggtitle(paste0(graphCodeTitle
     , "\nGenes detected per cluster versus number of cells per cluster"))
-ggsave(paste0(outGraph, "_PC1-40_nCellVsnGene_ScatterPlot.pdf")
+ggsave(paste0(outGraph, "PC1-40_nCellVsnGene_ScatterPlot.pdf")
   , width = 7, height = 7)
 
 # TBR1 expression per cluster
@@ -1234,6 +1261,20 @@ ggplot(ggDF, aes(x = CLUSTER, y = EXPRESSION)) +
     , "\nNormalized expression - read depth, regressed nUMI, brain, lablibrary"
     , "\n"))
 dev.off()
+################################################################################
+
+### Hierarchical cluster by Seurat cluster mean expression
+
+df <- data.frame(t(noCentExM))
+df$ClusterID <- centSO@ident
+df <- aggregate(.~ClusterID, df, mean)
+row.names(df) <- df$ClusterID
+df <- df[ ,colnames(df) != "ClusterID"]
+
+d1 <- dist(df, method = "euclidean") # distance matrix
+fit <- hclust(d1)
+ggdendrogram(fit)
+ggsave(paste0(outGraph, "PC1-40_hclust.pdf"))
 ################################################################################
 
 # ### Finding differentially expressed genes (cluster biomarkers)
