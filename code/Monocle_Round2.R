@@ -57,7 +57,7 @@ centSO@raw.data <- NULL
 centSO@scale.data <- NULL
 # Add custom cluster ID combinations to ID list
 clustersL <- c(list(
-  c(0, 1, 4, 12), c(0, 1, 2), c(0, 1), c(3, 14), c(5, 6), c(7, 9))
+  c(0, 1, 2, 4, 12), c(0, 1, 4, 12), c(0, 1, 2), c(0, 1), c(3, 14), c(5, 6), c(7, 9))
   , as.list(sort(as.numeric(as.character(unique(clusterIDs))))))
 # Select ID from list using qsub task ID
 clid <- unlist(clustersL[as.numeric(args[1])])
@@ -100,13 +100,13 @@ if (sum(clusterIDs %in% clid) < 100) {
   plot_ordering_genes(mo_filtered)
   dev.off()
   
-  print("Variance explained by each PC")
-  # Variance explained by each PC
-  png(paste0(outGraph, "PCA_VarianceExplained_Cluster"
-    , paste0(clid, collapse = '-'), ".png"))
-  plot_pc_variance_explained(mo_filtered, verbose = TRUE
-    , use_existing_pc_variance = TRUE, return_all = FALSE) 
-  dev.off()
+  # print("Variance explained by each PC")
+  # # Variance explained by each PC
+  # png(paste0(outGraph, "PCA_VarianceExplained_Cluster"
+  #   , paste0(clid, collapse = '-'), ".png"))
+  # plot_pc_variance_explained(mo_filtered, verbose = TRUE
+  #   , use_existing_pc_variance = TRUE, return_all = FALSE) 
+  # dev.off()
   
   print("Reduce data dimensionality")
   # Reduce data dimensionality

@@ -28,10 +28,10 @@ print(args)
 ## Inputs
 
 # Seurat clustering object
-# load("../analysis/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_seuratO.Robj")
-load("../analysis/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_TEST_seuratO.Robj")
-centSO <- ssCentSO
-noCentExM <- ssNoCentExM
+load("../analysis/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_seuratO.Robj")
+# load("../analysis/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_TEST_seuratO.Robj")
+# centSO <- ssCentSO
+# noCentExM <- ssNoCentExM
 
 # Cell cycle markers from Macosko 2015 Table S2 to remove from variable gene
 # list used for clustering
@@ -40,12 +40,12 @@ ccDF <- read.csv("../source/Macosko_2015_ST2_CellCycle.csv", header = TRUE
 
 ## Variables
 graphCodeTitle <- "Seurat_ClusterRound2.R"
-# outGraph <- "../analysis/graphs/Seurat_ClusterRound2_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/AllGenes/RegNumiLibBrain/PC1-30/Seurat_ClusterRound2_DS2-11_"
-# outTable <- "../analysis/tables/Seurat_ClusterRound2_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/AllGenes/RegNumiLibBrain/PC1-30/Seurat_ClusterRound2_DS2-11_"
-# outData <- "../analysis/Seurat_ClusterRound2_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/AllGenes/RegNumiLibBrain/PC1-30/Seurat_ClusterRound2_DS2-11_"
-outGraph <- "../analysis/graphs/Seurat_ClusterRound2_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/AllGenes/PC1-30/Seurat_ClusterRound2_DS2-11_"
-outTable <- "../analysis/tables/Seurat_ClusterRound2_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/AllGenes/PC1-30/Seurat_ClusterRound2_DS2-11_"
-outData <- "../analysis/Seurat_ClusterRound2_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/AllGenes/PC1-30/Seurat_ClusterRound2_DS2-11_"
+outGraph <- "../analysis/graphs/Seurat_ClusterRound2_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/AllGenes/RegNumiLibBrain/PC1-30/Seurat_ClusterRound2_DS2-11_"
+outTable <- "../analysis/tables/Seurat_ClusterRound2_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/AllGenes/RegNumiLibBrain/PC1-30/Seurat_ClusterRound2_DS2-11_"
+outData <- "../analysis/Seurat_ClusterRound2_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/AllGenes/RegNumiLibBrain/PC1-30/Seurat_ClusterRound2_DS2-11_"
+# outGraph <- "../analysis/graphs/Seurat_ClusterRound2_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/AllGenes/PC1-30/Seurat_ClusterRound2_DS2-11_"
+# outTable <- "../analysis/tables/Seurat_ClusterRound2_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/AllGenes/PC1-30/Seurat_ClusterRound2_DS2-11_"
+# outData <- "../analysis/Seurat_ClusterRound2_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/AllGenes/PC1-30/Seurat_ClusterRound2_DS2-11_"
 
 ## Output Directories
 dir.create(dirname(outGraph), recursive = TRUE)
@@ -170,7 +170,8 @@ lso <- lapply(clustersL, function(clid){
       , normalization.method = "LogNormalize", scale.factor = 10000
       , project = "Cluster 0", do.scale = FALSE, do.center = FALSE)
     # Add metadata
-    so <- AddMetaData(so, metadata = metDF[clids %in% clid, ])
+    ssMetDF <- metDF[row.names(metDF) %in% colnames(so@raw.data), ]
+    so <- AddMetaData(so, metadata = ssMetDF)
     # Replace @data with covariates regressed not centered so that mean centered data uses regressed data
     so@data <- noCentExM[row.names(noCentExM) %in% row.names(so@raw.data)
       , clids %in% clid]
@@ -261,13 +262,13 @@ print("### Regress out unwanted sources of variation")
 # ScaleData, you can set do.scale=F and do.center=F in the original object to
 # save some time.
 
-# # Regress covariates and center scale
-# lso <- lapply(lso, function(so) {
-#   # Regress covariates and center scale
-#   so <- ScaleData(so
-#     , vars.to.regress = c("nUMI", "librarylab", "individual"))
-#   return(so)
-# })
+# Regress covariates and center scale
+lso <- lapply(lso, function(so) {
+  # Regress covariates and center scale
+  so <- ScaleData(so
+    , vars.to.regress = c("nUMI", "librarylab", "individual"))
+  return(so)
+})
 ################################################################################
 
 ### Perform linear dimensional reduction
@@ -676,4 +677,65 @@ ggsave(paste0(outGraph, "PC1-40_PC1-30_ClusterRound1_tSNE.png")
 save(lso, file = paste0(outData, "seuratO.Robj"))
 ################################################################################
 
+print("### Feature plot of covariates")
+
+# Loop through clusters
+pgL <- lapply(names(lso), function(cl) {
+  
+  so <- lso[[cl]]
+  
+  ## Plot tSNE graph colored by lanes, samples, or GZ CP
+  # Collect tSNE values
+  ggDF <- as.data.frame(so@dr$tsne@cell.embeddings)
+  
+  # Add cluster identity
+  ggDF$CLUSTER <- so@ident
+  # Add metadata
+  ggDF <- data.frame(ggDF, so@meta.data[match(row.names(ggDF), so@meta.data$CELL), ])
+  ggDF$BRAIN <- as.factor(ggDF$BRAIN)
+  
+  # ggplot Donor
+  gg1 <- ggplot(ggDF, aes(x = tSNE_1, y = tSNE_2, col = BRAIN)) +
+    geom_point(size = 0.1, alpha = 0.5) +
+    guides(colour = guide_legend(override.aes = list(size = 7))) +
+    ggtitle(paste0("Donor"
+      , "\nCluster: ", cl))
+  
+  # ggplot Lab library
+  gg2 <- ggplot(ggDF, aes(x = tSNE_1, y = tSNE_2, col = LIBRARY)) +
+    geom_point(size = 0.1, alpha = 0.5) +
+    guides(colour = guide_legend(override.aes = list(size = 7))) +
+    ggtitle(paste0("Lab library"
+      , "\nCluster: ", cl))
+  
+  # ggplot GZ/CP
+  gg3 <- ggplot(ggDF, aes(x = tSNE_1, y = tSNE_2, col = REGION)) +
+    geom_point(size = 0.1, alpha = 0.5) +
+    guides(colour = guide_legend(override.aes = list(size = 7))) +
+    ggtitle(paste0("GZ/CP"
+      , "\nCluster: ", cl))
+  
+  # tSNE colored by clustering
+  ggTsne <- TSNE_Plot(so) + theme(legend.position = "none")
+  
+  # plot grid
+  pg <- plot_grid(ggTsne, gg1, gg2, gg3, align = "v", axis = "r", ncol = 4)
+  return(pg)
+})
+pg <- plot_grid(plotlist = pgL, ncol = 1)
+# now add the title
+title <- ggdraw() + draw_label(paste0(graphCodeTitle
+  , "\n\nSeurat clustering round 2 and covariates"
+  , "\nRemove cells < 200 genes detected in cluster"
+  , "\nRemove genes detected in < 3 cells in cluster"
+  , "\nOnly recluster clusters >= 100 cells"
+  , "\nSeurat variable genes used for clustering"
+  , "\ntSNE PC 1-40, cluster round 2 tSNE PC 1-30"
+  , "\n"))
+# rel_heights values control title margins
+plot_grid(title, pg, ncol = 1, rel_heights = c(0.05, 1))
+# save
+ggsave(paste0(outGraph, "tSNE_covariates.png")
+  , width = 20, height = 80, limitsize = FALSE)
+################################################################################
 

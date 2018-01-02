@@ -22,8 +22,9 @@ args <- commandArgs(trailingOnly = TRUE)
 # Monocle round 2
 
 # How to reorder list of monocle objects for plotting
-toOrder <- c("0-1-4-12", "0-1-2", "0-1", "3-14", "5-6", "7-9", "0", "1", "2", "3"
-  , "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15")
+toOrder <- c("0-1-2-4-12", "0-1-4-12", "0-1-2", "0-1", "3-14", "5-6", "7-9", "0"
+  , "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14"
+  , "15")
 
 # Monocle object
 inMo <- list.files("../analysis/Monocle_Round2/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Comp1-10/")

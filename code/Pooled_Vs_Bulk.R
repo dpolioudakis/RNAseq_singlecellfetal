@@ -23,6 +23,11 @@ require(gridExtra)
 # Seurat
 load("../analysis/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_seuratO.Robj")
 dsExM <- as.matrix(centSO@raw.data)
+centSO@raw.data <- NA
+centSO@data <- NA
+# load("../analysis/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_TEST_seuratO.Robj")
+# dsExM <- as.matrix(ssCentSO@raw.data)
+# centSO <- ssCentSO
 
 # Pollen
 pnExDF <- read.csv("../pollen_2015/data/htseq/Exprs_HTSCexon.csv")
@@ -45,6 +50,10 @@ blExDF <- read.csv("../bulk_VZ_CP_from_ATAC/data/htseq/Exprs_HTSCexon.csv"
 # Metadata
 blMtDF <- read.csv("../bulk_VZ_CP_from_ATAC/metadata/VZCP_sampleinfo.csv")
 
+# biomart
+bmDF <- read.csv("../source/BiomaRt_Compile_GeneInfo_GRCh38_Ensembl87.csv"
+  , header = TRUE)
+
 # Known cell type markers from Luis
 kmDF <- read.csv("../source/MarkersforSingleCell_2017-01-05.csv", header = TRUE
   , fill = TRUE)
@@ -59,16 +68,19 @@ brexpDF <- read.csv("../source/BrainExpressed_GTex.csv", header = FALSE)
 ## Variables
 graphCodeTitle <- "Pooled_Vs_Bulk.R"
 outGraph <- "../analysis/graphs/Pooled_Vs_Bulk/DS2-11/Pooled_Vs_Bulk_"
+dir.create(dirname(outGraph), recursive = TRUE)
 outTable <- "../analysis/tables/Pooled_Vs_Bulk/DS2-11/Pooled_Vs_Bulk_"
+dir.create(dirname(outTable), recursive = TRUE)
 outTableGpro <- "../analysis/tables/Pooled_Vs_Bulk/DS2-11/gprofiler/Pooled_Vs_Bulk_gprofiler_"
 dir.create("../analysis/tables/Pooled_Vs_Bulk/DS2-11/gprofiler", recursive = TRUE)
 outTableGproIds <- "../analysis/tables/Pooled_Vs_Bulk/DS2-11/gprofiler_goIDs/Pooled_Vs_Bulk_gprofiler_goIDs_"
 dir.create("../analysis/tables/Pooled_Vs_Bulk/DS2-11/gprofiler_goIDs", recursive = TRUE)
 outAnalysis <- "../analysis/Pooled_Vs_Bulk/DS2-11/Pooled_Vs_Bulk_"
+dir.create(dirname(outAnalysis), recursive = TRUE)
 
 ## ggplot2 theme
 theme_set(theme_bw())
-theme_set(theme_get() + theme(text = element_text(size = 16)))
+theme_set(theme_get() + theme(text = element_text(size = 12)))
 theme_update(plot.title = element_text(size = 12))
 theme_update(axis.line = element_line(colour = "black")
   , panel.border = element_blank()
@@ -95,6 +107,13 @@ QueryBiomaRt <- function (genesList, filters, attributes) {
     , mart = ensembl
   )
   bmDF
+}
+
+Convert_Mixed_GeneSym_EnsID_To_EnsID <- function(ids){
+  idx <- match(ids, bmDF$hgnc_symbol)
+  ens <- bmDF$ensembl_gene_id[idx]
+  ids[! is.na(ens)] <- as.character(ens[! is.na(ens)])
+  return(ids)
 }
 
 # ensembl = useEnsembl(biomart = "ENSEMBL_MART_ENSEMBL", host="feb2014.archive.ensembl.org")
@@ -237,6 +256,11 @@ Plot_MT_Percent <- function(geneSet, title) {
 }
 ################################################################################
 
+### Subset drop-seq raw counts matrix to cells that passed QC
+
+dsExM <- dsExM[ ,colnames(dsExM) %in% row.names(centSO@meta.data)]
+################################################################################
+
 ### Remove ERCCs and STAR stats from tail and move gene names to row.names
 
 # Remove ERCCs and STAR stats from tail
@@ -276,10 +300,12 @@ head(blExDF[ ,blMtDF$ExpCondition == "VZ"])
 gzBlExDF <- blExDF[ ,blMtDF$ExpCondition == "VZ"]
 
 # Drop-seq
-# Check GZ sample IDs
-table(grepl("VZ", colnames(dsExM)))
+# # Check GZ sample IDs
+# table(grepl("VZ", colnames(dsExM)))
 # Subset
-gzDsExM <- dsExM[ ,grep("VZ", colnames(dsExM))]
+# gzDsExM <- dsExM[ ,grep("VZ", colnames(dsExM))]
+ids <- row.names(centSO@meta.data)[centSO@meta.data$REGION == "GZ"]
+gzDsExM <- dsExM[, colnames(dsExM) %in% ids]
 
 # Fluidigm HT
 gzFhExDF <- fhExDF[ ,grep(
@@ -304,19 +330,23 @@ row.names(fhExDF) <- gsub("\\.[0-9]*", "", row.names(fhExDF))
 row.names(gzFhExDF) <- gsub("\\.[0-9]*", "", row.names(gzFhExDF))
 
 # Convert gene symbols to Ensembl IDs for Drop-seq
-# All cells
-dim(dsExM)
-ensDF <- QueryBiomaRt(row.names(dsExM), "hgnc_symbol"
-  , c("hgnc_symbol", "ensembl_gene_id"))
-dsExDF <- merge(ensDF, dsExM, by.x = "hgnc_symbol", by.y = "row.names")
-dim(dsExDF)
-# GZ
-# Convert gene symbols to Ensembl IDs for Drop-seq
-dim(gzDsExM)
-ensDF <- QueryBiomaRt(row.names(gzDsExM), "hgnc_symbol"
-  , c("hgnc_symbol", "ensembl_gene_id"))
-gzDsExDF <- merge(ensDF, gzDsExM, by.x = "hgnc_symbol", by.y = "row.names")
-dim(gzDsExDF)
+# # All cells
+# dim(dsExM)
+# ensDF <- QueryBiomaRt(row.names(dsExM), "hgnc_symbol"
+#   , c("hgnc_symbol", "ensembl_gene_id"))
+# dsExDF <- merge(ensDF, dsExM, by.x = "hgnc_symbol", by.y = "row.names")
+# dim(dsExDF)
+# # GZ
+# # Convert gene symbols to Ensembl IDs for Drop-seq
+# dim(gzDsExM)
+# ensDF <- QueryBiomaRt(row.names(gzDsExM), "hgnc_symbol"
+#   , c("hgnc_symbol", "ensembl_gene_id"))
+# gzDsExDF <- merge(ensDF, gzDsExM, by.x = "hgnc_symbol", by.y = "row.names")
+# dim(gzDsExDF)
+dsExDF <- data.frame(dsExM)
+dsExDF$ensembl_gene_id <- Convert_Mixed_GeneSym_EnsID_To_EnsID(row.names(dsExDF))
+gzDsExDF <- data.frame(gzDsExM)
+gzDsExDF$ensembl_gene_id <- Convert_Mixed_GeneSym_EnsID_To_EnsID(row.names(gzDsExDF))
 ################################################################################
 
 ### Pools of different sizes and read depth normalize
@@ -575,16 +605,27 @@ ggsave(paste0(outGraph, "Pool_Size_Genes_Detected.pdf"), height = 7, width = 11)
 ### Pool scRNA-seq and read depth normalize
 
 # Drop-seq randomly split into pooled groups
-# All cells - 69 pooled groups of 100 cells each
+# All cells - 310 pooled groups of 100 cells each
 ncol(dsExM)
-nPool <- 69
-rNums <- sample(1:6900, 6900, replace = FALSE)
+nPool <- 310
+rNums <- sample(1:31000, 31000, replace = FALSE)
 pDsExDF <- Pool_Cells(dsExM, nPool, rNums)
-# GZ - 34 pooled groups of 100 cells each
+# GZ - 150 pooled groups of 100 cells each
 ncol(gzDsExM)
-nPool <- 34
-rNums <- sample(1:3400, 3400, replace = FALSE)
+nPool <- 150
+rNums <- sample(1:15000, 15000, replace = FALSE)
 pGzDsExDF <- Pool_Cells(gzDsExM, nPool, rNums)
+
+# # For testing
+# ncol(dsExM)
+# nPool <- 20
+# rNums <- sample(1:2000, 2000, replace = FALSE)
+# pDsExDF <- Pool_Cells(dsExM, nPool, rNums)
+# # GZ - 34 pooled groups of 100 cells each
+# ncol(gzDsExM)
+# nPool <- 10
+# rNums <- sample(1:1000, 1000, replace = FALSE)
+# pGzDsExDF <- Pool_Cells(gzDsExM, nPool, rNums)
 
 # Pollen - randomly split into 10 pooled groups of 39 cells each
 ncol(pnExDF)
@@ -666,18 +707,23 @@ mnPoGzFhExDF <- data.frame(MEAN_POOLED_FLUIDIGM_HT_GZ = apply(pGzFhCpmDF, 1, mea
 mnPoFlExDF <- data.frame(MEAN_POOLED_FLUIDIGM_LT = apply(pFlCpmDF, 1, mean))
 
 # Convert gene symbols to Ensembl IDs for Drop-seq
-# All cells
-dim(mnPoDsExDF)
-ensDF <- QueryBiomaRt(row.names(mnPoDsExDF), "hgnc_symbol"
-  , c("hgnc_symbol", "ensembl_gene_id"))
-mnPoDsExDF <- merge(ensDF, mnPoDsExDF, by.x = "hgnc_symbol", by.y = "row.names")
-dim(mnPoDsExDF)
-# GZ
-dim(mnPoGzDsExDF)
-ensDF <- QueryBiomaRt(row.names(mnPoGzDsExDF), "hgnc_symbol"
-  , c("hgnc_symbol", "ensembl_gene_id"))
-mnPoGzDsExDF <- merge(ensDF, mnPoGzDsExDF, by.x = "hgnc_symbol", by.y = "row.names")
-dim(mnPoGzDsExDF)
+
+# # All cells
+# dim(mnPoDsExDF)
+# ensDF <- QueryBiomaRt(row.names(mnPoDsExDF), "hgnc_symbol"
+#   , c("hgnc_symbol", "ensembl_gene_id"))
+# mnPoDsExDF <- merge(ensDF, mnPoDsExDF, by.x = "hgnc_symbol", by.y = "row.names")
+# dim(mnPoDsExDF)
+# # GZ
+# dim(mnPoGzDsExDF)
+# ensDF <- QueryBiomaRt(row.names(mnPoGzDsExDF), "hgnc_symbol"
+#   , c("hgnc_symbol", "ensembl_gene_id"))
+# mnPoGzDsExDF <- merge(ensDF, mnPoGzDsExDF, by.x = "hgnc_symbol", by.y = "row.names")
+# dim(mnPoGzDsExDF)
+row.names(mnPoDsExDF) <- Convert_Mixed_GeneSym_EnsID_To_EnsID(row.names(mnPoDsExDF))
+mnPoDsExDF$ensembl_gene_id <- row.names(mnPoDsExDF)
+row.names(mnPoGzDsExDF) <- Convert_Mixed_GeneSym_EnsID_To_EnsID(row.names(mnPoGzDsExDF))
+mnPoGzDsExDF$ensembl_gene_id <- row.names(mnPoGzDsExDF)
 
 ## Combine
 
@@ -819,7 +865,7 @@ ggsave(paste0(outGraph, "ScatterIntersectionUnion.png"), width = 8, height = 5
 
 # log2(mean CPM + 1)
 l2MnCpmDF <- data.frame(ENSEMBL_ID = mnExDF$ensembl_gene_id
-  , HGNC_SYMBOL = mnExDF$hgnc_symbol.x
+  , HGNC_SYMBOL = mnExDF$hgnc_symbol
   , MEAN_POOLED_DROPSEQ = log(mnExDF$MEAN_POOLED_DROPSEQ + 1, 2)
   , MEAN_POOLED_DROPSEQ_GZ = log(mnExDF$MEAN_POOLED_DROPSEQ_GZ + 1, 2)
   , MEAN_POOLED_POLLEN = log(mnExDF$MEAN_POOLED_POLLEN + 1, 2)
@@ -1263,16 +1309,18 @@ Plot_CDS_Length_Histogram <- function(exM, title, geneIdType){
 
 ggL <- list(
   Plot_CDS_Length_Histogram(blExDF, "Bulk RNA-seq", "ensembl_gene_id")
-  , Plot_CDS_Length_Histogram(dsExM, "Drop-seq", "hgnc_symbol")
-  , Plot_CDS_Length_Histogram(gzDsExM, "Drop-seq GZ", "hgnc_symbol")
+  # , Plot_CDS_Length_Histogram(dsExM, "Drop-seq", "hgnc_symbol")
+  # , Plot_CDS_Length_Histogram(gzDsExM, "Drop-seq GZ", "hgnc_symbol")
+  , Plot_CDS_Length_Histogram(dsExM, "Drop-seq", "ensembl_gene_id")
+  , Plot_CDS_Length_Histogram(gzDsExM, "Drop-seq GZ", "ensembl_gene_id")
   , Plot_CDS_Length_Histogram(fhExDF, "Fluidigm HT", "ensembl_gene_id")
   , Plot_CDS_Length_Histogram(gzFhExDF, "Fluidigm HT GZ", "ensembl_gene_id")
   , Plot_CDS_Length_Histogram(flExDF, "Fluidigm LT", "ensembl_gene_id")
   , Plot_CDS_Length_Histogram(pnExDF, "Pollen", "ensembl_gene_id")
 )
-pdf(paste0(outGraph, "LengthCounts_Histogram.pdf"), width = 8, height = 12)
-ggL[[1]]
-dev.off()
+# pdf(paste0(outGraph, "LengthCounts_Histogram.pdf"), width = 8, height = 12)
+# ggL[[1]]
+# dev.off()
 
 png(paste0(outGraph, "LengthCounts_Histogram.png"), width = 8, height = 20
   , units = "in", res = 300)
@@ -1533,103 +1581,103 @@ lapply(names(gproLDF), function(dataset) {
     , quote = FALSE, row.names = FALSE)
 })
 
-## Intersect GO terms
-
-# Drop-seq GZ, Fluidigm HT GZ, Pollen
-# High pool
-go <- intersect(
-  intersect(gpPhiBloDsGzDF$term.id[
-      gpPhiBloDsGzDF$domain == "BP" |
-      gpPhiBloDsGzDF$domain == "MF" |
-      gpPhiBloDsGzDF$domain == "CC"]
-    , gpPhiBloFhGzDF$term.id)
-  , gpPhiBloPnDF$term.id)
-write.table(go, paste0(outTable, "GO_DsGz_FhGz_Pollen_PoolHigh.txt")
-  , quote = FALSE, row.names = FALSE)
-# High bulk
-go <- intersect(
-  intersect(gpPloBhiDsGzDF$term.id[
-      gpPloBhiDsGzDF$domain == "BP" |
-      gpPloBhiDsGzDF$domain == "MF" |
-      gpPloBhiDsGzDF$domain == "CC"]
-    , gpPloBhiFhGzDF$term.id)
-  , gpPloBhiPnDF$term.id)
-write.table(go, paste0(outTable, "GO_DsGz_FhGz_Pollen_BulkHigh.txt")
-  , quote = FALSE, row.names = FALSE)
-
-# Drop-seq, Fluidigm HT, Fluidigm LT
-# High pool
-go <- intersect(
-  intersect(gpPhiBloDsDF$term.id[
-      gpPhiBloDsDF$domain == "BP" |
-      gpPhiBloDsDF$domain == "MF" |
-      gpPhiBloDsDF$domain == "CC"]
-    , gpPhiBloFhDF$term.id)
-  , gpPhiBloFlDF$term.id)
-write.table(go, paste0(outTable, "GO_Ds_Fh_Fl_PoolHigh.txt")
-  , quote = FALSE, row.names = FALSE)
-# High bulk
-go <- intersect(
-  intersect(gpPloBhiDsDF$term.id[
-      gpPloBhiDsDF$domain == "BP" |
-      gpPloBhiDsDF$domain == "MF" |
-      gpPloBhiDsDF$domain == "CC"]
-    , gpPloBhiFhDF$term.id)
-  , gpPloBhiFlDF$term.id)
-write.table(go, paste0(outTable, "GO_Ds_Fh_Fl_BulkHigh.txt")
-  , quote = FALSE, row.names = FALSE)
-
-# Drop-seq, Fluidigm HT, Fluidigm LT, Pollen
-# High pool
-go <- intersect(
-  intersect(
-    intersect(gpPhiBloDsDF$term.id[
-        gpPhiBloDsDF$domain == "BP" |
-        gpPhiBloDsDF$domain == "MF" |
-        gpPhiBloDsDF$domain == "CC"]
-      , gpPhiBloFhDF$term.id)
-    , gpPhiBloFlDF$term.id)
-  , gpPhiBloPnDF$term.id
-)
-write.table(go, paste0(outTable, "GO_Ds_Fh_Fl_Pollen_PoolHigh.txt")
-  , quote = FALSE, row.names = FALSE)
-# High bulk
-go <- intersect(
-  intersect(
-    intersect(gpPloBhiDsDF$term.id[
-        gpPloBhiDsDF$domain == "BP" |
-        gpPloBhiDsDF$domain == "MF" |
-        gpPloBhiDsDF$domain == "CC"]
-      , gpPloBhiFhDF$term.id)
-    , gpPloBhiFlDF$term.id)
-  , gpPloBhiPnDF$term.id
-)
-write.table(go, paste0(outTable, "GO_Ds_Fh_Fl_Pollen_BulkHigh.txt")
-  , quote = FALSE, row.names = FALSE)
-
-# Drop-seq, not in Fluidigm HT, Fluidigm LT
-# High pool
-go <- setdiff(
-  setdiff(gpPhiBloDsDF$term.id[
-      gpPhiBloDsDF$domain == "BP" |
-      gpPhiBloDsDF$domain == "MF" |
-      gpPhiBloDsDF$domain == "CC"]
-    , gpPhiBloFhDF$term.id)
-  , gpPhiBloPnDF$term.id
-)
-write.table(go, paste0(outTable, "GO_Ds_NotInFhFl_Pollen_PoolHigh.txt")
-  , quote = FALSE, row.names = FALSE)
-# High bulk
-go <- setdiff(
-  setdiff(gpPloBhiDsDF$term.id[
-      gpPloBhiDsDF$domain == "BP" |
-      gpPloBhiDsDF$domain == "MF" |
-      gpPloBhiDsDF$domain == "CC"]
-    , gpPloBhiFhDF$term.id)
-  , gpPloBhiFlDF$term.id
-)
-write.table(go, paste0(outTable, "GO_Ds_NotInFhFl_Pollen_BulkHigh.txt")
-  , quote = FALSE, row.names = FALSE)
+# ## Intersect GO terms
+# 
+# # Drop-seq GZ, Fluidigm HT GZ, Pollen
+# # High pool
+# go <- intersect(
+#   intersect(gpPhiBloDsGzDF$term.id[
+#       gpPhiBloDsGzDF$domain == "BP" |
+#       gpPhiBloDsGzDF$domain == "MF" |
+#       gpPhiBloDsGzDF$domain == "CC"]
+#     , gpPhiBloFhGzDF$term.id)
+#   , gpPhiBloPnDF$term.id)
+# write.table(go, paste0(outTable, "GO_DsGz_FhGz_Pollen_PoolHigh.txt")
+#   , quote = FALSE, row.names = FALSE)
+# # High bulk
+# go <- intersect(
+#   intersect(gpPloBhiDsGzDF$term.id[
+#       gpPloBhiDsGzDF$domain == "BP" |
+#       gpPloBhiDsGzDF$domain == "MF" |
+#       gpPloBhiDsGzDF$domain == "CC"]
+#     , gpPloBhiFhGzDF$term.id)
+#   , gpPloBhiPnDF$term.id)
+# write.table(go, paste0(outTable, "GO_DsGz_FhGz_Pollen_BulkHigh.txt")
+#   , quote = FALSE, row.names = FALSE)
+# 
+# # Drop-seq, Fluidigm HT, Fluidigm LT
+# # High pool
+# go <- intersect(
+#   intersect(gpPhiBloDsDF$term.id[
+#       gpPhiBloDsDF$domain == "BP" |
+#       gpPhiBloDsDF$domain == "MF" |
+#       gpPhiBloDsDF$domain == "CC"]
+#     , gpPhiBloFhDF$term.id)
+#   , gpPhiBloFlDF$term.id)
+# write.table(go, paste0(outTable, "GO_Ds_Fh_Fl_PoolHigh.txt")
+#   , quote = FALSE, row.names = FALSE)
+# # High bulk
+# go <- intersect(
+#   intersect(gpPloBhiDsDF$term.id[
+#       gpPloBhiDsDF$domain == "BP" |
+#       gpPloBhiDsDF$domain == "MF" |
+#       gpPloBhiDsDF$domain == "CC"]
+#     , gpPloBhiFhDF$term.id)
+#   , gpPloBhiFlDF$term.id)
+# write.table(go, paste0(outTable, "GO_Ds_Fh_Fl_BulkHigh.txt")
+#   , quote = FALSE, row.names = FALSE)
+# 
+# # Drop-seq, Fluidigm HT, Fluidigm LT, Pollen
+# # High pool
+# go <- intersect(
+#   intersect(
+#     intersect(gpPhiBloDsDF$term.id[
+#         gpPhiBloDsDF$domain == "BP" |
+#         gpPhiBloDsDF$domain == "MF" |
+#         gpPhiBloDsDF$domain == "CC"]
+#       , gpPhiBloFhDF$term.id)
+#     , gpPhiBloFlDF$term.id)
+#   , gpPhiBloPnDF$term.id
+# )
+# write.table(go, paste0(outTable, "GO_Ds_Fh_Fl_Pollen_PoolHigh.txt")
+#   , quote = FALSE, row.names = FALSE)
+# # High bulk
+# go <- intersect(
+#   intersect(
+#     intersect(gpPloBhiDsDF$term.id[
+#         gpPloBhiDsDF$domain == "BP" |
+#         gpPloBhiDsDF$domain == "MF" |
+#         gpPloBhiDsDF$domain == "CC"]
+#       , gpPloBhiFhDF$term.id)
+#     , gpPloBhiFlDF$term.id)
+#   , gpPloBhiPnDF$term.id
+# )
+# write.table(go, paste0(outTable, "GO_Ds_Fh_Fl_Pollen_BulkHigh.txt")
+#   , quote = FALSE, row.names = FALSE)
+# 
+# # Drop-seq, not in Fluidigm HT, Fluidigm LT
+# # High pool
+# go <- setdiff(
+#   setdiff(gpPhiBloDsDF$term.id[
+#       gpPhiBloDsDF$domain == "BP" |
+#       gpPhiBloDsDF$domain == "MF" |
+#       gpPhiBloDsDF$domain == "CC"]
+#     , gpPhiBloFhDF$term.id)
+#   , gpPhiBloPnDF$term.id
+# )
+# write.table(go, paste0(outTable, "GO_Ds_NotInFhFl_Pollen_PoolHigh.txt")
+#   , quote = FALSE, row.names = FALSE)
+# # High bulk
+# go <- setdiff(
+#   setdiff(gpPloBhiDsDF$term.id[
+#       gpPloBhiDsDF$domain == "BP" |
+#       gpPloBhiDsDF$domain == "MF" |
+#       gpPloBhiDsDF$domain == "CC"]
+#     , gpPloBhiFhDF$term.id)
+#   , gpPloBhiFlDF$term.id
+# )
+# write.table(go, paste0(outTable, "GO_Ds_NotInFhFl_Pollen_BulkHigh.txt")
+#   , quote = FALSE, row.names = FALSE)
 
 ## Gene length for each GO ID
 

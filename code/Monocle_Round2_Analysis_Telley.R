@@ -1,6 +1,6 @@
 # Damon Polioudakis
-# 2017-08-15
-# Run monocle
+# 2017-12-09
+# Analyize Monocle output using Telley gene lists
 ################################################################################
 
 rm(list = ls())
@@ -22,7 +22,7 @@ args <- commandArgs(trailingOnly = TRUE)
 # Monocle round 2
 
 # How to reorder list of monocle objects for plotting
-toOrder <- c("0-1-4-12", "0-1-2", "0-1", "3-14", "5-6", "7-9", "0", "1", "2", "3"
+toOrder <- c("0-1-2-4-12", "0-1-4-12", "0-1-2", "0-1", "3-14", "5-6", "7-9", "0", "1", "2", "3"
   , "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15")
 
 # Monocle object
@@ -85,34 +85,18 @@ beamLLDF <- beamLLDF[toOrder]
 
 # Seurat clustering
 load("../analysis/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_seuratO.Robj")
-
-# Known cell type markers from Luis
-kmDF <- read.csv("../source/MarkersforSingleCell_2017-01-05.csv", header = TRUE
-  , fill = TRUE)
-
-# Molyneaux markers
-mmDF <- read.csv("../source/Molyneaux_LayerMarkers_Format.csv", header = TRUE)
+# load("../analysis/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_TEST_seuratO.Robj")
+# centSO <- ssCentSO
+# noCentExM <- ssNoCentExM
 
 # Telley transcriptional waves
 tyDF <- read.csv("../source/Telley_2015_ST3_TranscriptionalWaves.csv", header = TRUE)
 
-# Human TFs
-tfDF <- read.table("../source/AnimalTFDB_Homo_sapiens_TF_EnsemblID.txt")
-# Human chromatin remodeling factors
-crDF <- read.table(
-  "../source/AnimalTFDB_Homo_sapiens_chr_remodeling_factor_EnsemblID.txt")
-# Human co-factors
-cfDF <- read.table("../source/AnimalTFDB_Homo_sapiens_cofactor_EnsemblID.txt")
-
-# biomaRt gene info
-bmDF <- read.csv("../source/BiomaRt_Compile_GeneInfo_GRCh38_Ensembl87.csv"
-  , header = TRUE)
-
 ## Variables
 graphCodeTitle <- "Monocle_Round2_Analysis_Telley.R"
-outGraph <- "../analysis/graphs/Monocle_Round2_Analysis_Telley/Comp1-10/Monocle_Round2_"
-outTable <- "../analysis/tables/Monocle_Round2_Analysis_Telley/Comp1-10/Monocle_Round2_"
-outRdat <- "../analysis/Monocle_Round2_Analysis_Telley/Comp1-10/Monocle_Round2_"
+outGraph <- "../analysis/graphs/Monocle_Round2_Analysis_Telley/Comp1-10/Monocle_Round2_Analysis_Telley_"
+outTable <- "../analysis/tables/Monocle_Round2_Analysis_Telley/Comp1-10/Monocle_Round2_Analysis_Telley_"
+outRdat <- "../analysis/Monocle_Round2_Analysis_Telley/Comp1-10/Monocle_Round2_Analysis_Telley_"
 
 ## Output Directories
 dir.create(dirname(outGraph), recursive = TRUE)
@@ -131,12 +115,13 @@ theme_update(axis.line = element_line(colour = "black")
 )
 ################################################################################
 
-
+### Functions
 
 Convert_MouseGenes_To_HumanGenes <- function(geneList) {
   geneList <- data.frame(geneList)
   mart = useEnsembl(biomart = "ensembl", dataset = "mmusculus_gene_ensembl")
-  mart <- useMart("ENSEMBL_MART_ENSEMBL", host = "www.ensembl.org")
+  mart <- useMart("ENSEMBL_MART_ENSEMBL", host = "aug2017.archive.ensembl.org")
+  # mart <- useMart("ENSEMBL_MART_ENSEMBL", host = "www.ensembl.org")
   mart <- useDataset("mmusculus_gene_ensembl", mart = mart)
   # Look up human orthologs
   ensemblMmHsDF <- getBM(
@@ -160,147 +145,389 @@ Convert_MouseGenes_To_HumanGenes <- function(geneList) {
   return(genesDF)
 }
 
+GenesList_Expression_By_Pseudotime <- function(
+  gene_group_DF
+  , exM
+  , mo_filtered
+  , center_scale = FALSE) {
+  
+  # Center and scale expression for each gene across cells
+  if (center_scale == TRUE) {
+    exM <- t(scale(t(exM)))
+  }
+  
+  # Add pseudotime and calculate mean gene expression for each cell
+  df1 <- melt(exM[row.names(exM) %in% gene_group_DF$Gene, ])
+  idx <- match(df1$Var2, row.names(mo_filtered@phenoData@data))
+  df1$Pseudotime <- mo_filtered@phenoData@data$Pseudotime[idx]
+  df1$Group <- gene_group_DF$Group[match(df1$Var1, gene_group_DF$Gene)]
+  df1 <- aggregate(value~Var2+Pseudotime+Group, df1, mean)
+  # Downsample for testing
+  # df1 <- df1[sample(1:nrow(df1), 1000), ]
+  return(df1)
+}
+
+Expression_By_Pseudotime_FitLine_Plot <- function(df){
+  gg <- ggplot(df, aes(x = Pseudotime, y = value)) +
+    facet_wrap(~Group) +
+    geom_jitter(alpha = 0.1, size = 0.1) +
+    geom_smooth(method = "auto", aes(color = Group)) +
+    theme(legend.position="none") +
+    ylab("Expression")
+  # stat_summary(fun.y = "mean", color = "red", size = 1, geom = "point")
+  return(gg)
+}
+
+Expression_By_Pseudotime_FitLine_Combo_Plot <- function(df){
+  gg <- ggplot(df, aes(x = Pseudotime, y = value, group = Group)) +
+    geom_smooth(method = "auto", aes(color = Group)) +
+    ylab("Expression")
+  # stat_summary(fun.y = "mean", color = "red", size = 1, geom = "point")
+  return(gg)
+}
+################################################################################
+
+### Plot Telley genes across pseudotime
 
 # Output Directories
-outDir <- paste0(outGraph, "Pseudotime_Heatmap_TelleyCore-P-Ng-Ngenes")
+outDir <- paste0(outGraph, "Core-P-Ng-Ngenes_Loess")
 dir.create(outDir, recursive = TRUE)
 outSubGraph <- paste0(outDir, "/", basename(outDir), "_")
 
 lapply(names(ptDeL)[1:4], function(cluster){
   
-  # cluster <- "0-1"
+  # cluster <- "0-1-2"
   print(cluster)
   
   diff_test_res <- ptDeL[[cluster]]
   mo_filtered <- moL[[cluster]]
-  print(str(mo_filtered))
   
-  P <- c("Fabp7", "Nes", "Pax6", "Slc1a3", "Sox2", "Vim")
-  Ng <- c("Btg2", "Eomes", "Neurog2", "Tuba1a")
-  N <- c("Dcx", "Neurod1", "Map2", "Mapt", "Tbr1", "Tubb3", "Rbfox3")
+  # Telley Proliferative, Neurogenic, Neuronal genes
+  telleyPNgNgenesL <- list(
+    P = c("Fabp7", "Nes", "Pax6", "Slc1a3", "Sox2", "Vim")
+    , Ng = c("Btg2", "Eomes", "Neurog2", "Tuba1a")
+    , N = c("Dcx", "Neurod1", "Map2", "Mapt", "Tbr1", "Tubb3", "Rbfox3")  
+  )
+  # Human homolog
+  telleyPNgNgenesL <- lapply(telleyPNgNgenesL, function(genes) {
+    df1 <- Convert_MouseGenes_To_HumanGenes(genes)
+    return(df1$hsapiens_homolog_associated_gene_name)
+  })
+    
+
+  ## Plot Telley Proliferative, Neurogenic, Neuronal genes
   
-  P <- Convert_MouseGenes_To_HumanGenes(P)
-  P <- P$hsapiens_homolog_associated_gene_name
+  # Telley P, Ng, N genes filtered by pseudotime DE FDR < 0.001
+  gene_group_DF <- melt(telleyPNgNgenesL)
+  colnames(gene_group_DF) <- c("Gene", "Group")
+  de_genes <- diff_test_res$gene_short_name[diff_test_res$qval < 0.001]
+  gene_group_DF <- gene_group_DF[gene_group_DF$Gene %in% de_genes, ]
   
-  Ng <- Convert_MouseGenes_To_HumanGenes(Ng)
-  Ng <- Ng$hsapiens_homolog_associated_gene_name
+  # Mean expression of genes per cell and format for ggplot
+  ggDF <- GenesList_Expression_By_Pseudotime(
+    gene_group_DF = gene_group_DF
+    , exM = noCentExM
+    , mo_filtered = mo_filtered
+    , center_scale = TRUE
+    )
   
-  N <- Convert_MouseGenes_To_HumanGenes(N)
-  N <- N$hsapiens_homolog_associated_gene_name
+  # Faceted graph
+  Expression_By_Pseudotime_FitLine_Plot(ggDF) +
+    ggtitle(paste0(graphCodeTitle
+      , "\n\nExpression of Telley core Proliferative, Neurogenic, Neuronal genes"
+      , "\nDE across pseudotime filter: FDR < 0.001"
+      , "\nCentered and scaled expression"))
+  # Plot_Grid(ggL, ncol = 3, rel_height = 0.2, title = "Telley Waves")
+  ggsave(paste0(outSubGraph, "Cluster", paste0(cluster, collapse = "-")
+    , "_PNgNgenes_PseudotimeDE001_Facet_CenterScaled.png")
+    , width = 7, height = 5)
   
+  # Same graph
+  Expression_By_Pseudotime_FitLine_Combo_Plot(ggDF) +
+    ggtitle(paste0(graphCodeTitle
+      , "\n\nExpression of Telley core Proliferative, Neurogenic, Neuronal genes"
+      , "\nDE across pseudotime filter: FDR < 0.001"
+      , "\nCentered and scaled expression"))
+  ggsave(paste0(outSubGraph, "Cluster", paste0(cluster, collapse = "-")
+    , "_PNgNgenes_PseudotimeDE001_CenterScaled.png")
+    , width = 7, height = 5)
+  
+  # Telley core Proliferative, Neurogenic, Neuronal genes filtered by pseudotime DE FDR < 0.01
+  gene_group_DF <- melt(telleyPNgNgenesL)
+  colnames(gene_group_DF) <- c("Gene", "Group")
+  de_genes <- diff_test_res$gene_short_name[diff_test_res$qval < 0.01]
+  gene_group_DF <- gene_group_DF[gene_group_DF$Gene %in% de_genes, ]
+  
+  # Mean expression of genes per cell and format for ggplot
+  ggDF <- GenesList_Expression_By_Pseudotime(
+    gene_group_DF = gene_group_DF
+    , exM = noCentExM
+    , mo_filtered = mo_filtered
+    , center_scale = TRUE
+  )
+  
+  # Faceted graph
+  Expression_By_Pseudotime_FitLine_Plot(ggDF) +
+    ggtitle(paste0(graphCodeTitle
+      , "\n\nExpression of Telley core Proliferative, Neurogenic, Neuronal genes"
+      , "\nDE across pseudotime filter: FDR < 0.01"
+      , "\nCentered and scaled expression"))
+  # Plot_Grid(ggL, ncol = 3, rel_height = 0.2, title = "Telley Waves")
+  ggsave(paste0(outSubGraph, "Cluster", paste0(cluster, collapse = "-")
+    , "_PNgNgenes_PseudotimeDE01_Facet_CenterScaled.png")
+    , width = 7, height = 5)
+  
+  # Same graph
+  Expression_By_Pseudotime_FitLine_Combo_Plot(ggDF) +
+    ggtitle(paste0(graphCodeTitle
+      , "\n\nExpression of Telley core Proliferative, Neurogenic, Neuronal genes"
+      , "\nDE across pseudotime filter: FDR < 0.01"
+      , "\nCentered and scaled expression"))
+  ggsave(paste0(outSubGraph, "Cluster", paste0(cluster, collapse = "-")
+    , "_PNgNgenes_PseudotimeDE01_CenterScaled.png")
+    , width = 7, height = 5)
+  
+  # Telley core Proliferative, Neurogenic, Neuronal genes filtered by pseudotime DE FDR < 0.05
+  gene_group_DF <- melt(telleyPNgNgenesL)
+  colnames(gene_group_DF) <- c("Gene", "Group")
+  de_genes <- diff_test_res$gene_short_name[diff_test_res$qval < 0.05]
+  gene_group_DF <- gene_group_DF[gene_group_DF$Gene %in% de_genes, ]
+  
+  # Mean expression of genes per cell and format for ggplot
+  ggDF <- GenesList_Expression_By_Pseudotime(
+    gene_group_DF = gene_group_DF
+    , exM = noCentExM
+    , mo_filtered = mo_filtered
+    , center_scale = TRUE
+  )
+  
+  # Faceted graph
+  Expression_By_Pseudotime_FitLine_Plot(ggDF) +
+    ggtitle(paste0(graphCodeTitle
+      , "\n\nExpression of Telley core Proliferative, Neurogenic, Neuronal genes"
+      , "\nDE across pseudotime filter: FDR < 0.05"
+      , "\nCentered and scaled expression"))
+  # Plot_Grid(ggL, ncol = 3, rel_height = 0.2, title = "Telley Waves")
+  ggsave(paste0(outSubGraph, "Cluster", paste0(cluster, collapse = "-")
+    , "_PNgNgenes_PseudotimeDE05_Facet_CenterScaled.png")
+    , width = 7, height = 5)
+  
+  # Same graph
+  Expression_By_Pseudotime_FitLine_Combo_Plot(ggDF) +
+    ggtitle(paste0(graphCodeTitle
+      , "\n\nExpression of Telley core Proliferative, Neurogenic, Neuronal genes"
+      , "\nDE across pseudotime filter: FDR < 0.05"
+      , "\nCentered and scaled expression"))
+  ggsave(paste0(outSubGraph, "Cluster", paste0(cluster, collapse = "-")
+    , "_PNgNgenes_PseudotimeDE05_CenterScaled.png")
+    , width = 7, height = 5)
+  
+  # Telley core Proliferative, Neurogenic, Neuronal genes
+  gene_group_DF <- melt(telleyPNgNgenesL)
+  colnames(gene_group_DF) <- c("Gene", "Group")
+
+  # Mean expression of genes per cell and format for ggplot
+  ggDF <- GenesList_Expression_By_Pseudotime(
+    gene_group_DF = gene_group_DF
+    , exM = noCentExM
+    , mo_filtered = mo_filtered
+    , center_scale = TRUE
+  )
+  
+  # Faceted graph
+  Expression_By_Pseudotime_FitLine_Plot(ggDF) +
+    ggtitle(paste0(graphCodeTitle
+      , "\n\nExpression of Telley core Proliferative, Neurogenic, Neuronal genes"
+      , "\nCentered and scaled expression"))
+  # Plot_Grid(ggL, ncol = 3, rel_height = 0.2, title = "Telley Waves")
+  ggsave(paste0(outSubGraph, "Cluster", paste0(cluster, collapse = "-")
+    , "_PNgNgenes_Facet_CenterScaled.png")
+    , width = 7, height = 5)
+  
+  # Same graph
+  Expression_By_Pseudotime_FitLine_Combo_Plot(ggDF) +
+    ggtitle(paste0(graphCodeTitle
+      , "\n\nExpression of Telley core Proliferative, Neurogenic, Neuronal genes"
+      , "\nCentered and scaled expression"))
+  ggsave(paste0(outSubGraph, "Cluster", paste0(cluster, collapse = "-")
+    , "_PNgNgenes_CenterScaled.png")
+    , width = 7, height = 5)
+  
+  # png(paste0(outSubGraph, "facet_N.png"))
+  # plot_genes_in_pseudotime(mo_filtered[N[1:6], ])
+  # dev.off()
+  # 
+  # png(paste0(outSubGraph, "facet_P.png"))
+  # plot_genes_in_pseudotime(mo_filtered[P, ])
+  # dev.off()
+  # 
+  # png(paste0(outSubGraph, "facet_Ng.png"))
+  # plot_genes_in_pseudotime(mo_filtered[Ng, ])
+  # dev.off()
+})
+################################################################################
+
+### Telley wave genes
+
+# Output Directories
+outDir <- paste0(outGraph, "WaveGenes")
+dir.create(outDir, recursive = TRUE)
+outSubGraph <- paste0(outDir, "/", basename(outDir), "_")
+
+lapply(names(ptDeL)[1:4], function(cluster){
+  
+  # cluster <- "0-1-2"
+  print(cluster)
+  
+  diff_test_res <- ptDeL[[cluster]]
+  mo_filtered <- moL[[cluster]]
+  
+  # Wave genes human homolog
   telleyWaveL <- lapply(tyDF, function(df) {
     df <- Convert_MouseGenes_To_HumanGenes(df)
     return(df$hsapiens_homolog_associated_gene_name)
   })
   
   
+  ## Plot Telley wave genes
   
-  GenesList_Expression_By_Pseudotime <- function(geneList, exM) {
-    # df1 <- melt(as.matrix(centSO@scale.data)[row.names(centSO@scale.data) %in% P, ])
-    
-    df1 <- melt(exM[row.names(exM) %in% geneList, ])
-    idx <- match(df1$Var2, row.names(mo_filtered@phenoData@data))
-    df1$Pseudotime <- mo_filtered@phenoData@data$Pseudotime[idx]
-    df1 <- aggregate(value~Var2+Pseudotime, df1, mean)
-    # Downsample for testing
-    # df1 <- df1[sample(1:nrow(df1), 1000), ]
-    return(df1)
-  }
+  # Telley wave genes filtered by pseudotime DE FDR < 0.001
+  gene_group_DF <- melt(telleyWaveL)
+  colnames(gene_group_DF) <- c("Gene", "Group")
+  de_genes <- diff_test_res$gene_short_name[diff_test_res$qval < 0.001]
+  gene_group_DF <- gene_group_DF[gene_group_DF$Gene %in% de_genes, ]
   
-  Expression_By_Pseudotime_FitLine_Plot <- function(df){
-    gg <- ggplot(df, aes(x = Pseudotime, y = value)) +
-      geom_jitter(alpha = 0.1, size = 0.1) +
-      geom_smooth(method = "auto")
-    # stat_summary(fun.y = "mean", color = "red", size = 1, geom = "point")
-    return(gg)
-  }
+  # Mean expression of genes per cell and format for ggplot
+  ggDF <- GenesList_Expression_By_Pseudotime(
+    gene_group_DF = gene_group_DF
+    , exM = noCentExM
+    , mo_filtered = mo_filtered
+    , center_scale = TRUE
+  )
   
-  ggDF <- GenesList_Expression_By_Pseudotime(geneList = P, exM = noCentExM)
-  Expression_By_Pseudotime_FitLine_Plot(ggDF)
-  ggsave(paste0(outSubGraph, "Cluster", paste0(cluster, collapse = "-"), "_P.png"))
+  # Faceted graph
+  Expression_By_Pseudotime_FitLine_Plot(ggDF) +
+    ggtitle(paste0(graphCodeTitle
+      , "\n\nExpression of Telley transcriptional wave genes"
+      , "\nDE across pseudotime filter: FDR < 0.001"
+      , "\nCentered and scaled expression"))
+  # Plot_Grid(ggL, ncol = 3, rel_height = 0.2, title = "Telley Waves")
+  ggsave(paste0(outSubGraph, "Cluster", paste0(cluster, collapse = "-")
+    , "_Waves_PseudotimeDE001_Facet_CenterScaled.png")
+    , width = 7, height = 7)
   
-  ggDF <- GenesList_Expression_By_Pseudotime(geneList = Ng, exM = noCentExM)
-  Expression_By_Pseudotime_FitLine_Plot(ggDF)
-  ggsave(paste0(outSubGraph, "Cluster", paste0(cluster, collapse = "-"), "_Ng.png"))
+  # Same graph
+  Expression_By_Pseudotime_FitLine_Combo_Plot(ggDF) +
+    ggtitle(paste0(graphCodeTitle
+      , "\n\nExpression of Telley transcriptional wave genes"
+      , "\nDE across pseudotime filter: FDR < 0.001"
+      , "\nCentered and scaled expression"))
+  ggsave(paste0(outSubGraph, "Cluster", paste0(cluster, collapse = "-")
+    , "_Waves_PseudotimeDE001_CenterScaled.png")
+    , width = 7, height = 7)
   
-  ggDF <- GenesList_Expression_By_Pseudotime(geneList = N, exM = noCentExM)
-  Expression_By_Pseudotime_FitLine_Plot(ggDF)
-  ggsave(paste0(outSubGraph, "Cluster", paste0(cluster, collapse = "-"), "_N.png"))
+  # Telley wave genes filtered by pseudotime DE FDR < 0.01
+  gene_group_DF <- melt(telleyWaveL)
+  colnames(gene_group_DF) <- c("Gene", "Group")
+  de_genes <- diff_test_res$gene_short_name[diff_test_res$qval < 0.01]
+  gene_group_DF <- gene_group_DF[gene_group_DF$Gene %in% de_genes, ]
   
-  ggL <- lapply(telleyWaveL, function(genes) {
-    ggDF <- GenesList_Expression_By_Pseudotime(genes, exM = noCentExM)
-    gg <- Expression_By_Pseudotime_FitLine_Plot(ggDF)
-    return(gg)
-  })
-  Plot_Grid(ggL, ncol = 3, rel_height = 0.2, title = "Telley Waves")
-  ggsave(paste0(outSubGraph, "Cluster", paste0(cluster, collapse = "-"), "_Waves.png")
-    , width = 12, height = 7)
+  # Mean expression of genes per cell and format for ggplot
+  ggDF <- GenesList_Expression_By_Pseudotime(
+    gene_group_DF = gene_group_DF
+    , exM = noCentExM
+    , mo_filtered = mo_filtered
+    , center_scale = TRUE
+  )
   
-  ggL <- lapply(telleyWaveL, function(genes) {
-    ggDF <- GenesList_Expression_By_Pseudotime(genes, exM = as.matrix(centSO@scale.data))
-    gg <- Expression_By_Pseudotime_FitLine_Plot(ggDF)
-    return(gg)
-  })
-  Plot_Grid(ggL, ncol = 3, rel_height = 0.2, title = "Telley Waves")
-  ggsave(paste0(outSubGraph, "Cluster", paste0(cluster, collapse = "-"), "_Waves_CenteredScaled.png")
-    , width = 12, height = 7)
+  # Faceted graph
+  Expression_By_Pseudotime_FitLine_Plot(ggDF) +
+    ggtitle(paste0(graphCodeTitle
+      , "\n\nExpression of Telley transcriptional wave genes"
+      , "\nDE across pseudotime filter: FDR < 0.01"
+      , "\nCentered and scaled expression"))
+  # Plot_Grid(ggL, ncol = 3, rel_height = 0.2, title = "Telley Waves")
+  ggsave(paste0(outSubGraph, "Cluster", paste0(cluster, collapse = "-")
+    , "_Waves_PseudotimeDE01_Facet_CenterScaled.png")
+    , width = 7, height = 7)
   
-  ggL <- lapply(telleyWaveL, function(genes) {
-    de_genes <- diff_test_res$gene_short_name[diff_test_res$qval < 0.05]
-    genes <- genes[genes %in% de_genes]
-    ggDF <- GenesList_Expression_By_Pseudotime(genes, exM = noCentExM)
-    gg <- Expression_By_Pseudotime_FitLine_Plot(ggDF)
-    return(gg)
-  })
-  Plot_Grid(ggL, ncol = 3, rel_height = 0.2, title = "Telley Waves")
-  ggsave(paste0(outSubGraph, "Cluster", paste0(cluster, collapse = "-"), "_Waves_PseudotimeDE.png")
-    , width = 12, height = 7)
+  # Same graph
+  Expression_By_Pseudotime_FitLine_Combo_Plot(ggDF) +
+    ggtitle(paste0(graphCodeTitle
+      , "\n\nExpression of Telley transcriptional wave genes"
+      , "\nDE across pseudotime filter: FDR < 0.01"
+      , "\nCentered and scaled expression"))
+  ggsave(paste0(outSubGraph, "Cluster", paste0(cluster, collapse = "-")
+    , "_Waves_PseudotimeDE01_CenterScaled.png")
+    , width = 7, height = 7)
   
-  ggL <- lapply(telleyWaveL, function(genes) {
-    de_genes <- diff_test_res$gene_short_name[diff_test_res$qval < 0.05]
-    genes <- genes[genes %in% de_genes]
-    ggDF <- GenesList_Expression_By_Pseudotime(genes, exM = as.matrix(centSO@scale.data))
-    gg <- Expression_By_Pseudotime_FitLine_Plot(ggDF)
-    return(gg)
-  })
-  Plot_Grid(ggL, ncol = 3, rel_height = 0.2, title = "Telley Waves")
-  ggsave(paste0(outSubGraph, "Cluster", paste0(cluster, collapse = "-"), "_Waves_PseudotimeDE_CenteredScaled.png")
-    , width = 12, height = 7)
+  # Telley wave genes filtered by pseudotime DE FDR < 0.05
+  gene_group_DF <- melt(telleyWaveL)
+  colnames(gene_group_DF) <- c("Gene", "Group")
+  de_genes <- diff_test_res$gene_short_name[diff_test_res$qval < 0.05]
+  gene_group_DF <- gene_group_DF[gene_group_DF$Gene %in% de_genes, ]
   
+  # Mean expression of genes per cell and format for ggplot
+  ggDF <- GenesList_Expression_By_Pseudotime(
+    gene_group_DF = gene_group_DF
+    , exM = noCentExM
+    , mo_filtered = mo_filtered
+    , center_scale = TRUE
+  )
   
-  # 
-  # ggDF <- GenesList_Expression_By_Pseudotime(telleyWaveL[[1]])
-  # gg1 <- Expression_By_Pseudotime_FitLine_Plot(ggDF)
-  # 
-  # ggDF <- GenesList_Expression_By_Pseudotime(telleyWaveL[[2]])
-  # gg2 <- Expression_By_Pseudotime_FitLine_Plot(ggDF)
-  # 
-  # ggDF <- GenesList_Expression_By_Pseudotime(telleyWaveL[[3]])
-  # gg3 <- Expression_By_Pseudotime_FitLine_Plot(ggDF)
-  # 
-  # ggDF <- GenesList_Expression_By_Pseudotime(telleyWaveL[[4]])
-  # gg4 <- Expression_By_Pseudotime_FitLine_Plot(ggDF)
-  # 
-  # ggDF <- GenesList_Expression_By_Pseudotime(telleyWaveL[[5]])
-  # gg5 <- Expression_By_Pseudotime_FitLine_Plot(ggDF)
-  # 
-  # ggDF <- GenesList_Expression_By_Pseudotime(telleyWaveL[[6]])
-  # gg6 <- Expression_By_Pseudotime_FitLine_Plot(ggDF)
-  # 
-  # 
-  png(paste0(outSubGraph, "facet_N.png"))
-  plot_genes_in_pseudotime(mo_filtered[N[1:6], ])
-  dev.off()
+  # Faceted graph
+  Expression_By_Pseudotime_FitLine_Plot(ggDF) +
+    ggtitle(paste0(graphCodeTitle
+      , "\n\nExpression of Telley transcriptional wave genes"
+      , "\nDE across pseudotime filter: FDR < 0.05"
+      , "\nCentered and scaled expression"))
+  # Plot_Grid(ggL, ncol = 3, rel_height = 0.2, title = "Telley Waves")
+  ggsave(paste0(outSubGraph, "Cluster", paste0(cluster, collapse = "-")
+    , "_Waves_PseudotimeDE05_Facet_CenterScaled.png")
+    , width = 7, height = 7)
   
-  png(paste0(outSubGraph, "facet_P.png"))
-  plot_genes_in_pseudotime(mo_filtered[P, ])
-  dev.off()
+  # Same graph
+  Expression_By_Pseudotime_FitLine_Combo_Plot(ggDF) +
+    ggtitle(paste0(graphCodeTitle
+      , "\n\nExpression of Telley transcriptional wave genes"
+      , "\nDE across pseudotime filter: FDR < 0.05"
+      , "\nCentered and scaled expression"))
+  ggsave(paste0(outSubGraph, "Cluster", paste0(cluster, collapse = "-")
+    , "_Waves_PseudotimeDE05_CenterScaled.png")
+    , width = 7, height = 7)
   
-  png(paste0(outSubGraph, "facet_Ng.png"))
-  plot_genes_in_pseudotime(mo_filtered[Ng, ])
-  dev.off()
+  # Telley wave genes
+  gene_group_DF <- melt(telleyWaveL)
+  colnames(gene_group_DF) <- c("Gene", "Group")
+  
+  # Mean expression of genes per cell and format for ggplot
+  ggDF <- GenesList_Expression_By_Pseudotime(
+    gene_group_DF = gene_group_DF
+    , exM = noCentExM
+    , mo_filtered = mo_filtered
+    , center_scale = TRUE
+  )
+  
+  # Faceted graph
+  Expression_By_Pseudotime_FitLine_Plot(ggDF) +
+    ggtitle(paste0(graphCodeTitle
+      , "\n\nExpression of Telley transcriptional wave genes"
+      , "\nCentered and scaled expression"))
+  # Plot_Grid(ggL, ncol = 3, rel_height = 0.2, title = "Telley Waves")
+  ggsave(paste0(outSubGraph, "Cluster", paste0(cluster, collapse = "-")
+    , "_Waves_Facet_CenterScaled.png")
+    , width = 7, height = 7)
+  
+  # Same graph
+  Expression_By_Pseudotime_FitLine_Combo_Plot(ggDF) +
+    ggtitle(paste0(graphCodeTitle
+      , "\n\nExpression of Telley transcriptional wave genes"
+      , "\nCentered and scaled expression"))
+  ggsave(paste0(outSubGraph, "Cluster", paste0(cluster, collapse = "-")
+    , "_Waves_CenterScaled.png")
+    , width = 7, height = 7)
 })
-  
+################################################################################
     # 
   # 
   # 

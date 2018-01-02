@@ -80,27 +80,30 @@ Positive_Negative_Expression_Flag <- function(
   
   df <- exDF
   df$TYPE <- NA
+  df$TYPE[df[ ,c("Neuron")] > highThreshold] <- "Neuron+"
   df$TYPE[df[ ,c("IP")] > highThreshold] <- "IP+"
+  df$TYPE[df[ ,c("RG")] > highThreshold] <- "RG+"
   df$TYPE[df[ ,c("RG")] > highThreshold &
-      apply((df[ ,c("vRG", "oRG", "IP")] < lowThreshold), 1, all)] <- "RG+ vRG- oRG- IP-"
-  df$TYPE[df[ ,c("vRG")] > highThreshold &
-      df[ ,c("IP")] < lowThreshold] <- "vRG+ IP-"
-  df$TYPE[df[ ,c("oRG")] > highThreshold &
-      df[ ,c("IP")] < lowThreshold] <- "oRG+ IP-"
-  df$TYPE[df[ ,c("IP")] > highThreshold &
-      apply((df[ ,c("vRG", "oRG", "RG")] < lowThreshold), 1, all)] <- "IP+ vRG- oRG- RG-"
+      apply((df[ ,c("vRG", "oRG")] < lowThreshold), 1, all)] <- "RG+ vRG- oRG-"
+  # df$TYPE[df[ ,c("vRG")] > highThreshold &
+  #     df[ ,c("IP")] < lowThreshold] <- "vRG+ IP-"
+  # df$TYPE[df[ ,c("oRG")] > highThreshold &
+  #     df[ ,c("IP")] < lowThreshold] <- "oRG+ IP-"
+  # df$TYPE[df[ ,c("IP")] > highThreshold &
+  #     apply((df[ ,c("vRG", "oRG", "RG")] < lowThreshold), 1, all)] <- "IP+ vRG- oRG- RG-"
   df$TYPE[apply((df[ ,c("IP", "RG")] > highThreshold), 1, all)] <- "IP+ RG+"
+  df$TYPE[apply((df[ ,c("Neuron", "IP")] > highThreshold), 1, all)] <- "Neuron+ IP+"
+  df$TYPE[apply((df[ ,c("Neuron", "RG")] > highThreshold), 1, all)] <- "Neuron+ RG+"
+  
   # Controls
   df$TYPE[df[ ,c("Endothelial")] > highThreshold &
       df[ ,c("IP")] > highThreshold] <- "Endothelial+ IP+"
-  df$TYPE[df[ ,c("Neuron")] > highThreshold &
-      df[ ,c("IP")] > highThreshold] <- "Neuron+ IP+"
-  df$TYPE[df[ ,c("Neuron")] > highThreshold &
-      df[ ,c("RG")] > highThreshold] <- "Neuron+ RG+"
+  df$TYPE[df[ ,c("Interneuron")] > highThreshold &
+      df[ ,c("IP")] > highThreshold] <- "Interneuron+ IP+"
   
-  df$TYPE <- factor(df$TYPE, levels = c("IP+", "RG+ vRG- oRG- IP-", "vRG+ IP-"
-    , "oRG+ IP-", "IP+ vRG- oRG- RG-", "IP+ RG+", "Endothelial+ IP+", 
-    "Neuron+ IP+", "Neuron+ RG+"))
+  df$TYPE <- factor(df$TYPE, levels = c("Neuron+", "IP+", "RG+"
+    , "RG+ vRG- oRG-", "IP+ RG+", "Neuron+ IP+", "Neuron+ RG+"
+    , "Endothelial+ IP+", "Interneuron IP+"))
   df$CLUSTER <- factor(df$CLUSTER, levels = sort(unique(as.numeric(df$CLUSTER))))
   
   return(df)
@@ -125,6 +128,7 @@ Format_Number_Cell_Types_Cluster_Dataframe <- function (exM, seuratO) {
     , IP = Mean_Gene_Group_Expression(exM = exM, grouping = "IP")
     , Endothelial = Mean_Gene_Group_Expression(exM = exM, grouping = "Endothelial Cell")
     , Neuron = Mean_Gene_Group_Expression(exM = exM, grouping = "Neuron")
+    , Interneuron = Mean_Gene_Group_Expression(exM = exM, grouping = "GABAergic interneuron")
   )
   
   idx <- match(row.names(mnExDF), row.names(seuratO@meta.data))
@@ -403,9 +407,13 @@ gg2 <- Percent_RgIpCluster_Barplot(exM = noCentExM, seuratO = centSO
   , highThreshold = 0.5, lowThreshold = 0.25
   , title = "Keep CC\n+ = > 0.5 normalized expression\n- = < 0.25 normalized expression"
 )
+gg3 <- Percent_RgIpCluster_Barplot(exM = noCentExM, seuratO = centSO
+  , highThreshold = 0.75, lowThreshold = 0.25
+  , title = "Keep CC\n+ = > 0.75 normalized expression\n- = < 0.25 normalized expression"
+)
 
 # Plot grid
-pg <- plot_grid(gg1, gg2, ncol = 2)
+pg <- plot_grid(gg1, gg2, gg3, ncol = 2)
 # now add the title
 title <- ggdraw() + draw_label(paste0(graphCodeTitle
   , "\n\nPercent of cells passing combinations of RG, oRG, vRG, IPC expression filters"
@@ -414,7 +422,7 @@ title <- ggdraw() + draw_label(paste0(graphCodeTitle
 plot_grid(title, pg, ncol = 1, rel_heights = c(0.2, 1))
 # Save
 ggsave(paste0(outGraph, "PercentRgIpCluster_Barplot.pdf")
-  , width = 12, height = 7)
+  , width = 12, height = 14)
 ################################################################################
 
 ### Number / Percent of cells in CC phase subset by markers

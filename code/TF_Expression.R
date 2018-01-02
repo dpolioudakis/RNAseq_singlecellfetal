@@ -30,11 +30,11 @@ load("../analysis/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_Ke
 # centSO <- ssCentSO
 # noCentExM <- ssNoCentExM
 
-# # BrainSpan developmental transcriptome
-# bsDF <- read.csv("../source/BrainSpan_DevTranscriptome/genes_matrix_csv/expression_matrix.csv", header = FALSE)
-# rnames <- read.csv("../source/BrainSpan_DevTranscriptome/genes_matrix_csv/rows_metadata.csv")
-# row.names(bsDF) <- rnames$gene_symbol
-# bsMtDF <- read.csv("../source/BrainSpan_DevTranscriptome/genes_matrix_csv/columns_metadata.csv")
+# BrainSpan developmental transcriptome
+bsDF <- read.csv("../source/BrainSpan_DevTranscriptome/genes_matrix_csv/expression_matrix.csv", header = FALSE)
+rnames <- read.csv("../source/BrainSpan_DevTranscriptome/genes_matrix_csv/rows_metadata.csv")
+row.names(bsDF) <- rnames$gene_symbol
+bsMtDF <- read.csv("../source/BrainSpan_DevTranscriptome/genes_matrix_csv/columns_metadata.csv")
 
 # Miller
 load("../neurogenesis/orig.data/LCMDE/AllenLCM.Rdata")
@@ -1064,7 +1064,7 @@ ssDeDF[ssDeDF$ENSEMBL %in% aheGzDF$Identifier, ]
 
 ssDeDF[ssDeDF$GENE %in% hsDF$Gene[hsDF$Set == "Human-specific"], ]
 ssDeDF[ssDeDF$GENE %in% hsDF$Gene[hsDF$Set == "Primate-specific"], ]
- ################################################################################
+################################################################################
 
 ### Expression ranking in cell classes of interest
 
@@ -1353,20 +1353,20 @@ ggsave(paste0(outGraph, "TFsOfInterest_And_Markers_NumberIntersect_Heatmap_ExcDe
 
 
 # Interneuron
-genes <- c("CITED2", "DLX1", "DLX2", "DLX5", "DLX6")
+genes <- c("CITED2", "DLX1", "DLX2", "DLX5", "DLX6", "LHX6")
 
 # tSNE
 ggL <- Intersection_tSNE_Plots(genes)
 gg1 <- TSNE_Plot(centSO) + theme(legend.position = "none")
 ggL <- append(list(gg1), ggL)
-Plot_Grid(ggPlotsL = ggL, ncol = 3, rel_height = 0.2, align = 'v', axis = 'r'
+Plot_Grid(ggPlotsL = ggL, ncol = 3, rel_height = 0.1, align = 'v', axis = 'r'
   , title = paste0(paste0(graphCodeTitle
     , "\n\ntSNE plot colored by intersection of expression of gene A and gene B"
     , "\n(> 0.5 normalized expression)"
     , "\nInterneuron"))
 )
 ggsave(paste0(outGraph, "TFsOfInterest_And_Marker_Intersection_tSNE_Interneuron.png")
-  , width = 13, height = 17)
+  , width = 15, height = 25)
 
 # Heatmap
 Number_Of_Cells_Intersection_Heatmap(
@@ -1416,7 +1416,7 @@ df <- Mean_Expression_Rank(genes, clusters = c(3,14))
 write.csv(df, file = paste0(outTable, "MeanExpr_ExcDeepLayer.csv"), quote = FALSE)
 
 # Interneuron
-genes <- c("CITED2", "DLX1", "DLX2", "DLX5", "DLX6")
+genes <- c("CITED2", "DLX1", "DLX2", "DLX5", "DLX6", "LHX6")
 df <- Mean_Expression_Rank(genes, clusters = c(5,6))
 write.csv(df, file = paste0(outTable, "MeanExpr_Interneuron.csv"), quote = FALSE)
 ################################################################################

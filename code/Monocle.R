@@ -74,7 +74,7 @@ centSO <- AddMetaData(centSO, v1, "cluster")
 
 # Subset cells to Seurat filtered cells
 exDF <- centSO@raw.data
-exDF <- exDF[colnames(exDF) %in% colnames(centSO@scale.data)]
+exDF <- exDF[ ,colnames(exDF) %in% colnames(centSO@scale.data)]
 metDF <- centSO@meta.data
 metDF$BRAIN <- as.factor(metDF$BRAIN)
 # Order metadata to match expression matrix colnames
@@ -414,12 +414,12 @@ ggsave(paste0(outGraph, "Trajectory_Pseudotime.png")
 
 ## Color tSNE by pseudotime
 
-
+# Collect tSNE and pseudotime values
 df1 <- as.data.frame(centSO@dr$tsne@cell.embeddings)
 df1$Pseudotime <- mo_filtered@phenoData@data$Pseudotime[
   match(row.names(df1), row.names(mo_filtered@phenoData@data))]
 
-# ggplot Lab library
+# ggplot tSNE colored by pseudotime
 gg1 <- ggplot(df1, aes(x = tSNE_1, y = tSNE_2, col = Pseudotime)) +
   geom_point(size = 0.1, alpha = 0.5) +
   scale_color_viridis() +
