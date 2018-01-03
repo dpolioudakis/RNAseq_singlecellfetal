@@ -18,7 +18,7 @@ require(reshape2)
 require(eulerr)
 require(gridExtra)
 
-# load("../analysis/Pooled_Vs_Bulk_Workspace.RData")
+# load("../analysis/Pooled_Vs_Bulk/DS2-11/Pooled_Vs_Bulk_Workspace.RData")
 
 # Seurat
 load("../analysis/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_seuratO.Robj")
@@ -55,8 +55,8 @@ bmDF <- read.csv("../source/BiomaRt_Compile_GeneInfo_GRCh38_Ensembl87.csv"
   , header = TRUE)
 
 # Known cell type markers from Luis
-kmDF <- read.csv("../source/MarkersforSingleCell_2017-01-05.csv", header = TRUE
-  , fill = TRUE)
+kmDF <- read.csv("../source/MarkersforSingleCell_2017-10-11_Markers.csv"
+  , header = TRUE, fill = TRUE)
 
 # # Markers from Seurat
 # mkDF <- read.table("../analysis/tables/Cluster_Seurat/Cluster_Seurat_exon_FtMm250_Marker_Genes_Clusters_Vs_All_Top20.txt"
@@ -122,11 +122,11 @@ Convert_Mixed_GeneSym_EnsID_To_EnsID <- function(ids){
 #   , dataset="hsapiens_gene_ensembl")
 # ensembl <- useDataset("hsapiens_gene_ensembl", mart=ensembl)
 # listAttributes(ensembl)
-# 
+#
 # listMarts(mart = NULL, host="feb2014.archive.ensembl.org", path="/biomart/martservice"
 #   , port=80, includeHosts = FALSE, archive = FALSE, ssl.verifypeer = TRUE
 #   , verbose = FALSE)
-# 
+#
 # listAttributes(ensembl)[[1]][grep("gc", listAttributes(ensembl)[[1]])]
 
 # Pools of different sizes correlations to bulk
@@ -487,7 +487,7 @@ Number_Genes_Detected <- function (exDF, nSamp, datasetName) {
     else {
       # Sum genes with >= 1 count
       rSums <- rowSums(ssExDF)
-      sum(rSums >= 1)  
+      sum(rSums >= 1)
     }
   })
   # Genes with >= 2 count (raw counts)
@@ -505,7 +505,7 @@ Number_Genes_Detected <- function (exDF, nSamp, datasetName) {
     else {
       # Sum genes with >= 1 count
       rSums <- rowSums(ssExDF)
-      sum(rSums >= 1)  
+      sum(rSums >= 1)
     }
   })
   # Genes with >= 3 count (raw counts)
@@ -523,7 +523,7 @@ Number_Genes_Detected <- function (exDF, nSamp, datasetName) {
     else {
       # Sum genes with >= 3 count
       rSums <- rowSums(ssExDF)
-      sum(rSums >= 1)  
+      sum(rSums >= 1)
     }
   })
   # Genes with >= 10 count (raw counts)
@@ -541,7 +541,7 @@ Number_Genes_Detected <- function (exDF, nSamp, datasetName) {
     else {
       # Sum genes with >= 10 count
       rSums <- rowSums(ssExDF)
-      sum(rSums >= 1)  
+      sum(rSums >= 1)
     }
   })
   nGeneDF <- data.frame(
@@ -788,7 +788,7 @@ df2 <- melt(mnExDF[c("MEAN_BULK", "MEAN_BULK_GZ", "MEAN_POOLED_DROPSEQ_GZ"
   , "MEAN_POOLED_POLLEN", "MEAN_POOLED_FLUIDIGM_HT_GZ")]
   , measure.vars = c("MEAN_POOLED_DROPSEQ_GZ"
   , "MEAN_POOLED_POLLEN", "MEAN_POOLED_FLUIDIGM_HT_GZ"))
-df2$MEAN_BULK <- df2$MEAN_BULK_GZ 
+df2$MEAN_BULK <- df2$MEAN_BULK_GZ
 ggDF <- rbind(df1, df2)
 # Spearman
 sprL <- lapply(split(ggDF, ggDF$variable), function(df) {
@@ -889,7 +889,7 @@ l2MnCpmDF$RATIO_FLUIDIGM_LT <- l2MnCpmDF$MEAN_POOLED_FLUIDIGM_LT - l2MnCpmDF$MEA
 # ssPlBhdf <- subset(l2MnCpmDF, RATIO >= quantile(RATIO, 0.1, na.rm = TRUE))
 # # ssPlBhdf <- subset(l2MnCpmDF, RATIO < (mean(RATIO) - 2*sd(RATIO)) & BULK >= quantile(BULK, 0.75))
 
-# Subset 
+# Subset
 ssl2MnCpmDF <- l2MnCpmDF
 ssl2MnCpmDF$SUBSET_DROPSEQ <- "All other genes"
 idxDF <- Subset_Two_SD(l2MnCpmDF$RATIO_DROPSEQ)
@@ -1238,7 +1238,7 @@ ssl2MnCpmDF$SINGLE_CELL_BIAS[
 #     ssl2MnCpmDF$SUBSET_FLUIDIGM_HT_GZ == "Pool high" &
 #     ssl2MnCpmDF$SUBSET_FLUIDIGM_LT == "Pool high" &
 #     ! ssl2MnCpmDF$SUBSET_POLLEN == "Pool high"] <- "Pool high"
-# 
+#
 # # Include Pollen, Exclude Dropseq GZ, Fluidigm HT GZ, Fluidigm LT
 # ssl2MnCpmDF$LAB_BIAS_POLLEN <- "All other genes"
 # ssl2MnCpmDF$LAB_BIAS_POLLEN[
@@ -1251,7 +1251,7 @@ ssl2MnCpmDF$SINGLE_CELL_BIAS[
 #     ! ssl2MnCpmDF$SUBSET_FLUIDIGM_HT_GZ == "Pool high" &
 #     ! ssl2MnCpmDF$SUBSET_FLUIDIGM_LT == "Pool high" &
 #     ssl2MnCpmDF$SUBSET_POLLEN == "Pool high"] <- "Pool high"
-# 
+#
 # # Include Drop-seq, Exclude Fluidigm HT GZ, Fluidigm LT
 # ssl2MnCpmDF$DROPSEQ_BIAS <- "All other genes"
 # ssl2MnCpmDF$DROPSEQ_BIAS[
@@ -1304,7 +1304,7 @@ Plot_CDS_Length_Histogram <- function(exM, title, geneIdType){
       , "\nHistogram of raw counts versus CDS length"
       , "\n", title
       , "\n"))
-  return(gg)  
+  return(gg)
 }
 
 ggL <- list(
@@ -1496,7 +1496,7 @@ l <- lapply(cols, function(dfcol) {
   seq.max <- seq_len(max(n.obs))
   mat <- sapply(l, "[", i = seq.max)
   print(str(mat))
-  colnames(mat) <- c("BULK_HIGH_ENSEMBL", "BULK_HIGH_HGNC", "POOL_HIGH_ENSEMBL", "POOL_HIGH_HGNC") 
+  colnames(mat) <- c("BULK_HIGH_ENSEMBL", "BULK_HIGH_HGNC", "POOL_HIGH_ENSEMBL", "POOL_HIGH_HGNC")
   # Convert dataframe to lists
   l <- as.list(as.data.frame(mat, stringsAsFactors = FALSE))
   return(l)
@@ -1522,15 +1522,17 @@ write.csv(m, file = paste0(outTable, "Subset_Gene_Lists.csv"))
 
 ### GO and pathway analysis
 
+print("### GO and pathway analysis")
+
 ## gprofiler
 gproLDF <- list(
   # High Drop-seq, Fluidigm HT, Fluidigm LT
   Single_Cell_Bias_High_Pool = gprofiler(query = as.character(ssl2MnCpmDF$HGNC_SYMBOL[ssl2MnCpmDF$SINGLE_CELL_BIAS == "Pool high"]))
-  # Low 
+  # Low
   , Single_Cell_Bias_High_Bulk = gprofiler(query = as.character(ssl2MnCpmDF$HGNC_SYMBOL[ssl2MnCpmDF$SINGLE_CELL_BIAS == "Bulk high"]))
   # High Drop-seq GZ, Fluidigm HT GZ, Pollen
   , Single_Cell_Bias_GZ_High_Pool = gprofiler(query = as.character(ssl2MnCpmDF$HGNC_SYMBOL[ssl2MnCpmDF$SINGLE_CELL_BIAS_GZ == "Pool high"]))
-  # Low 
+  # Low
   , Single_Cell_Bias_GZ_High_Bulk = gprofiler(query = as.character(ssl2MnCpmDF$HGNC_SYMBOL[ssl2MnCpmDF$SINGLE_CELL_BIAS_GZ == "Bulk high"]))
   # High Drop-seq
   , Dropseq_High_Pool = gprofiler(query = as.character(ssl2MnCpmDF$HGNC_SYMBOL[ssl2MnCpmDF$SUBSET_DROPSEQ == "Pool high"]))
@@ -1582,7 +1584,7 @@ lapply(names(gproLDF), function(dataset) {
 })
 
 # ## Intersect GO terms
-# 
+#
 # # Drop-seq GZ, Fluidigm HT GZ, Pollen
 # # High pool
 # go <- intersect(
@@ -1604,7 +1606,7 @@ lapply(names(gproLDF), function(dataset) {
 #   , gpPloBhiPnDF$term.id)
 # write.table(go, paste0(outTable, "GO_DsGz_FhGz_Pollen_BulkHigh.txt")
 #   , quote = FALSE, row.names = FALSE)
-# 
+#
 # # Drop-seq, Fluidigm HT, Fluidigm LT
 # # High pool
 # go <- intersect(
@@ -1626,7 +1628,7 @@ lapply(names(gproLDF), function(dataset) {
 #   , gpPloBhiFlDF$term.id)
 # write.table(go, paste0(outTable, "GO_Ds_Fh_Fl_BulkHigh.txt")
 #   , quote = FALSE, row.names = FALSE)
-# 
+#
 # # Drop-seq, Fluidigm HT, Fluidigm LT, Pollen
 # # High pool
 # go <- intersect(
@@ -1654,7 +1656,7 @@ lapply(names(gproLDF), function(dataset) {
 # )
 # write.table(go, paste0(outTable, "GO_Ds_Fh_Fl_Pollen_BulkHigh.txt")
 #   , quote = FALSE, row.names = FALSE)
-# 
+#
 # # Drop-seq, not in Fluidigm HT, Fluidigm LT
 # # High pool
 # go <- setdiff(
@@ -1681,7 +1683,7 @@ lapply(names(gproLDF), function(dataset) {
 
 ## Gene length for each GO ID
 
-dir.create("../analysis/graphs/Pooled_Vs_Bulk_GO_CDS_Length", recursive = TRUE)
+dir.create("../analysis/graphs/Pooled_Vs_Bulk/DS2-11/Pooled_Vs_Bulk_GO_CDS_Length", recursive = TRUE)
 # Loop through gprofiler results for each subset
 lapply(names(gproLDF), function(name) {
   print(name)
@@ -1694,7 +1696,7 @@ lapply(names(gproLDF), function(name) {
     names(l) <- gproDF$term.name
     # Data frame of genes and term names
     ggDF <- do.call("rbind", lapply(names(l), function(name) {
-      data.frame(hgnc_symbol = l[[name]], term.name = name)  
+      data.frame(hgnc_symbol = l[[name]], term.name = name)
     }))
     # Add CDS length
     ggDF <- merge(ggDF, mnExDF[c("hgnc_symbol", "cds_length")], by = "hgnc_symbol")
@@ -1724,8 +1726,8 @@ lapply(names(gproLDF), function(name) {
   else {print(paste0("No significant GO terms for ", name))}
 })
 
-# # "BP"  "CC"  "MF"  "cor" "hp"  "hpa" "keg" "mi"  "omi" "rea" "tf" 
-# 
+# # "BP"  "CC"  "MF"  "cor" "hp"  "hpa" "keg" "mi"  "omi" "rea" "tf"
+#
 # pdf(paste0(outGraph, "gProfileR.pdf"), width = 9, height = 7.5)
 # # Title page
 # plot(0:10, type = "n", xaxt="n", yaxt="n", bty="n", xlab = "", ylab = "")
@@ -1863,7 +1865,7 @@ lapply(names(gproLDF), function(name) {
 # ggplot(ggDF, aes(y = NEG_LOG10_PVALUE, x = term.name)) +
 #   geom_bar(stat = "identity") +
 #   coord_flip()
-# 
+#
 # # Kegg
 # ggDF <- subset(gpPlBhDF, domain == "keg")
 # ggDF <- ggDF[order(ggDF$p.value), ]
@@ -1877,7 +1879,7 @@ lapply(names(gproLDF), function(name) {
 # ggplot(ggDF, aes(y = NEG_LOG10_PVALUE, x = term.name)) +
 #   geom_bar(stat = "identity") +
 #   coord_flip()
-# 
+#
 # # Omi
 # ggDF <- subset(gpPlBhDF, domain == "omi")
 # ggDF <- ggDF[order(ggDF$p.value), ]
@@ -1927,7 +1929,7 @@ Heatmap_Expression_Clusters <- function (ggDF, graphTitle) {
     geom_tile() +
     facet_grid(~CLUSTERS, space = "free", scales = "free") +
     # scale_fill_gradient2(high = "#d7191c", low = "#2c7bb6")
-    scale_y_discrete(labels = gsub(".*_", "", ggDF$Var1)) + 
+    scale_y_discrete(labels = gsub(".*_", "", ggDF$Var1)) +
     scale_fill_distiller(name = "Normalized\nexpression", type = "div"
       , palette = 5, direction = -1) +
     theme_bw() +
@@ -1980,7 +1982,7 @@ l <- list(Intersect_KnownMarks_Subsets("SUBSET_DROPSEQ", "Bulk high")
   , Intersect_KnownMarks_Subsets("SINGLE_CELL_BIAS", "Pool high")
 )
 nr <- max(sapply(l, length))
-nc <- length(ldf)
+nc <- length(l)
 m <- matrix(NA, nr, nc)
 for(i in 1:length(l)){
   m[ ,i] <- l[[i]]
@@ -2028,11 +2030,11 @@ ll <- list(Intersect_KnownMarks_Subsets("SUBSET_DROPSEQ", "Bulk high")
   , Intersect_KnownMarks_Subsets("SINGLE_CELL_BIAS", "Pool high")
   )
 l <- unlist(ll, recursive = FALSE)
-nr <- max(sapply(l, length))
-nc <- 3*length(ldf)
+nr <- max(sapply(ll, length))
+nc <- 3*length(ll)
 m <- matrix(NA, nr, nc)
-for(i in 1:length(l)){
-  m[ ,i] <- as.character(l[[i]][1:nr])  
+for(i in 1:length(ll)){
+  m[ ,i] <- as.character(l[[i]][1:nr])
 }
 m[is.na(m)] <- ""
 colnames(m) <- c(
@@ -2057,14 +2059,18 @@ mnDs <- mean(l2MnCpmDF$RATIO_DROPSEQ)
 df <- merge(l2MnCpmDF, kmDF, by.x = "HGNC_SYMBOL", by.y = "Gene.Symbol")
 # df <- l2MnCpmDF[l2MnCpmDF$HGNC_SYMBOL %in% kmDF$Gene.Symbol, ]
 df$Z_SCORE <- (df$RATIO_DROPSEQ - mnDs) / sdDs
-split(df, df$Grouping)
+# Label non-marker genes
+df$Grouping <- as.character(df$Grouping)
+df$Grouping[df$Grouping == ""] <- "Non-marker gene"
+df$Grouping <- factor(df$Grouping
+  , levels = c("Non-marker gene", as.character(unique(kmDF$Grouping))))
 
 # Markers individually bar graph
 ggplot(df, aes(x = HGNC_SYMBOL, y = Z_SCORE)) +
   facet_wrap("Grouping", scales = "free_x") +
   geom_bar(stat = "identity") +
   coord_cartesian(ylim = c(-5, 5)) +
-  theme(axis.text.x = element_text(angle = 90, hjust = 1)) + 
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
   theme(text = element_text(size = 12)) +
   ylab("Z-score (<- Bulk, Pooled ->)") +
   ggtitle(paste0(graphCodeTitle
@@ -2086,11 +2092,11 @@ ggplot(df, aes(x = Grouping, y = Z_SCORE)) +
     , "\n"
     , "\nDrop-seq GZ CP"
     , "\nRatio of log2(CPM + 1) pooled versus bulk"))
-ggsave(paste0(outGraph, "KnownMarkersCombined.pdf"), width = 8, height = 6)
+ggsave(paste0(outGraph, "KnownMarkersCombined.pdf"), width = 10, height = 7)
 ################################################################################
 
 # ### Cluster markers from Seurat
-# 
+#
 # # Z-score
 # sdDs <- sd(l2MnCpmDF$RATIO_DROPSEQ)
 # mnDs <- mean(l2MnCpmDF$RATIO_DROPSEQ)
@@ -2099,13 +2105,13 @@ ggsave(paste0(outGraph, "KnownMarkersCombined.pdf"), width = 8, height = 6)
 # # df <- l2MnCpmDF[l2MnCpmDF$HGNC_SYMBOL %in% kmDF$Gene.Symbol, ]
 # df$Z_SCORE <- (df$RATIO_DROPSEQ - mnDs) / sdDs
 # df$cluster <- as.factor(df$cluster)
-# 
+#
 # # Markers individually bar graph
 # ggplot(df, aes(x = HGNC_SYMBOL, y = Z_SCORE)) +
 #   facet_wrap("Grouping", scales = "free_x") +
 #   geom_bar(stat = "identity") +
 #   coord_cartesian(ylim = c(-5, 5)) +
-#   theme(axis.text.x = element_text(angle = 90, hjust = 1)) + 
+#   theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
 #   theme(text = element_text(size = 12)) +
 #   ylab("Z-score (<- Bulk, Pooled ->)") +
 #   ggtitle(paste0(graphCodeTitle
@@ -2115,7 +2121,7 @@ ggsave(paste0(outGraph, "KnownMarkersCombined.pdf"), width = 8, height = 6)
 #     , "\nDrop-seq GZ CP"
 #     , "\nRatio of log2(CPM + 1) pooled versus bulk"))
 # ggsave(paste0(outGraph, "SeuratMarkers.pdf"), width = 12, height = 12)
-# 
+#
 # # Markers combined as boxplot
 # ggplot(df, aes(x = cluster, y = Z_SCORE)) +
 #   geom_boxplot() +
