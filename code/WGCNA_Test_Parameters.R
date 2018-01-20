@@ -1,9 +1,3 @@
-# edit
-# modulesColors <- dendro_modules_LL[[softPower]]$modulesColors[ ,2]
-# Parameters
-# data loaded in
-
-
 # Damon Polioudakis
 # 2018-01-16
 # WGCNA test soft power and dendrogram cutting parameters
@@ -33,15 +27,15 @@ allowWGCNAThreads()
 # load("../analysis/WGCNA_Workspace_AllGenes.RData")
 
 # Expression and metadata data stored as Seurat object
-# load("../analysis/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_seuratO.Robj")
-load("../analysis/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_TEST_seuratO.Robj")
-noCentExM <- ssNoCentExM
-centSO <- ssCentSO
+load("../analysis/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_seuratO.Robj")
+# load("../analysis/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_TEST_seuratO.Robj")
+# noCentExM <- ssNoCentExM
+# centSO <- ssCentSO
 
 # Variables
-outGraph <- "../analysis/graphs/WGCNA_DS2-11/WGCNA_Test_Parameters/WGCNA_Test_Parameters_DS2-11_"
-outAnalysis <- "../analysis/WGCNA_DS2-11/WGCNA_Test_Parameters/WGCNA_Test_Parameters_DS2-11_"
-graphCodeTitle <- "WGCNA_Test_Parameters.R"
+outGraph <- "../analysis/graphs/WGCNA/DS2-11/Test_Parameters/WGCNA_Test_Parameters_"
+outAnalysis <- "../analysis/analyzed_data/WGCNA/DS2-11/Test_Parameters/WGCNA_Test_Parameters_"
+graphCodeTitle <- "WGCNA_Test_Parameters.R DS2-11"
 
 ## Output Directories
 dir.create(dirname(outGraph), recursive = TRUE)
@@ -150,18 +144,19 @@ WGCNA_Adjacency_TOM <- function(exM, softPower = 10) {
 ### Make Modules
 
 WGCNA_Make_Modules <- function(adj_TOM_disTOM_L, exM) {
+  print("WGCNA_Make_Modules")
   # Make tree
   geneTree <- hclust(as.dist(adj_TOM_disTOM_L$dissTOM), method = "average")
   print(str(geneTree))
 
   # Test different parameters for constructing and merging modules
   # Define arguments to test for cutreeHybrid
-  # minModSizes <- c(30, 50, 100)
-  # deepSplits <- c(2, 4)
-  # cutHeightMergeMEs <- c(0, 0.1, 0.2, 0.25)
-  minModSizes <- c(30, 50)
-  deepSplits <- c(2)
-  cutHeightMergeMEs <- c(0)
+  minModSizes <- c(30, 50, 100)
+  deepSplits <- c(2, 4)
+  cutHeightMergeMEs <- c(0, 0.1, 0.2, 0.25)
+  # minModSizes <- c(30, 50)
+  # deepSplits <- c(2)
+  # cutHeightMergeMEs <- c(0)
 
   # Cut tree and merge modules looping through lists of parameters
   modulesColors <- NULL
@@ -198,6 +193,7 @@ WGCNA_Make_Modules <- function(adj_TOM_disTOM_L, exM) {
 }
 
 WGCNA_Plot_Dendrogram_Modules <- function(dendro_modules, name) {
+  print("WGCNA_Plot_Dendrogram_Modules")
 # Plot dendrograms and modules
   pdf(file = paste0(outGraph, "Dendrogram_Modules_", name, ".pdf")
     , height = 25, width = 20)
@@ -218,7 +214,9 @@ WGCNA_Plot_Dendrogram_Modules <- function(dendro_modules, name) {
 WGCNA_Run_Parameters_Test <- function(
   exM
   , dendroName
-  , softPowers = c(SP10 = 10, SP20 = 15)) {
+  , softPowers = c(SP10 = 10, SP15 = 15)) {
+
+  print("WGCNA_Run_Parameters_Test")
 
   dendro_modules_L <- lapply(softPowers, function(softPower){
     adj_TOM_disTOM_L <- WGCNA_Adjacency_TOM(exM, softPower = softPower)
@@ -229,6 +227,7 @@ WGCNA_Run_Parameters_Test <- function(
     )
     return(dendro_modules)
   })
+  print("Done running WGCNA with different parameters")
   return(dendro_modules_L)
 }
 ################################################################################
@@ -239,6 +238,8 @@ WGCNA_Correlate_ME_Seurat_Cluster_Membership <- function(
   exM
   , modulesColors
   , graphTitle) {
+
+  print("WGCNA_Correlate_ME_Seurat_Cluster_Membership")
 
   meM <- moduleEigengenes(t(exM), modulesColors)$eigengenes
 
@@ -282,7 +283,7 @@ WGCNA_Correlate_ME_Seurat_Cluster_Membership_Wrapper <- function(exM = exM, dend
   # Correlate module ME to Seurat cluster membership
   ggL <- lapply(names(dendro_modules_LL), function(softPower) {
     print(str(dendro_modules_LL))
-    modulesColors <- dendro_modules_LL[[softPower]]$modulesColors[ ,2]
+    modulesColors <- dendro_modules_LL[[softPower]]$modulesColors[ ,14]
     WGCNA_Correlate_ME_Seurat_Cluster_Membership(
       exM = exM
       , modulesColors = modulesColors
@@ -301,6 +302,7 @@ WGCNA_Correlate_ME_Seurat_Cluster_Membership_Wrapper <- function(exM = exM, dend
 # Execute script
 
 Run_Top_1000_Genes <- function() {
+  print("Run_Top_1000_Genes")
   # Mean expression of each gene to use for filtering
   mnEx <- sort(rowMeans(noCentExM), decreasing = TRUE)
   # Filter expression matrix to genes of interest
@@ -315,12 +317,14 @@ Run_Top_1000_Genes <- function() {
   )
 
   # Correlate module ME to Seurat cluster membership
-  WGCNA_Correlate_ME_Seurat_Cluster_Membership_Wrapper(dendro_modules_LL)
+  WGCNA_Correlate_ME_Seurat_Cluster_Membership_Wrapper(exM = exM,
+    dendro_modules_LL = dendro_modules_LL)
   ggsave(paste0(outGraph, "MeClusterCorr_Heatmap_Top_1000_genes.pdf")
     , height = 9, width = 9)
 }
 
 Run_Top_5000_Genes <- function() {
+  print("Run_Top_5000_Genes")
   # Mean expression of each gene to use for filtering
   mnEx <- sort(rowMeans(noCentExM), decreasing = TRUE)
   # Filter expression matrix to genes of interest
@@ -335,12 +339,14 @@ Run_Top_5000_Genes <- function() {
   )
 
   # Correlate module ME to Seurat cluster membership
-  WGCNA_Correlate_ME_Seurat_Cluster_Membership_Wrapper(dendro_modules_LL)
+  WGCNA_Correlate_ME_Seurat_Cluster_Membership_Wrapper(exM = exM,
+    dendro_modules_LL = dendro_modules_LL)
   ggsave(paste0(outGraph, "MeClusterCorr_Heatmap_Top_5000_genes.pdf")
     , height = 9, width = 9)
 }
 
 Run_Top_10000_Genes <- function() {
+  print("Run_Top_10000_Genes")
   # Mean expression of each gene to use for filtering
   mnEx <- sort(rowMeans(noCentExM), decreasing = TRUE)
   # Filter expression matrix to genes of interest
@@ -355,7 +361,8 @@ Run_Top_10000_Genes <- function() {
   )
 
   # Correlate module ME to Seurat cluster membership
-  WGCNA_Correlate_ME_Seurat_Cluster_Membership_Wrapper(dendro_modules_LL)
+  WGCNA_Correlate_ME_Seurat_Cluster_Membership_Wrapper(exM = exM,
+    dendro_modules_LL = dendro_modules_LL)
   ggsave(paste0(outGraph, "MeClusterCorr_Heatmap_Top_10000_genes.pdf")
     , height = 9, width = 9)
 }

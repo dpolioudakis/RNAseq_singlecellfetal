@@ -20,6 +20,10 @@
 #$ -e logs/WGCNA_Test_Parameters_QSUB_$JOB_ID.error
 #$ -l h_data=256G,h_rt=24:00:00,highp
 ################################################################################
+echo ""
+echo "Starting WGCNA_Test_Parameters_QSUB.sh... "$(date)
+echo ""
+################################################################################
 
 # Path to R
 pathRscript=/u/local/apps/R/3.4.0/gcc-4.9.3_MKL-2017.0/bin/Rscript
@@ -31,4 +35,8 @@ LIBRARY_PATH=/u/local/compilers/gcc/4.9.3/lib:/u/local/compilers/gcc/4.9.3/lib64
 
 ## Run WGCNA_Test_Parameters.R
 ${pathRscript} WGCNA_Test_Parameters.R
+################################################################################
+
+echo ""
+echo "End of WGCNA_Test_Parameters_QSUB.sh... "$(date)
 ################################################################################
