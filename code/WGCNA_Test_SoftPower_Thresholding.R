@@ -155,6 +155,10 @@ exLDF <- list(
     dimnames(centSO@scale.data)[[1]] %in% centSO@var.genes &
       dimnames(centSO@scale.data)[[1]] %in% names(mnEx[1:(length(mnEx)*0.3)]), ]
 
+  # Variable genes
+  , VarGenes = as.data.frame(as.matrix(centSO@scale.data))[
+    dimnames(centSO@scale.data)[[1]] %in% centSO@var.genes, ]
+
   # Top 10% expressed genes
   , Top10 = as.data.frame(as.matrix(centSO@scale.data))[
     dimnames(centSO@scale.data)[[1]] %in% names(mnEx[1:(length(mnEx)*0.1)]), ]
@@ -174,6 +178,9 @@ exLDF <- list(
   # Top 10000 expressed genes
   , Top10000 = as.data.frame(as.matrix(centSO@scale.data))[
     dimnames(centSO@scale.data)[[1]] %in% names(mnEx[1:10000]), ]
+  # Top 20000 expressed genes
+  , Top20000 = as.data.frame(as.matrix(centSO@scale.data))[
+    dimnames(centSO@scale.data)[[1]] %in% names(mnEx[1:20000]), ]
 )
 
 # Subset for testing
