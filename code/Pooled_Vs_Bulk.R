@@ -128,45 +128,7 @@ Subset_Two_SD <- function(dataset) {
   return(idx)
 }
 
-Venn_Diagram_3 <- function(v1, v2, v3, labels, title) {
-  print(length(intersect(v1, intersect(v2, v3))))
-  venn <- euler(c(
-    "A" = length(v1)
-    , "B" = length(v2)
-    , "C" = length(v3)
-    , "A&B" = length(intersect(v1, v2))
-    , "A&C" = length(intersect(v1, v3))
-    , "B&C" = length(intersect(v2, v3))
-    , "A&B&C" = length(intersect(v1, intersect(v2, v3)))))
-  plot(venn, counts = TRUE, labels = labels
-    , fill = c("#e41a1c", "#377eb8", "#4daf4a")
-    , main = paste0(graphCodeTitle
-      , "\n"
-      , "\n", title
-      , "\n"
-      , "\nHuman fetal brain"))
-}
 
-Venn_Diagram_3_Wrapper <- function(
-  datasets
-  , bias_direction
-  , title = paste0(paste(datasets, collapse = ", "), ": ", bias_direction)){
-
-  ensembl_gene_id_L <- lapply(datasets, function(dataset){
-    print(dataset)
-    ensembl_gene_id <- row.names(bias_flag_DF)[
-      bias_flag_DF[[dataset]] == bias_direction]
-    return(ensembl_gene_id)
-  })
-  print(head(ensembl_gene_id_L[[1]]))
-  Venn_Diagram_3(
-    v1 = ensembl_gene_id_L[[1]]
-    , v2 = ensembl_gene_id_L[[2]]
-    , v3 = ensembl_gene_id_L[[3]]
-    , labels = datasets
-    , title = title
-  )
-}
 
 # Plot gProfileR results
 Graph_GO_Enrichment <- function (df, domain, depth, graphTitle) {
@@ -874,25 +836,190 @@ ggplot(ggDF, aes(x = value)) +
     , "\nSubset 2 SD from mean ratio of pooled vs bulk"))
 ggsave(paste0(outGraph, "DensitySubset.pdf"), width = 14, height = 8)
 
+
+Venn_Diagram_3 <- function(
+  v1, v2, v3, fill = c("#e41a1c", "#377eb8", "#4daf4a"), ...) {
+  print(length(intersect(v1, intersect(v2, v3))))
+  venn <- euler(c(
+    "A" = length(v1)
+    , "B" = length(v2)
+    , "C" = length(v3)
+    , "A&B" = length(intersect(v1, v2))
+    , "A&C" = length(intersect(v1, v3))
+    , "B&C" = length(intersect(v2, v3))
+    , "A&B&C" = length(intersect(v1, intersect(v2, v3)))))
+  plot(venn, counts = TRUE, fill = fill, ...)
+}
+
+Venn_Diagram_3_Wrapper <- function(
+  datasets
+  , bias_direction
+  , fill = c("#e41a1c", "#377eb8", "#4daf4a")
+  , title = paste0(paste(datasets, collapse = ", "), ": ", bias_direction)
+  , ...){
+
+  ensembl_gene_id_L <- lapply(datasets, function(dataset){
+    print(dataset)
+    ensembl_gene_id <- row.names(bias_flag_DF)[
+      bias_flag_DF[[dataset]] == bias_direction]
+    return(ensembl_gene_id)
+  })
+  print(head(ensembl_gene_id_L[[1]]))
+  Venn_Diagram_3(
+    v1 = ensembl_gene_id_L[[1]]
+    , v2 = ensembl_gene_id_L[[2]]
+    , v3 = ensembl_gene_id_L[[3]]
+    , labels = datasets
+    , fill = fill
+    , main = paste0(graphCodeTitle
+      , "\n\nIntersection of single-cell or bulk RNA-seq biased gene sets"
+      , "\n", title)
+    , ...
+  )
+}
+
 ## Venn diagrams of gene intersections high in bulk or high in pooled
 pdf(paste0(outGraph, "VennDiagrams.pdf"))
   Venn_Diagram_3_Wrapper(
     datasets = c("Dropseq", "Fluidigm_HT", "Fluidigm_LT")
     , bias_direction = "Bulk high"
+    , fill = c("#e41a1c", "#377eb8", "#984ea3")
   )
   Venn_Diagram_3_Wrapper(
     datasets = c("Dropseq", "Fluidigm_HT", "Fluidigm_LT")
     , bias_direction = "Pool high"
+    , fill = c("#e41a1c", "#377eb8", "#984ea3")
   )
   Venn_Diagram_3_Wrapper(
     datasets = c("Dropseq_GZ", "Fluidigm_HT_GZ", "Pollen")
     , bias_direction = "Bulk high"
+    , fill = c("#fb9a99", "#a6cee3", "#b2df8a")
   )
   Venn_Diagram_3_Wrapper(
     datasets = c("Dropseq_GZ", "Fluidigm_HT_GZ", "Pollen")
     , bias_direction = "Pool high"
+    , fill = c("#fb9a99", "#a6cee3", "#b2df8a")
   )
 dev.off()
+
+## CDS length of biased gene sets
+# Format for ggplot
+ggDF <- bias_flag_DF
+ggDF$ensembl_gene_id <- row.names(ggDF)
+ggDF <- melt(ggDF, id.vars = "ensembl_gene_id")
+idx <- match(ggDF$ensembl_gene_id, mean_cpm_DF$ensembl_gene_id)
+ggDF$cds_length <- mean_cpm_DF$cds_length[idx]
+ggDF <- ggDF[! is.na(ggDF$cds_length), ]
+ggDF$value[ggDF$value == "None"] <- "All other genes"
+ggDF$value <- as.factor(ggDF$value)
+# Plot
+ggplot(ggDF, aes(x = variable, y = cds_length, fill = value)) +
+  geom_boxplot(outlier.shape = NA) +
+  scale_fill_manual(name = "Gene subset"
+    , values = c("#e31a1c", "#bdbdbd", "#1f78b4")) +
+  coord_cartesian(ylim = c(0, 5000)) +
+  # theme(text = element_text(size = 12)) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  xlab("Dataset") +
+  ylab("CDS length") +
+  ggtitle(paste0(graphCodeTitle
+    , "\n"
+    , "\nCDS length of genes biased towards single-cell or bulk RNA-seq"
+    , "\n")
+  )
+ggsave(paste0(outGraph, "Length_Boxplot.pdf"), width = 8, height = 5)
+# Subset for paper
+ggDF <- ggDF[ggDF$variable %in% c("GZ_Datasets", "GZCP_Datasets"), ]
+ggplot(ggDF, aes(x = variable, y = cds_length, fill = value)) +
+  geom_boxplot(outlier.shape = NA) +
+  scale_fill_manual(name = "Gene subset"
+    , values = c("#e31a1c", "#bdbdbd", "#1f78b4")) +
+  coord_cartesian(ylim = c(0, 5000)) +
+  # theme(text = element_text(size = 12)) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  xlab("Dataset") +
+  ylab("CDS length") +
+  ggtitle(paste0(graphCodeTitle
+    , "\n"
+    , "\nCDS length of genes biased towards single-cell or bulk RNA-seq"
+    , "\n")
+  )
+ggsave(paste0(outGraph, "Length_Boxplot_paper.pdf"), width = 5, height = 5)
+
+# CDS length for each dataset
+Plot_CDS_Length_Histogram <- function(exM, title, geneIdType){
+  cGene <- rowSums(exM)
+  ggDF <- data.frame(GENE = names(cGene), COUNTS = cGene)
+  ggDF <- merge(ggDF, mean_cpm_DF[c("ensembl_gene_id", "cds_length")]
+    , by.x = "GENE", by.y = "ensembl_gene_id")
+  ggDF <- data.frame(CDS_LENGTH = rep(ggDF$cds_length, ggDF$COUNTS))
+  gg <- ggplot(ggDF, aes(x = CDS_LENGTH)) +
+    geom_histogram(binwidth = 500) +
+    # coord_cartesian(xlim = c(0, 10000)) +
+    # scale_x_continuous(limits = c(0, 10000)) +
+    xlab("CDS length") +
+    ylab("Counts") +
+    ggtitle(title)
+  return(gg)
+}
+ggL <- list(
+  Plot_CDS_Length_Histogram(bulk_ex_DF, "Bulk RNA-seq")
+  , Plot_CDS_Length_Histogram(ds_ex_DF, "Drop-seq")
+  , Plot_CDS_Length_Histogram(gz_df_ex_DF, "Drop-seq GZ")
+  , Plot_CDS_Length_Histogram(fldm_HT_ex_DF, "Fluidigm HT")
+  , Plot_CDS_Length_Histogram(gz_fldm_HT_ex_DF, "Fluidigm HT GZ")
+  , Plot_CDS_Length_Histogram(fldm_LT_ex_DF, "Fluidigm LT")
+  , Plot_CDS_Length_Histogram(pollen_ex_DF, "Pollen")
+)
+Plot_Grid(ggL, ncol = 3, rel_height = 0.1, title = paste0(graphCodeTitle
+  , "\n"
+  , "\nHistogram of raw counts versus CDS length"
+  , "\n")
+)
+ggsave(paste0(outGraph, "LengthCounts_Histogram.png"), width = 8, height = 20)
+
+## GC content for each dataset
+ggDF <- bias_flag_DF
+ggDF$ensembl_gene_id <- row.names(ggDF)
+ggDF <- melt(ggDF, id.vars = "ensembl_gene_id")
+idx <- match(ggDF$ensembl_gene_id, mean_cpm_DF$ensembl_gene_id)
+ggDF$percentage_gc_content <- mean_cpm_DF$percentage_gc_content[idx]
+ggDF <- ggDF[! is.na(ggDF$percentage_gc_content), ]
+ggDF$value[ggDF$value == "None"] <- "All other genes"
+ggDF$value <- as.factor(ggDF$value)
+# Plot
+ggplot(ggDF, aes(x = variable, y = percentage_gc_content, fill = value)) +
+  geom_boxplot(outlier.shape = NA) +
+  scale_fill_manual(name = "Gene subset"
+    , values = c("#e31a1c", "#bdbdbd", "#1f78b4")) +
+  coord_cartesian(ylim = c(0, 100)) +
+  # theme(text = element_text(size = 12)) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  xlab("Dataset") +
+  ylab("Percent GC") +
+  ggtitle(paste0(graphCodeTitle
+    , "\n"
+    , "\nPercent GC content of genes biased towards single-cell or bulk RNA-seq"
+    , "\n")
+  )
+ggsave(paste0(outGraph, "GC_Boxplot.pdf"), width = 8, height = 5)
+# Subset for paper
+ggDF <- ggDF[ggDF$variable %in% c("GZ_Datasets", "GZCP_Datasets"), ]
+ggplot(ggDF, aes(x = variable, y = percentage_gc_content, fill = value)) +
+  geom_boxplot(outlier.shape = NA) +
+  scale_fill_manual(name = "Gene subset"
+    , values = c("#e31a1c", "#bdbdbd", "#1f78b4")) +
+  coord_cartesian(ylim = c(0, 100)) +
+  # theme(text = element_text(size = 12)) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  xlab("Dataset") +
+  ylab("Percent GC") +
+  ggtitle(paste0(graphCodeTitle
+    , "\n"
+    , "\nPercent GC content of genes biased towards single-cell or bulk RNA-seq"
+    , "\n")
+  )
+ggsave(paste0(outGraph, "GC_Boxplot_paper.pdf"), width = 5, height = 5)
 
 # ## Drop-seq union genes versus intersection genes
 # # Intersection (only genes in both)
@@ -994,124 +1121,7 @@ ggsave(paste0(outGraph, "Biotypes.pdf"), width = 8, height = 8)
 ### GC, length, MT genes, brain expressed, and biotype of gene intersections
 ### high in bulk or pooled
 
-## CDS length of biased gene sets
-# Format for ggplot
-ggDF <- bias_flag_DF
-ggDF$ensembl_gene_id <- row.names(ggDF)
-ggDF <- melt(ggDF, id.vars = "ensembl_gene_id")
-idx <- match(ggDF$ensembl_gene_id, mean_cpm_DF$ensembl_gene_id)
-ggDF$cds_length <- mean_cpm_DF$cds_length[idx]
-ggDF <- ggDF[! is.na(ggDF$cds_length), ]
-ggDF$value[ggDF$value == "None"] <- "All other genes"
-ggDF$value <- as.factor(ggDF$value)
-# Plot
-ggplot(ggDF, aes(x = variable, y = cds_length, fill = value)) +
-  geom_boxplot(outlier.shape = NA) +
-  scale_fill_manual(name = "Gene subset"
-    , values = c("#e31a1c", "#bdbdbd", "#1f78b4")) +
-  coord_cartesian(ylim = c(0, 5000)) +
-  # theme(text = element_text(size = 12)) +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-  xlab("Dataset") +
-  ylab("CDS length") +
-  ggtitle(paste0(graphCodeTitle
-    , "\n"
-    , "\nCDS length of genes biased towards single-cell or bulk RNA-seq"
-    , "\n")
-  )
-ggsave(paste0(outGraph, "Length_Boxplot.pdf"), width = 8, height = 5)
-# Subset for paper
-ggDF <- ggDF[ggDF$variable %in% c("GZ_Datasets", "GZCP_Datasets"), ]
-ggplot(ggDF, aes(x = variable, y = cds_length, fill = value)) +
-  geom_boxplot(outlier.shape = NA) +
-  scale_fill_manual(name = "Gene subset"
-    , values = c("#e31a1c", "#bdbdbd", "#1f78b4")) +
-  coord_cartesian(ylim = c(0, 5000)) +
-  # theme(text = element_text(size = 12)) +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-  xlab("Dataset") +
-  ylab("CDS length") +
-  ggtitle(paste0(graphCodeTitle
-    , "\n"
-    , "\nCDS length of genes biased towards single-cell or bulk RNA-seq"
-    , "\n")
-  )
-ggsave(paste0(outGraph, "Length_Boxplot_paper.pdf"), width = 5, height = 5)
 
-# CDS length for each dataset
-Plot_CDS_Length_Histogram <- function(exM, title, geneIdType){
-  cGene <- rowSums(exM)
-  ggDF <- data.frame(GENE = names(cGene), COUNTS = cGene)
-  ggDF <- merge(ggDF, mean_cpm_DF[c("ensembl_gene_id", "cds_length")]
-    , by.x = "GENE", by.y = "ensembl_gene_id")
-  ggDF <- data.frame(CDS_LENGTH = rep(ggDF$cds_length, ggDF$COUNTS))
-  gg <- ggplot(ggDF, aes(x = CDS_LENGTH)) +
-    geom_histogram(binwidth = 500) +
-    # coord_cartesian(xlim = c(0, 10000)) +
-    # scale_x_continuous(limits = c(0, 10000)) +
-    xlab("CDS length") +
-    ylab("Counts") +
-    ggtitle(title)
-  return(gg)
-}
-ggL <- list(
-  Plot_CDS_Length_Histogram(bulk_ex_DF, "Bulk RNA-seq")
-  , Plot_CDS_Length_Histogram(ds_ex_DF, "Drop-seq")
-  , Plot_CDS_Length_Histogram(gz_df_ex_DF, "Drop-seq GZ")
-  , Plot_CDS_Length_Histogram(fldm_HT_ex_DF, "Fluidigm HT")
-  , Plot_CDS_Length_Histogram(gz_fldm_HT_ex_DF, "Fluidigm HT GZ")
-  , Plot_CDS_Length_Histogram(fldm_LT_ex_DF, "Fluidigm LT")
-  , Plot_CDS_Length_Histogram(pollen_ex_DF, "Pollen")
-)
-Plot_Grid(ggL, ncol = 3, rel_height = 0.1, title = paste0(graphCodeTitle
-  , "\n"
-  , "\nHistogram of raw counts versus CDS length"
-  , "\n")
-)
-ggsave(paste0(outGraph, "LengthCounts_Histogram.png"), width = 8, height = 20)
-
-## GC content for each dataset
-ggDF <- bias_flag_DF
-ggDF$percentage_gc_content <- row.names(ggDF)
-ggDF <- melt(ggDF, id.vars = "percentage_gc_content")
-idx <- match(ggDF$percentage_gc_content, mean_cpm_DF$percentage_gc_content)
-ggDF$cds_length <- mean_cpm_DF$cds_length[idx]
-ggDF <- ggDF[! is.na(ggDF$cds_length), ]
-ggDF$value[ggDF$value == "None"] <- "All other genes"
-ggDF$value <- as.factor(ggDF$value)
-# Plot
-ggplot(ggDF, aes(x = variable, y = cds_length, fill = value)) +
-  geom_boxplot(outlier.shape = NA) +
-  scale_fill_manual(name = "Gene subset"
-    , values = c("#e31a1c", "#bdbdbd", "#1f78b4")) +
-  coord_cartesian(ylim = c(0, 5000)) +
-  # theme(text = element_text(size = 12)) +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-  xlab("Dataset") +
-  ylab("Percent GC") +
-  ggtitle(paste0(graphCodeTitle
-    , "\n"
-    , "\nCDS length of genes biased towards single-cell or bulk RNA-seq"
-    , "\n")
-  )
-ggsave(paste0(outGraph, "GC_boxplot.pdf"), width = 8, height = 5)
-# Subset for paper
-ggDF <- ggDF[ggDF$variable %in% c("GZ_Datasets", "GZCP_Datasets"), ]
-ggplot(ggDF, aes(x = variable, y = cds_length, fill = value)) +
-  geom_boxplot(outlier.shape = NA) +
-  scale_fill_manual(name = "Gene subset"
-    , values = c("#e31a1c", "#bdbdbd", "#1f78b4")) +
-  coord_cartesian(ylim = c(0, 100)) +
-  # theme(text = element_text(size = 12)) +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-  xlab("Dataset") +
-  ylab("Percent GC") +
-  ggtitle(paste0(graphCodeTitle
-    , "\n"
-    , "\nCDS length of genes biased towards single-cell or bulk RNA-seq"
-    , "\n")
-  )
-ggsave(paste0(outGraph, "GC_boxplot_paper.pdf"), width = 5, height = 5)
 
 ## Biotype
 # Format for ggplot2 and calculate percent of each biotype in each subset
