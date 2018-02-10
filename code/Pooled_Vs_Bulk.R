@@ -8,51 +8,54 @@ rm(list = ls())
 sessionInfo()
 set.seed(27)
 
-# install.packages("devtools")
-# library(devtools)
-# install_github("satijalab/seurat", dependencies = TRUE, repos = 'http://cran.rstudio.com/')
 require(Seurat)
 require(biomaRt)
 require(gProfileR)
 require(reshape2)
 require(eulerr)
 require(gridExtra)
+require(cqn)
+require(cowplot)
+source("Function_Library.R")
 
-# load("../analysis/Pooled_Vs_Bulk/DS2-11/Pooled_Vs_Bulk_Workspace.RData")
+# load("../analysis/analyzed_data/Pooled_Vs_Bulk/DS2-11/Pooled_Vs_Bulk_Workspace.RData")
 
 # Seurat
-load("../analysis/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_seuratO.Robj")
-dsExM <- as.matrix(centSO@raw.data)
+load("../analysis/analyzed_data/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_seuratO.Robj")
+ds_ex_DF <- as.data.frame(as.matrix(centSO@raw.data))
 centSO@raw.data <- NA
 centSO@data <- NA
-# load("../analysis/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_TEST_seuratO.Robj")
-# dsExM <- as.matrix(ssCentSO@raw.data)
+# load("../analysis/analyzed_data/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_TEST_seuratO.Robj")
+# ds_ex_DF <- as.data.frame(as.matrix(ssCentSO@raw.data))
 # centSO <- ssCentSO
 
 # Pollen
-pnExDF <- read.csv("../pollen_2015/data/htseq/Exprs_HTSCexon.csv")
+pollen_ex_DF <- read.csv("../pollen_2015/data/htseq/Exprs_HTSCexon.csv")
 # # Picard Sequencing Statistics - bulk RNAseq
 # picStatsBuDF <- read.table("../../kriegstein_2015/metadata/PicardToolsQC.csv")
 
 # Fluidigm LT
-flExDF <- read.csv("../C196-001_002_DP/data/htseq/merged/Exprs_HTSCexon.csv"
+fldm_LT_ex_DF <- read.csv("../C196-001_002_DP/data/htseq/merged/Exprs_HTSCexon.csv"
   , row.names = 1)
-flMtDF <- read.table("../C196-001_002_DP/metadata/Compiled_Metadata_20160218.txt"
+fldm_LT_mt_DF <- read.table("../C196-001_002_DP/metadata/Compiled_Metadata_20160218.txt"
   , fill = TRUE, header = TRUE)
 
 # Fluidigm HT
-fhExDF <- read.csv(
+fldm_HT_ex_DF <- read.csv(
   "../HT-003_DP/data/htseq/GRCh37.75_NoERCC/Exprs_HTSCexon_FtMm3e4.csv")
 
 # Bulk
-blExDF <- read.csv("../bulk_VZ_CP_from_ATAC/data/htseq/Exprs_HTSCexon.csv"
+bulk_ex_DF <- read.csv("../bulk_VZ_CP_from_ATAC/data/htseq/Exprs_HTSCexon.csv"
   , header = TRUE, row.names = 1)
 # Metadata
-blMtDF <- read.csv("../bulk_VZ_CP_from_ATAC/metadata/VZCP_sampleinfo.csv")
+bulk_mt_DF <- read.csv("../bulk_VZ_CP_from_ATAC/metadata/VZCP_sampleinfo.csv")
 
 # biomart
 bmDF <- read.csv("../source/BiomaRt_Compile_GeneInfo_GRCh38_Ensembl87.csv"
   , header = TRUE)
+
+# Gene lengths and GC content for Union Exon model to normalize bulk by length
+load("../source/ENSEMBLhg19_UnionAnno.rda")
 
 # Known cell type markers from Luis
 kmDF <- read.csv("../source/MarkersforSingleCell_2017-10-11_Markers.csv"
@@ -63,7 +66,7 @@ kmDF <- read.csv("../source/MarkersforSingleCell_2017-10-11_Markers.csv"
 #   , header = TRUE)
 
 # Brain expressed genes from Vivek
-brexpDF <- read.csv("../source/BrainExpressed_GTex.csv", header = FALSE)
+brain_exp_DF <- read.csv("../source/BrainExpressed_GTex.csv", header = FALSE)
 
 ## Variables
 graphCodeTitle <- "Pooled_Vs_Bulk.R"
@@ -75,7 +78,7 @@ outTableGpro <- "../analysis/tables/Pooled_Vs_Bulk/DS2-11/gprofiler/Pooled_Vs_Bu
 dir.create("../analysis/tables/Pooled_Vs_Bulk/DS2-11/gprofiler", recursive = TRUE)
 outTableGproIds <- "../analysis/tables/Pooled_Vs_Bulk/DS2-11/gprofiler_goIDs/Pooled_Vs_Bulk_gprofiler_goIDs_"
 dir.create("../analysis/tables/Pooled_Vs_Bulk/DS2-11/gprofiler_goIDs", recursive = TRUE)
-outAnalysis <- "../analysis/Pooled_Vs_Bulk/DS2-11/Pooled_Vs_Bulk_"
+outAnalysis <- "../analysis/analyzed_data/Pooled_Vs_Bulk/DS2-11/Pooled_Vs_Bulk_"
 dir.create(dirname(outAnalysis), recursive = TRUE)
 
 ## ggplot2 theme
@@ -116,60 +119,53 @@ Convert_Mixed_GeneSym_EnsID_To_EnsID <- function(ids){
   return(ids)
 }
 
-# ensembl = useEnsembl(biomart = "ENSEMBL_MART_ENSEMBL", host="feb2014.archive.ensembl.org")
-# ensembl= useMart(biomart="ENSEMBL_MART_ENSEMBL"
-#   , host="feb2014.archive.ensembl.org", path="/biomart/martservice"
-#   , dataset="hsapiens_gene_ensembl")
-# ensembl <- useDataset("hsapiens_gene_ensembl", mart=ensembl)
-# listAttributes(ensembl)
-#
-# listMarts(mart = NULL, host="feb2014.archive.ensembl.org", path="/biomart/martservice"
-#   , port=80, includeHosts = FALSE, archive = FALSE, ssl.verifypeer = TRUE
-#   , verbose = FALSE)
-#
-# listAttributes(ensembl)[[1]][grep("gc", listAttributes(ensembl)[[1]])]
-
-# Pools of different sizes correlations to bulk
-# mnExDF: mean expression dataframe
-# nSamp: Vector of sizes of pools
-Pool_Size_Correlation <- function (mnExDF, nSamp) {
-  sprCor <- sapply(nSamp, function(i) {
-    print(i)
-    # Sample
-    ssExDF <- mnExDF[ ,c(1:2, sample(3:ncol(mnExDF), i, replace = FALSE))]
-    # Pool
-    plExDF <- data.frame(ssExDF[1:2], POOLED = apply(ssExDF[3:ncol(ssExDF)], 1, sum))
-    # # Read depth normalize pooled Drop-seq by number mapped to exons
-    # rDep <- sum(plExDF$POOLED, na.rm = TRUE) / 10^6
-    # Convert NAs to 0s
-    plExDF[is.na(plExDF)] <- 0
-    # # Read depth normalize
-    # plExDF$POOLED <- plExDF$POOLED / rDep
-    # Spearman correlation
-    round(cor(plExDF$MEAN_BULK, plExDF$POOLED, method = "spearman"), 2)
-  })
-  sprDF <- data.frame(NUMBER_OF_CELLS = nSamp, SPEARMAN = sprCor)
-  return(sprDF)
-}
-
-# Randomly sample and pool cells
-# rNums: Columns to sample from
-# nPool: Number of pools to split into
-Pool_Cells <- function (exDF, nPool, rNums) {
-  rndmGroups <- split(rNums, ceiling(seq_along(rNums) / (length(rNums) / nPool)))
-  pExDF <- data.frame(lapply(rndmGroups
-    , function (group) {apply(exDF[ ,group], 1, sum)}))
-  print(head(pExDF, 10))
-  return(pExDF)
-}
-
 # Subset to higher in bulk or higher in pooled
-Subset_Two_SD <- function (dataset) {
+Subset_Two_SD <- function(dataset) {
   idx <- data.frame(
-    HIGH_BULK = dataset < (mean(dataset) - 2*sd(dataset))
-    , HIGH_POOL = dataset > (mean(dataset) + 2*sd(dataset))
+    High_Bulk = dataset < (mean(dataset) - 2*sd(dataset))
+    , High_Pool = dataset > (mean(dataset) + 2*sd(dataset))
   )
   return(idx)
+}
+
+Venn_Diagram_3 <- function(v1, v2, v3, labels, title) {
+  print(length(intersect(v1, intersect(v2, v3))))
+  venn <- euler(c(
+    "A" = length(v1)
+    , "B" = length(v2)
+    , "C" = length(v3)
+    , "A&B" = length(intersect(v1, v2))
+    , "A&C" = length(intersect(v1, v3))
+    , "B&C" = length(intersect(v2, v3))
+    , "A&B&C" = length(intersect(v1, intersect(v2, v3)))))
+  plot(venn, counts = TRUE, labels = labels
+    , fill = c("#e41a1c", "#377eb8", "#4daf4a")
+    , main = paste0(graphCodeTitle
+      , "\n"
+      , "\n", title
+      , "\n"
+      , "\nHuman fetal brain"))
+}
+
+Venn_Diagram_3_Wrapper <- function(
+  datasets
+  , bias_direction
+  , title = paste0(paste(datasets, collapse = ", "), ": ", bias_direction)){
+
+  ensembl_gene_id_L <- lapply(datasets, function(dataset){
+    print(dataset)
+    ensembl_gene_id <- row.names(bias_flag_DF)[
+      bias_flag_DF[[dataset]] == bias_direction]
+    return(ensembl_gene_id)
+  })
+  print(head(ensembl_gene_id_L[[1]]))
+  Venn_Diagram_3(
+    v1 = ensembl_gene_id_L[[1]]
+    , v2 = ensembl_gene_id_L[[2]]
+    , v3 = ensembl_gene_id_L[[3]]
+    , labels = datasets
+    , title = title
+  )
 }
 
 # Plot gProfileR results
@@ -193,36 +189,6 @@ Graph_GO_Enrichment <- function (df, domain, depth, graphTitle) {
     ggtitle(graphTitle)
   # ggsave(paste0(outGraph, "AllGenes_ScatterSubsetHighBulk.pdf"))
   print(gg)
-}
-
-# CDS length from biomart, using longest CDS
-Plot_CDS_Length <- function(geneSet, title) {
-  gg <- ggplot(ggDF, aes_string(x = geneSet, y = "mnExDF.cds_length")) +
-    geom_boxplot(fill = c("#e41a1c", "#377eb8", "#4daf4a")) +
-    coord_cartesian(ylim = c(0, 5000)) +
-    theme(text = element_text(size = 12)) +
-    xlab("Gene subset") +
-    ylab("CDS length") +
-    ggtitle(paste0(graphCodeTitle
-      , "\n"
-      , "\n", title
-      , "\n"))
-  return(gg)
-}
-
-# Percent GC from biomart
-Plot_GC <- function(geneSet, title) {
-  gg <- ggplot(ggDF, aes_string(x = geneSet, y = "mnExDF.percentage_gc_content")) +
-    geom_boxplot(fill = c("#e41a1c", "#377eb8", "#4daf4a")) +
-    coord_cartesian(ylim = c(0, 100)) +
-    theme(text = element_text(size = 12)) +
-    xlab("Gene subset") +
-    ylab("Percent GC") +
-    ggtitle(paste0(graphCodeTitle
-      , "\n"
-      , "\n", title
-      , "\n"))
-  return(gg)
 }
 
 # Percentage of MT genes
@@ -256,190 +222,523 @@ Plot_MT_Percent <- function(geneSet, title) {
 }
 ################################################################################
 
-### Subset drop-seq raw counts matrix to cells that passed QC
+### Cleaning and formatting
 
-dsExM <- dsExM[ ,colnames(dsExM) %in% row.names(centSO@meta.data)]
-################################################################################
+## Subset drop-seq raw counts matrix to cells that passed QC
 
-### Remove ERCCs and STAR stats from tail and move gene names to row.names
+ds_ex_DF <- ds_ex_DF[ ,colnames(ds_ex_DF) %in% row.names(centSO@meta.data)]
+
+## Remove ERCCs and STAR stats from tail and move gene names to row.names
 
 # Remove ERCCs and STAR stats from tail
 # Bulk
-tail(blExDF, 10)
-blExDF <- head(blExDF, -97)
-tail(blExDF, 5)
+tail(bulk_ex_DF, 10)
+bulk_ex_DF <- head(bulk_ex_DF, -97)
+tail(bulk_ex_DF, 5)
 # Pollen
-tail(pnExDF, 10)
-pnExDF <- head(pnExDF, -97)
-tail(pnExDF, 5)
+tail(pollen_ex_DF, 10)
+pollen_ex_DF <- head(pollen_ex_DF, -97)
+tail(pollen_ex_DF, 5)
 # Fluidigm LT
-tail(flExDF, 10)
-flExDF <- head(flExDF, -97)
-tail(flExDF, 5)
+tail(fldm_LT_ex_DF, 10)
+fldm_LT_ex_DF <- head(fldm_LT_ex_DF, -97)
+tail(fldm_LT_ex_DF, 5)
 # Fluidigm HT
-tail(fhExDF, 10)
-fhExDF <- head(fhExDF, -5)
-tail(fhExDF, 5)
+tail(fldm_HT_ex_DF, 10)
+fldm_HT_ex_DF <- head(fldm_HT_ex_DF, -5)
+tail(fldm_HT_ex_DF, 5)
 
 # Move gene names
 # Pollen
-row.names(pnExDF) <- pnExDF$X
-pnExDF <- pnExDF[ ,-1]
+row.names(pollen_ex_DF) <- pollen_ex_DF$X
+pollen_ex_DF <- pollen_ex_DF[ ,-1]
 # Fluidigm HT
-row.names(fhExDF) <- fhExDF$X
-fhExDF <- fhExDF[ ,-1]
-################################################################################
+row.names(fldm_HT_ex_DF) <- fldm_HT_ex_DF$X
+fldm_HT_ex_DF <- fldm_HT_ex_DF[ ,-1]
 
-### Subset to GZ
-
+## Clean chr number of ens IDs for bulk, Pollen
 # Bulk
-# Check GZ sample IDs
-blMtDF$RNAID[blMtDF$ExpCondition == "VZ"]
-head(blExDF[ ,blMtDF$ExpCondition == "VZ"])
-# Subset
-gzBlExDF <- blExDF[ ,blMtDF$ExpCondition == "VZ"]
-
-# Drop-seq
-# # Check GZ sample IDs
-# table(grepl("VZ", colnames(dsExM)))
-# Subset
-# gzDsExM <- dsExM[ ,grep("VZ", colnames(dsExM))]
-ids <- row.names(centSO@meta.data)[centSO@meta.data$REGION == "GZ"]
-gzDsExM <- dsExM[, colnames(dsExM) %in% ids]
-
-# Fluidigm HT
-gzFhExDF <- fhExDF[ ,grep(
-  "COL01|COL02|COL03|COL04|COL05|COL06|COL07|COL08|COL09|COL10"
-  , colnames(fhExDF))]
-################################################################################
-
-### Format
-
-# Clean chr number of ens IDs for bulk, Pollen
-# Bulk
-row.names(blExDF) <- gsub("\\.[0-9]*", "", row.names(blExDF))
-# Bulk GZ
-row.names(gzBlExDF) <- gsub("\\.[0-9]*", "", row.names(gzBlExDF))
+row.names(bulk_ex_DF) <- gsub("\\.[0-9]*", "", row.names(bulk_ex_DF))
 # Pollen
-row.names(pnExDF) <- gsub("\\.[0-9]*", "", row.names(pnExDF))
+row.names(pollen_ex_DF) <- gsub("\\.[0-9]*", "", row.names(pollen_ex_DF))
 # Fluidigm LT
-row.names(flExDF) <- gsub("\\.[0-9]*", "", row.names(flExDF))
+row.names(fldm_LT_ex_DF) <- gsub("\\.[0-9]*", "", row.names(fldm_LT_ex_DF))
 # Fluidigm HT
-row.names(fhExDF) <- gsub("\\.[0-9]*", "", row.names(fhExDF))
-# Fluidigm HT GZ
-row.names(gzFhExDF) <- gsub("\\.[0-9]*", "", row.names(gzFhExDF))
+row.names(fldm_HT_ex_DF) <- gsub("\\.[0-9]*", "", row.names(fldm_HT_ex_DF))
 
-# Convert gene symbols to Ensembl IDs for Drop-seq
-# # All cells
-# dim(dsExM)
-# ensDF <- QueryBiomaRt(row.names(dsExM), "hgnc_symbol"
-#   , c("hgnc_symbol", "ensembl_gene_id"))
-# dsExDF <- merge(ensDF, dsExM, by.x = "hgnc_symbol", by.y = "row.names")
-# dim(dsExDF)
-# # GZ
-# # Convert gene symbols to Ensembl IDs for Drop-seq
-# dim(gzDsExM)
-# ensDF <- QueryBiomaRt(row.names(gzDsExM), "hgnc_symbol"
-#   , c("hgnc_symbol", "ensembl_gene_id"))
-# gzDsExDF <- merge(ensDF, gzDsExM, by.x = "hgnc_symbol", by.y = "row.names")
-# dim(gzDsExDF)
-dsExDF <- data.frame(dsExM)
-dsExDF$ensembl_gene_id <- Convert_Mixed_GeneSym_EnsID_To_EnsID(row.names(dsExDF))
-gzDsExDF <- data.frame(gzDsExM)
-gzDsExDF$ensembl_gene_id <- Convert_Mixed_GeneSym_EnsID_To_EnsID(row.names(gzDsExDF))
+## Convert gene symbols to Ensembl IDs for Drop-seq
+row.names(ds_ex_DF) <- Convert_Mixed_GeneSym_EnsID_To_EnsID(row.names(ds_ex_DF))
+
+## Subset to GZ
+# Bulk
+gz_bulk_ex_DF <- bulk_ex_DF[ ,bulk_mt_DF$ExpCondition == "VZ"]
+# Drop-seq
+ids <- row.names(centSO@meta.data)[centSO@meta.data$REGION == "GZ"]
+gz_df_ex_DF <- ds_ex_DF[, colnames(ds_ex_DF) %in% ids]
+# Fluidigm HT
+gz_fldm_HT_ex_DF <- fldm_HT_ex_DF[ ,grep(
+  "COL01|COL02|COL03|COL04|COL05|COL06|COL07|COL08|COL09|COL10"
+  , colnames(fldm_HT_ex_DF))]
+
+# ## CQN Normalization for length
+#
+# # CQN fits this model:
+# # log2(RPM) = s(x) + s(log2(length))
+# # Since x is required, input log2(length) for x
+#
+# # Use CQN to normalize for GC content and gene length
+# RunCQN <- function (exprDatDF, lengthGcDF) {
+#   # Remove genes not in GC and gene length annotation file
+#   keepV <- intersect(rownames(lengthGcDF), rownames(exprDatDF))
+#   geneAnno <- lengthGcDF[match(keepV, rownames(lengthGcDF)), ]
+#   # Set genes with length 0 to length 1 - why? - from Vivek's code
+#   geneAnno[geneAnno[,1] == 0] <- 1
+#   exprDatDF <- exprDatDF[match(keepV, rownames(exprDatDF)), ]
+#
+#   # Run CQN with specified depths and no quantile normalization
+#   cqnDat <- cqn(exprDatDF, lengths = 1
+#                 , x = log(as.numeric(geneAnno[ ,1]), 2)
+#                 , lengthMethod = c("fixed")
+#                 , sqn = FALSE)
+#   # Get the log2(Normalized FPKM) values
+#   cqnDat <- cqnDat$y + cqnDat$offset
+#   cqnDat
+# }
+#
+# bulk_ex_DF <- RunCQN(bulk_ex_DF, ENSEMBLhg19.70UnionAnno)
 ################################################################################
 
 ### Pools of different sizes and read depth normalize
 
-# Read depth normalize bulk by number mapped to exons
-# All cells
-rDep <- (apply(blExDF, 2, sum) / 10^6)
-buCpmDF <- blExDF / rDep
-# Bulk mean CPM
-mnBuExDF <- data.frame(MEAN_BULK = apply(buCpmDF, 1, mean))
-# GZ
-rDep <- (apply(gzBlExDF, 2, sum) / 10^6)
-gzBuCpmDF <- gzBlExDF / rDep
-# Bulk mean CPM
-mnGzBuExDF <- data.frame(MEAN_BULK = apply(gzBuCpmDF, 1, mean))
-
 ## Pools of different sizes correlated to bulk
 
-# Drop-seq
-# All cells
-# Merge bulk and pooled means, include genes not in both
-mnBuDsExDF <- merge(mnBuExDF, dsExDF, by.x = "row.names"
-  , by.y = "ensembl_gene_id", all = TRUE)
-names(mnBuDsExDF)[1] <- "ensembl_gene_id"
-mnBuDsExDF <- mnBuDsExDF[ ,! names(mnBuDsExDF) == "hgnc_symbol"]
-# Convert NAs to 0s
-mnBuDsExDF[is.na(mnBuDsExDF)] <- 0
-# Pool sizes
-nSamp <- c(seq(1, 9, 1), seq(10, 90, 10), seq(100, 900, 100)
-  , seq(1000, (ncol(dsExM)-3), 500))
-sprDsDF <- Pool_Size_Correlation(mnBuDsExDF, nSamp)
-# GZ
-# Merge bulk and pooled means, include genes not in both
-mnGzBuDsExDF <- merge(mnGzBuExDF, gzDsExDF, by.x = "row.names"
-  , by.y = "ensembl_gene_id", all = TRUE)
-names(mnGzBuDsExDF)[1] <- "ensembl_gene_id"
-mnGzBuDsExDF <- mnGzBuDsExDF[ ,! names(mnGzBuDsExDF) == "hgnc_symbol"]
-# Convert NAs to 0s
-mnGzBuDsExDF[is.na(mnGzBuDsExDF)] <- 0
-# Pool sizes
-nSamp <- c(seq(1, 9, 1), seq(10, 90, 10), seq(100, 900, 100)
-  , seq(1000, (ncol(gzDsExM)-3), 500))
-sprGzDsDF <- Pool_Size_Correlation(mnGzBuDsExDF, nSamp)
+# Pools of different sizes correlations to bulk
+# mean_bulk_ex_DF: mean expression dataframe
+# sc_ex_DF: single-cell expression data frame
+# nSamp: Vector of sizes of pools
+Pool_Size_Correlation <- function(
+  mean_bulk_ex_DF, sc_ex_DF, nSamp, Dataset_label = NA) {
 
-# Pollen
-# Merge bulk and pooled means, include genes not in both
-mnBuPnExDF <- merge(mnGzBuExDF, pnExDF, by = "row.names", all = TRUE)
-names(mnBuPnExDF)[1] <- "ensembl_gene_id"
-# Convert NAs to 0s
-mnBuPnExDF[is.na(mnBuPnExDF)] <- 0
-# Pool sizes
-nSamp <- c(seq(1, 9, 1), seq(10, 90, 10), seq(100, (ncol(pnExDF)-2), 100))
-sprPnDF <- Pool_Size_Correlation(mnBuPnExDF, nSamp)
+  print(Dataset_label)
 
-# Fluidigm HT
-# All cells
-# Merge bulk and pooled means, include genes not in both
-mnBuFhExDF <- merge(mnBuExDF, fhExDF, by = "row.names", all = TRUE)
-names(mnBuFhExDF)[1] <- "ensembl_gene_id"
-# Convert NAs to 0s
-mnBuFhExDF[is.na(mnBuFhExDF)] <- 0
-# Pool sizes
-nSamp <- c(seq(1, 9, 1), seq(10, 90, 10), seq(100, (ncol(fhExDF)-2), 100))
-sprFhDF <- Pool_Size_Correlation(mnBuFhExDF, nSamp)
-# GZ
-# Merge bulk and pooled means, include genes not in both
-mnGzBuFhExDF <- merge(mnGzBuExDF, gzFhExDF, by = "row.names", all = TRUE)
-names(mnGzBuFhExDF)[1] <- "ensembl_gene_id"
-# Convert NAs to 0s
-mnGzBuFhExDF[is.na(mnGzBuFhExDF)] <- 0
-# Pool sizes
-nSamp <- c(seq(1, 9, 1), seq(10, 90, 10), seq(100, (ncol(gzFhExDF)-2), 100))
-sprGzFhDF <- Pool_Size_Correlation(mnGzBuFhExDF, nSamp)
+  # Do not exceed number of cells in dataset with sampling
+  nSamp <- nSamp[nSamp < ncol(sc_ex_DF)]
 
-# Fluidigm LT
-# All cells
-# Merge bulk and pooled means, include genes not in both
-mnBuFlExDF <- merge(mnBuExDF, flExDF, by = "row.names", all = TRUE)
-names(mnBuFlExDF)[1] <- "ensembl_gene_id"
-# Convert NAs to 0s
-mnBuFlExDF[is.na(mnBuFlExDF)] <- 0
-# Pool sizes
-nSamp <- c(seq(1, 9, 1), seq(10, 90, 10), seq(100, (ncol(flExDF)-2), 50))
-sprFlDF <- Pool_Size_Correlation(mnBuFlExDF, nSamp)
+  # Format
+  # Merge bulk and pooled means, use union of genes
+  combo_mean_ex_DF <- merge(mean_bulk_ex_DF, sc_ex_DF
+    , by = "row.names", all = TRUE)
+  names(combo_mean_ex_DF)[1] <- "ensembl_gene_id"
+  combo_mean_ex_DF <- combo_mean_ex_DF[
+    , ! names(combo_mean_ex_DF) == "hgnc_symbol"]
+  # Convert NAs to 0s
+  combo_mean_ex_DF[is.na(combo_mean_ex_DF)] <- 0
 
-## Plot as grid
-# All cells
-sprDsDF$DATASET <- "DROP-SEQ"
-sprFhDF$DATASET <- "FLUIDIGM_HT"
-sprFlDF$DATASET <- "FLUIDIGM_LT"
-ggDF <- rbind(sprDsDF, sprFhDF, sprFlDF)
-ggplot(ggDF, aes(x = NUMBER_OF_CELLS, y = SPEARMAN)) +
-  facet_wrap( ~ DATASET, ncol = 2, scales = "free_x") +
+  # Sample, pool, and correlation
+  sprman_cor <- sapply(nSamp, function(i) {
+    print(i)
+    # Sample
+    sampled_DF <- combo_mean_ex_DF[
+      , c(1:2, sample(3:ncol(combo_mean_ex_DF), i, replace = FALSE))]
+    # Pool
+    sampled_DF <- data.frame(sampled_DF[1:2]
+      , Pooled = apply(sampled_DF[3:ncol(sampled_DF)], 1, sum)
+    )
+    # # Read depth normalize pooled by number mapped to exons
+    # total_counts <- sum(plExDF$POOLED, na.rm = TRUE) / 10^6
+    # Convert NAs to 0s
+    sampled_DF[is.na(sampled_DF)] <- 0
+    # # Read depth normalize
+    # plExDF$POOLED <- plExDF$POOLED / total_counts
+
+    # Spearman correlation
+    round(cor(sampled_DF$Mean_Bulk, sampled_DF$Pooled, method = "spearman"), 2)
+  })
+
+  # Format ouput correlation data frame
+  sprman_cor_DF <- data.frame(Number_of_cells = nSamp, Spearman = sprman_cor)
+  sprman_cor_DF$Dataset_label <- Dataset_label
+  row.names(sprman_cor_DF) <- paste0(Dataset_label, row.names(sprman_cor_DF))
+
+  return(sprman_cor_DF)
+}
+
+
+Read_Depth_Normalize_To_CPM <- function(exM) {
+  # Read depth normalize bulk by number mapped to exons
+  # All cells
+  total_counts <- (apply(exM, 2, sum) / 10^6)
+  exM <- exM / total_counts
+  return(exM)
+}
+
+Pool_Size_Correlation_Run <- function(){
+
+  # Read depth normalize bulk by number mapped to exons
+  # CP GZ
+  bulk_ex_DF <- Read_Depth_Normalize_To_CPM(bulk_ex_DF)
+  # GZ
+  gz_bulk_ex_DF <- Read_Depth_Normalize_To_CPM(gz_bulk_ex_DF)
+
+  # Bulk mean CPM
+  # CP GZ
+  mean_ex_DF <- data.frame(
+    Mean_Bulk = apply(bulk_ex_DF, 1, mean)
+    , Mean_Bulk_GZ = apply(gz_bulk_ex_DF, 1, mean)
+  )
+
+  # Pool sizes
+  nSamp <- c(seq(1, 9, 1), seq(10, 90, 10), seq(100, 900, 100)
+    , seq(1000, 40000, 500))
+
+  pool_corr_DF <- rbind(
+    # Drop-seq
+    Pool_Size_Correlation(
+      mean_bulk_ex_DF = mean_ex_DF[c("Mean_Bulk")]
+      , sc_ex_DF = ds_ex_DF
+      , nSamp = nSamp
+      , Dataset_label = "Dropseq"
+    )
+    # Drop-seq GZ
+    , Pool_Size_Correlation(
+        mean_bulk_ex_DF = mean_ex_DF[c("Mean_Bulk_GZ")]
+        , sc_ex_DF = gz_df_ex_DF
+        , nSamp = nSamp
+        , Dataset_label = "Dropseq GZ"
+    )
+    # Pollen
+    , Pool_Size_Correlation(
+        mean_bulk_ex_DF = mean_ex_DF[c("Mean_Bulk_GZ")]
+        , sc_ex_DF = pollen_ex_DF
+        , nSamp = nSamp
+        , Dataset_label = "Pollen"
+    )
+    # Fluidigm HT
+    , Pool_Size_Correlation(
+        mean_bulk_ex_DF = mean_ex_DF[c("Mean_Bulk")]
+        , sc_ex_DF = fldm_HT_ex_DF
+        , nSamp = nSamp
+        , Dataset_label = "Fluidigm HT"
+    )
+    # Fluidigm HT GZ
+    , Pool_Size_Correlation(
+        mean_bulk_ex_DF = mean_ex_DF[c("Mean_Bulk_GZ")]
+        , sc_ex_DF = gz_fldm_HT_ex_DF
+        , nSamp = nSamp
+        , Dataset_label = "Fluidigm HT GZ"
+    )
+    # Fluidigm LT
+    , Pool_Size_Correlation(
+        mean_bulk_ex_DF = mean_ex_DF[c("Mean_Bulk")]
+        , sc_ex_DF = fldm_LT_ex_DF
+        , nSamp = nSamp
+        , Dataset_label = "Fluidigm LT"
+    )
+  )
+  return(pool_corr_DF)
+}
+
+# Number of genes detected as pool size increases
+Number_Genes_Detected <- function(exDF, nSamp, datasetName) {
+  # Genes with >= 1 count (raw counts)
+  nGeneCutoff <- c(0,1,2,10)
+  names(nGeneCutoff) <- paste0("Detection_threshold_", nGeneCutoff)
+  nGeneL <- lapply(nGeneCutoff, function(nGeneCutoff){
+    print(paste0("Genes with >= ", nGeneCutoff, " count (raw counts)"))
+    tfExDF <- exDF >= nGeneCutoff
+    nGene <- sapply(nSamp, function(i) {
+      print(i)
+      # Sample
+      ssExDF <- tfExDF[ ,c(sample(1:ncol(tfExDF), i, replace = FALSE))]
+      # rowSums throws error if only 1 column (nSamp = 1)
+      if (i == 1) {
+        print("nSamp = 1")
+        sum(ssExDF >= 1)
+      }
+      else {
+        # Sum genes with >= 1 count
+        rSums <- rowSums(ssExDF)
+        sum(rSums >= 1)
+      }
+    })
+    return(nGene)
+  })
+  # Format into data drame
+  nGeneDF <- as.data.frame(do.call("cbind", nGeneL))
+  nGeneDF$Number_of_cells <- nSamp
+  nGeneDF$Dataset <- datasetName
+
+  return(nGeneDF)
+}
+
+### Number of genes detected as pool size increases
+Number_Genes_Detected_Run <- function(){
+  ngd_DF <- rbind(
+    # Drop-seq
+    Number_Genes_Detected(ds_ex_DF
+      , c(seq(1, 9, 1), seq(10, 90, 10), seq(100, 900, 100)
+        , seq(1000, (ncol(ds_ex_DF)), 500))
+      , "DROPSEQ")
+    # Fluidigm HT
+    , Number_Genes_Detected(fldm_HT_ex_DF
+      , c(seq(1, 9, 1), seq(10, 90, 10), seq(100, (ncol(fldm_HT_ex_DF)), 100))
+      , "FLUIDIGM_HT")
+    # Fluidigm LT
+    , Number_Genes_Detected(fldm_LT_ex_DF
+      , c(seq(1, 9, 1), seq(10, 90, 10), seq(100, (ncol(fldm_LT_ex_DF)), 50))
+      , "FLUIDIGM_LT")
+    # Drop-seq GZ
+    , Number_Genes_Detected(gz_df_ex_DF
+      , c(seq(1, 9, 1), seq(10, 90, 10), seq(100, 900, 100)
+        , seq(1000, (ncol(gz_df_ex_DF)), 500))
+      , "DROPSEQ_GZ")
+    # Fluidigm HT GZ
+    , Number_Genes_Detected(gz_fldm_HT_ex_DF
+      , c(seq(1, 9, 1), seq(10, 90, 10), seq(100, (ncol(gz_fldm_HT_ex_DF)), 100))
+      , "FLUIDIGM_HT_GZ")
+    , Number_Genes_Detected(pollen_ex_DF
+      , c(seq(1, 9, 1), seq(10, 90, 10), seq(100, (ncol(pollen_ex_DF)), 100))
+      , "POLLEN")
+  )
+  return(ngd_DF)
+}
+
+pool_corr_DF <- Pool_Size_Correlation_Run()
+number_gene_detected_DF <- Number_Genes_Detected_Run()
+################################################################################
+
+### Pool scRNA-seq and read depth normalize
+
+# Randomly sample and pool cells
+# rNums: Columns to sample from
+# nPool: Number of pools to split into
+Pool_Cells <- function(exDF, nPool, rNums) {
+  rNums <- rNums[rNums < ncol(exDF)]
+  rndmGroups <- split(rNums, ceiling(seq_along(rNums) / (length(rNums) / nPool)))
+  pExDF <- data.frame(lapply(rndmGroups, function (group){
+    apply(exDF[ ,group], 1, sum)
+  }))
+  print(head(pExDF, 10))
+  return(pExDF)
+}
+
+Pool_To_CPM <- function(exM, nPools, rNums){
+  exM <- Pool_Cells(exM, nPools, rNums)
+  total_counts <- (apply(exM, 2, sum) / 10^6)
+  cpm_DF <- exM / total_counts
+  return(cpm_DF)
+}
+
+Pool_To_CPM_Run <- function(){
+  pools_cpm_DFL <- list(
+    # Dropseq
+    # 310 pooled groups of 100 cells each
+    Dropseq = Pool_To_CPM(
+      exM = ds_ex_DF
+      , nPools = 310
+      , rNums = sample(1:31000, 31000, replace = FALSE)
+    )
+    # Dropseq GZ
+    # 150 pooled groups of 100 cells each
+    , Dropseq_GZ = Pool_To_CPM(
+      exM = gz_df_ex_DF
+      , nPools = 150
+      , rNums = sample(1:15000, 15000, replace = FALSE)
+    )
+    # Fluidigm HT
+    # 12 pooled groups of 48 cells each
+    , Fluidigm_HT = Pool_To_CPM(
+      exM = fldm_HT_ex_DF
+      , nPools = 12
+      , rNums <- sample(1:48, 48, replace = FALSE)
+    )
+    # Fluidigm HT GZ
+    # 6 pooled groups of 48 cells each
+    , Fluidigm_HT_GZ = Pool_To_CPM(
+      exM = gz_fldm_HT_ex_DF
+      , nPools = 6
+      , rNums <- sample(1:288, 288, replace = FALSE)
+    )
+    # Pollen
+    # 10 pooled groups of 39 cells each
+    , Pollen = Pool_To_CPM(
+      exM = pollen_ex_DF
+      , nPools = 10
+      , rNums = sample(1:390, 390, replace = FALSE)
+    )
+    # Fluidigm LT
+    # 6 pooled groups of 30 cells each
+    , Fluidigm_LT = Pool_To_CPM(
+      exM = fldm_LT_ex_DF
+      , nPools = 6
+      , rNums = sample(1:180, 180, replace = FALSE)
+    )
+  )
+  return(pools_cpm_DFL)
+}
+
+pools_cpm_DFL <- Pool_To_CPM_Run()
+################################################################################
+
+### Mean CPM for each pooled dataset and bulk
+
+Mean_CPM <- function(){
+  # Mean counts
+  mean_cpm_DFL <- lapply(pools_cpm_DFL, function(pools_cpm_DF) {
+    mean_cpm <- apply(pools_cpm_DF, 1, mean)
+    return(data.frame(mean_cpm))
+  })
+
+  # Read depth normalize bulk by number mapped to exons
+  # CP GZ
+  bulk_ex_DF <- Read_Depth_Normalize_To_CPM(bulk_ex_DF)
+  # GZ
+  gz_bulk_ex_DF <- Read_Depth_Normalize_To_CPM(gz_bulk_ex_DF)
+  # Bulk mean CPM
+  mean_cpm_DFL$Bulk = data.frame(mean_cpm = apply(bulk_ex_DF, 1, mean))
+  mean_cpm_DFL$Bulk_GZ = data.frame(mean_cpm = apply(gz_bulk_ex_DF, 1, mean))
+
+  # Merge keeping all genes (union)
+  mean_cpm_DF <- mean_cpm_DFL[[1]]
+  names(mean_cpm_DF) <- names(mean_cpm_DFL)[1]
+  mean_cpm_DF$ensembl_gene_id <- row.names(mean_cpm_DF)
+  for (name in names(mean_cpm_DFL[-1])) {
+    print(name)
+    df1 <- mean_cpm_DFL[[name]]
+    names(df1) <- name
+    df1$ensembl_gene_id <- row.names(df1)
+    mean_cpm_DF <- merge(mean_cpm_DF, df1
+      , by = "ensembl_gene_id", all = TRUE
+    )
+  }
+  # Convert NAs to 0s
+  mean_cpm_DF[is.na(mean_cpm_DF)] <- 0
+
+  return(mean_cpm_DF)
+}
+
+Subset_To_Biomart_EnsIDs <- function(){
+  mean_cpm_DF <- mean_cpm_DF[
+    mean_cpm_DF$ensembl_gene_id %in% bmDF$ensembl_gene_id, ]
+  return(mean_cpm_DF)
+}
+
+Add_Gene_Info <- function(){
+  # Subset to ensembl IDs in biomart and add gene information
+  idx <- match(mean_cpm_DF$ensembl_gene_id, bmDF$ensembl_gene_id)
+  mean_cpm_DF$ensembl_gene_id <- bmDF$ensembl_gene_id[idx]
+  mean_cpm_DF$gene_biotype <- bmDF$gene_biotype[idx]
+  mean_cpm_DF$percentage_gc_content <- bmDF$percentage_gc_content[idx]
+  mean_cpm_DF$cds_length <- bmDF$cds_length[idx]
+
+  return(mean_cpm_DF)
+}
+
+mean_cpm_DF <- Mean_CPM()
+mean_cpm_DF <- Subset_To_Biomart_EnsIDs()
+mean_cpm_DF <- Add_Gene_Info()
+
+save(list = ls(), file = paste0(outAnalysis, "Workspace_TEST.RData"))
+################################################################################
+
+### Subset to higher in pooled or higher in bulk
+
+# Log2(mean CPM + 1)
+Log2_Mean_CPM <- function(){
+  log2_mean_cpm_DF <- apply(mean_cpm_DF[ ,2:9], 2, function(y){
+    log2_mean_cpm <- log(y + 1, 2)
+    return(log2_mean_cpm)
+  })
+  log2_mean_cpm_DF <- as.data.frame(log2_mean_cpm_DF)
+  row.names(log2_mean_cpm_DF) <- mean_cpm_DF$ensembl_gene_id
+  return(log2_mean_cpm_DF)
+}
+
+Ratio_Log2_Mean_CPM <- function(){
+  # Ratio of single-cell vs bulk
+  df1 <- apply(log2_mean_cpm_DF[ ,c("Dropseq", "Fluidigm_HT", "Fluidigm_LT")], 2
+    , function(y){
+      ratio <- (y - log2_mean_cpm_DF[ ,"Bulk"])
+      return(ratio)
+  })
+  df2 <- apply(log2_mean_cpm_DF[ ,c("Dropseq_GZ", "Fluidigm_HT_GZ", "Pollen")], 2
+    , function(y){
+      ratio <- y - log2_mean_cpm_DF[ ,"Bulk_GZ"]
+      return(ratio)
+  })
+  ratio_log2_mean_cpm_DF <- cbind(df1, df2)
+  ratio_log2_mean_cpm_DF <- as.data.frame(ratio_log2_mean_cpm_DF)
+  row.names(ratio_log2_mean_cpm_DF) <- row.names(log2_mean_cpm_DF)
+  return(ratio_log2_mean_cpm_DF)
+}
+
+# Flag as high in single-cell or bulk
+Bias_Flag_DF <- function(){
+
+  bias_flag_DF <- apply(ratio_log2_mean_cpm_DF, 2, function(y){
+    bias_DF <- Subset_Two_SD(y)
+    bias <- rep("None", nrow(bias_DF))
+    bias[bias_DF$High_Bulk == TRUE] <- "Bulk high"
+    bias[bias_DF$High_Pool == TRUE] <- "Pool high"
+    return(bias)
+  })
+  bias_flag_DF <- as.data.frame(bias_flag_DF)
+  row.names(bias_flag_DF) <- row.names(ratio_log2_mean_cpm_DF)
+
+  # Flag 0 detection for drop-seq
+  bias_flag_DF$Dropseq_0 <- "None"
+  bias_flag_DF$Dropseq_0[
+    log2_mean_cpm_DF$Bulk == 0 & bias_flag_DF$Dropseq == "Pool high"
+    ] <- "Pool high"
+  bias_flag_DF$Dropseq_0[
+    log2_mean_cpm_DF$Dropseq == 0 & bias_flag_DF$Dropseq == "Bulk high"
+    ] <- "Bulk high"
+  bias_flag_DF$Dropseq_0 <- as.factor(bias_flag_DF$Dropseq_0)
+
+  # Intersect Dropseq GZ, Fluidigm HT GZ, Pollen
+  bias_flag_DF$GZ_Datasets <- "None"
+  bias_flag_DF$GZ_Datasets[
+    bias_flag_DF$Dropseq == "Pool high" &
+    bias_flag_DF$Fluidigm_HT == "Pool high" &
+    bias_flag_DF$Fluidigm_LT == "Pool high"
+    ] <- "Pool high"
+  bias_flag_DF$GZ_Datasets[
+    bias_flag_DF$Dropseq == "Bulk high" &
+    bias_flag_DF$Fluidigm_HT == "Bulk high" &
+    bias_flag_DF$Fluidigm_LT == "Bulk high"
+    ] <- "Bulk high"
+  bias_flag_DF$GZ_Datasets <- as.factor(bias_flag_DF$GZ_Datasets)
+
+  # Intersect Dropseq GZ, Fluidigm HT GZ, Pollen
+  bias_flag_DF$GZCP_Datasets <- "None"
+  bias_flag_DF$GZCP_Datasets[
+    bias_flag_DF$Dropseq_GZ == "Pool high" &
+    bias_flag_DF$Fluidigm_HT_GZ == "Pool high" &
+    bias_flag_DF$Pollen == "Pool high"
+    ] <- "Pool high"
+  bias_flag_DF$GZCP_Datasets[
+    bias_flag_DF$Dropseq_GZ == "Bulk high" &
+    bias_flag_DF$Fluidigm_HT_GZ == "Bulk high" &
+    bias_flag_DF$Pollen == "Bulk high"
+    ] <- "Bulk high"
+  bias_flag_DF$GZCP_Datasets <- as.factor(bias_flag_DF$GZCP_Datasets)
+
+  return(bias_flag_DF)
+}
+
+log2_mean_cpm_DF <- Log2_Mean_CPM()
+ratio_log2_mean_cpm_DF <- Ratio_Log2_Mean_CPM()
+bias_flag_DF <- Bias_Flag_DF()
+
+save(list = ls(), file = paste0(outAnalysis, "Workspace.RData"))
+################################################################################
+
+### Plots
+
+## Correlation to bulk as pool size increases
+ggplot(pool_corr_DF, aes(
+  x = Number_of_cells, y = Spearman, color = Dataset_label)) +
+  facet_wrap(~Dataset_label, ncol = 2, scales = "free") +
   geom_line() +
   xlab("Number of cells in pool") +
   ylab("Spearman") +
@@ -451,145 +750,16 @@ ggplot(ggDF, aes(x = NUMBER_OF_CELLS, y = SPEARMAN)) +
     , "\n"
   ))
 ggsave(paste0(outGraph, "Pool_Size_Spearman.pdf"))
-# GZ
-sprGzDsDF$DATASET <- "DROP-SEQ"
-sprPnDF$DATASET <- "POLLEN_2015"
-sprGzFhDF$DATASET <- "FLUIDIGM_HT"
-ggDF <- rbind(sprGzDsDF, sprPnDF, sprGzFhDF)
-ggplot(ggDF, aes(x = NUMBER_OF_CELLS, y = SPEARMAN)) +
-  facet_wrap( ~ DATASET, ncol = 2, scales = "free_x") +
-  geom_line() +
-  xlab("Number of cells in pool") +
-  ylab("Spearman") +
-  ylim(0, 1) +
-  ggtitle(paste0(graphCodeTitle
-    , "\n"
-    , "\nCorrelation of different size pools to bulk"
-    , "\nGZ fetal human brain"
-    , "\n"
-  ))
-ggsave(paste0(outGraph, "Pool_Size_Spearman_GZ.pdf"))
 
-# Number of genes detected as pool size increases
-Number_Genes_Detected <- function (exDF, nSamp, datasetName) {
-  # Genes with >= 1 count (raw counts)
-  print("Genes with >= 1 count (raw counts)")
-  tfExDF <- exDF >= 1
-  nGene1 <- sapply(nSamp, function(i) {
-    print(i)
-    # Sample
-    ssExDF <- tfExDF[ ,c(sample(1:ncol(tfExDF), i, replace = FALSE))]
-    # rowSums throws error if only 1 column (nSamp = 1)
-    if (i == 1) {
-      print("nSamp = 1")
-      sum(ssExDF >= 1)
-    }
-    else {
-      # Sum genes with >= 1 count
-      rSums <- rowSums(ssExDF)
-      sum(rSums >= 1)
-    }
-  })
-  # Genes with >= 2 count (raw counts)
-  print("Genes with >= 2 count (raw counts)")
-  tfExDF <- exDF >= 2
-  nGene2 <- sapply(nSamp, function(i) {
-    print(i)
-    # Sample
-    ssExDF <- tfExDF[ ,c(sample(1:ncol(tfExDF), i, replace = FALSE))]
-    # rowSums throws error if only 1 column (nSamp = 1)
-    if (i == 1) {
-      print("nSamp = 1")
-      sum(ssExDF >= 1)
-    }
-    else {
-      # Sum genes with >= 1 count
-      rSums <- rowSums(ssExDF)
-      sum(rSums >= 1)
-    }
-  })
-  # Genes with >= 3 count (raw counts)
-  print("Genes with >= 3 count (raw counts)")
-  tfexDF <- exDF >= 3
-  nGene3 <- sapply(nSamp, function(i) {
-    print(i)
-    # Sample
-    ssExDF <- tfexDF[ ,c(sample(1:ncol(tfexDF), i, replace = FALSE))]
-    # rowSums throws error if only 1 column (nSamp = 1)
-    if (i == 1) {
-      print("nSamp = 1")
-      sum(ssExDF >= 1)
-    }
-    else {
-      # Sum genes with >= 3 count
-      rSums <- rowSums(ssExDF)
-      sum(rSums >= 1)
-    }
-  })
-  # Genes with >= 10 count (raw counts)
-  print("Genes with >= 10 count (raw counts)")
-  tfexDF <- exDF >= 10
-  nGene10 <- sapply(nSamp, function(i) {
-    print(i)
-    # Sample
-    ssExDF <- tfexDF[ ,c(sample(1:ncol(tfexDF), i, replace = FALSE))]
-    # rowSums throws error if only 1 column (nSamp = 1)
-    if (i == 1) {
-      print("nSamp = 1")
-      sum(ssExDF >= 1)
-    }
-    else {
-      # Sum genes with >= 10 count
-      rSums <- rowSums(ssExDF)
-      sum(rSums >= 1)
-    }
-  })
-  nGeneDF <- data.frame(
-    NUMBER_OF_CELLS = nSamp
-    , DATASET = datasetName
-    , NUMBER_GENES_DETECTED_1 = nGene1
-    , NUMBER_GENES_DETECTED_2 = nGene2
-    , NUMBER_GENES_DETECTED_3 = nGene3
-    , NUMBER_GENES_DETECTED_10 = nGene10)
-  return(nGeneDF)
-}
-
-### Number of genes detected as pool size increases
-ngdDF <- rbind(
-  # Drop-seq
-  Number_Genes_Detected(dsExM
-    , c(seq(1, 9, 1), seq(10, 90, 10), seq(100, 900, 100)
-      , seq(1000, (ncol(dsExM)), 500))
-    , "DROPSEQ")
-  # Fluidigm HT
-  , Number_Genes_Detected(fhExDF
-    , c(seq(1, 9, 1), seq(10, 90, 10), seq(100, (ncol(fhExDF)), 100))
-    , "FLUIDIGM_HT")
-  # Fluidigm LT
-  , Number_Genes_Detected(flExDF
-    , c(seq(1, 9, 1), seq(10, 90, 10), seq(100, (ncol(flExDF)), 50))
-    , "FLUIDIGM_LT")
-  # Drop-seq GZ
-  , Number_Genes_Detected(gzDsExM
-    , c(seq(1, 9, 1), seq(10, 90, 10), seq(100, 900, 100)
-      , seq(1000, (ncol(gzDsExM)), 500))
-    , "DROPSEQ_GZ")
-  # Fluidigm HT GZ
-  , Number_Genes_Detected(gzFhExDF
-    , c(seq(1, 9, 1), seq(10, 90, 10), seq(100, (ncol(gzFhExDF)), 100))
-    , "FLUIDIGM_HT_GZ")
-  , Number_Genes_Detected(pnExDF
-    , c(seq(1, 9, 1), seq(10, 90, 10), seq(100, (ncol(pnExDF)), 100))
-    , "POLLEN")
+## Number of genes detected as pool size increases
+ggDF <- melt(number_gene_detected_DF
+  , measure.vars = c("Detection_threshold_0"
+  , "Detection_threshold_1", "Detection_threshold_2"
+  , "Detection_threshold_10")
 )
-
-ggDF <- melt(ngdDF, measure.vars = c("NUMBER_GENES_DETECTED_1"
-  , "NUMBER_GENES_DETECTED_2", "NUMBER_GENES_DETECTED_3"
-  , "NUMBER_GENES_DETECTED_10"))
-
-## Plot as grid
-ggplot(ggDF, aes(x = NUMBER_OF_CELLS, y = value, col = variable)) +
-  facet_wrap( ~ DATASET, ncol = 3, scales = "free_x") +
+# Plot as grid
+ggplot(ggDF, aes(x = Number_of_cells, y = value, col = variable)) +
+  facet_wrap(~DATASET, ncol = 3, scales = "free_x") +
   geom_line() +
   xlab("Number of cells in pool") +
   ylab("Number of genes detected") +
@@ -600,210 +770,35 @@ ggplot(ggDF, aes(x = NUMBER_OF_CELLS, y = value, col = variable)) +
     , "\n"
   ))
 ggsave(paste0(outGraph, "Pool_Size_Genes_Detected.pdf"), height = 7, width = 11)
-################################################################################
 
-### Pool scRNA-seq and read depth normalize
-
-# Drop-seq randomly split into pooled groups
-# All cells - 310 pooled groups of 100 cells each
-ncol(dsExM)
-nPool <- 310
-rNums <- sample(1:31000, 31000, replace = FALSE)
-pDsExDF <- Pool_Cells(dsExM, nPool, rNums)
-# GZ - 150 pooled groups of 100 cells each
-ncol(gzDsExM)
-nPool <- 150
-rNums <- sample(1:15000, 15000, replace = FALSE)
-pGzDsExDF <- Pool_Cells(gzDsExM, nPool, rNums)
-
-# # For testing
-# ncol(dsExM)
-# nPool <- 20
-# rNums <- sample(1:2000, 2000, replace = FALSE)
-# pDsExDF <- Pool_Cells(dsExM, nPool, rNums)
-# # GZ - 34 pooled groups of 100 cells each
-# ncol(gzDsExM)
-# nPool <- 10
-# rNums <- sample(1:1000, 1000, replace = FALSE)
-# pGzDsExDF <- Pool_Cells(gzDsExM, nPool, rNums)
-
-# Pollen - randomly split into 10 pooled groups of 39 cells each
-ncol(pnExDF)
-nPool <- 10
-rNums <- sample(1:390, 390, replace = FALSE)
-pPnExDF <- Pool_Cells(pnExDF, nPool, rNums)
-
-# Fluidigm HT - randomly split into pooled groups
-# All cells - 12 pooled groups of 48 cells each
-ncol(fhExDF)
-nPool <- 12
-rNums <- sample(1:576, 576, replace = FALSE)
-pFhExDF <- Pool_Cells(fhExDF, nPool, rNums)
-# GZ - 6 pooled groups of 48 cells each
-ncol(gzFhExDF)
-nPool <- 6
-rNums <- sample(1:288, 288, replace = FALSE)
-pGzFhExDF <- Pool_Cells(gzFhExDF, nPool, rNums)
-
-# Fluidigm LT - randomly split into pooled groups
-# All cells - 6 pooled groups of 30 cells each
-ncol(flExDF)
-nPool <- 6
-rNums <- sample(1:180, 180, replace = FALSE)
-pFlExDF <- Pool_Cells(flExDF, nPool, rNums)
-
-## Read depth normalize
-
-# Read depth normalize pooled Drop-seq by number mapped to exons
-# All cells
-rDep <- (apply(pDsExDF, 2, sum) / 10^6)
-pDsCpmDF <- pDsExDF / rDep
-# GZ
-rDep <- (apply(pGzDsExDF, 2, sum) / 10^6)
-pGzDsCpmDF <- pGzDsExDF / rDep
-
-# Read depth normalize pooled Pollen by number mapped to exons
-rDep <- (apply(pPnExDF, 2, sum) / 10^6)
-pPnCpmDF <- pPnExDF / rDep
-
-# Read depth normalize pooled Fluidigm HT by number mapped to exons
-# All cells
-rDep <- (apply(pFhExDF, 2, sum) / 10^6)
-pFhCpmDF <- pFhExDF / rDep
-# GZ
-rDep <- (apply(pGzFhExDF, 2, sum) / 10^6)
-pGzFhCpmDF <- pGzFhExDF / rDep
-
-# Read depth normalize pooled Fluidigm LT by number mapped to exons
-# All cells
-rDep <- (apply(pFlExDF, 2, sum) / 10^6)
-pFlCpmDF <- pFlExDF / rDep
-################################################################################
-
-### Mean counts and merge datasets to align genes
-
-## Mean counts
-
-# # Mean counts for bulk RNAseq
-# mnBuExDF <- data.frame(MEAN_BULK = apply(buCpmDF, 1, mean))
-
-# Mean counts for pooled Drop-seq groups
-# All cells
-mnPoDsExDF <- data.frame(MEAN_POOLED_DROPSEQ = apply(pDsCpmDF, 1, mean))
-# GZ
-mnPoGzDsExDF <- data.frame(MEAN_POOLED_DROPSEQ_GZ = apply(pGzDsCpmDF, 1, mean))
-
-# Mean counts for pooled Pollen groups
-mnPoPnExDF <- data.frame(MEAN_POOLED_POLLEN = apply(pPnCpmDF, 1, mean))
-
-# Mean counts for pooled Fluidigm HT groups
-# All cells
-mnPoFhExDF <- data.frame(MEAN_POOLED_FLUIDIGM_HT = apply(pFhCpmDF, 1, mean))
-# GZ
-mnPoGzFhExDF <- data.frame(MEAN_POOLED_FLUIDIGM_HT_GZ = apply(pGzFhCpmDF, 1, mean))
-
-# Mean counts for pooled Fluidigm LT groups
-# All cells
-mnPoFlExDF <- data.frame(MEAN_POOLED_FLUIDIGM_LT = apply(pFlCpmDF, 1, mean))
-
-# Convert gene symbols to Ensembl IDs for Drop-seq
-
-# # All cells
-# dim(mnPoDsExDF)
-# ensDF <- QueryBiomaRt(row.names(mnPoDsExDF), "hgnc_symbol"
-#   , c("hgnc_symbol", "ensembl_gene_id"))
-# mnPoDsExDF <- merge(ensDF, mnPoDsExDF, by.x = "hgnc_symbol", by.y = "row.names")
-# dim(mnPoDsExDF)
-# # GZ
-# dim(mnPoGzDsExDF)
-# ensDF <- QueryBiomaRt(row.names(mnPoGzDsExDF), "hgnc_symbol"
-#   , c("hgnc_symbol", "ensembl_gene_id"))
-# mnPoGzDsExDF <- merge(ensDF, mnPoGzDsExDF, by.x = "hgnc_symbol", by.y = "row.names")
-# dim(mnPoGzDsExDF)
-row.names(mnPoDsExDF) <- Convert_Mixed_GeneSym_EnsID_To_EnsID(row.names(mnPoDsExDF))
-mnPoDsExDF$ensembl_gene_id <- row.names(mnPoDsExDF)
-row.names(mnPoGzDsExDF) <- Convert_Mixed_GeneSym_EnsID_To_EnsID(row.names(mnPoGzDsExDF))
-mnPoGzDsExDF$ensembl_gene_id <- row.names(mnPoGzDsExDF)
-
-## Combine
-
-# Merge bulk and pooled means, include genes not in both
-# Bulk GZ
-names(mnGzBuExDF) <- "MEAN_BULK_GZ"
-mnExDF <- merge(mnBuExDF, mnGzBuExDF, by.x = "row.names"
-  , by.y = "row.names", all = TRUE)
-# DS all cells
-mnExDF <- merge(mnExDF, mnPoDsExDF, by.x = "Row.names"
-  , by.y = "ensembl_gene_id", all = TRUE)
-# DS GZ
-mnExDF <- merge(mnExDF, mnPoGzDsExDF, by.x = "Row.names"
-  , by.y = "ensembl_gene_id", all = TRUE)
-# Pollen
-mnExDF <- merge(mnExDF, mnPoPnExDF, by.x = "Row.names", by.y = "row.names"
-  , all = TRUE)
-# Fluidigm HT all cells
-mnExDF <- merge(mnExDF, mnPoFhExDF, by.x = "Row.names", by.y = "row.names"
-  , all = TRUE)
-# Fluidigm HT GZ
-mnExDF <- merge(mnExDF, mnPoGzFhExDF, by.x = "Row.names", by.y = "row.names"
-  , all = TRUE)
-# Fluidigm LT all cells
-mnExDF <- merge(mnExDF, mnPoFlExDF, by.x = "Row.names", by.y = "row.names"
-  , all = TRUE)
-# Convert NAs to 0s
-mnExDF[is.na(mnExDF)] <- 0
-head(mnExDF)
-
-# Convert ensembl ID to gene symbol and subset to ensembl IDs found in biomaRt
-df <- QueryBiomaRt(mnExDF$Row.names, "ensembl_gene_id"
-  , c("ensembl_gene_id", "hgnc_symbol"))
-mnExDF <- merge(df, mnExDF, by.x = "ensembl_gene_id", by.y = "Row.names")
-# Add gene information
-df <- QueryBiomaRt(mnExDF$ensembl_gene_id, "ensembl_gene_id"
-  , c("ensembl_gene_id", "gene_biotype", "percentage_gc_content"))
-mnExDF <- merge(mnExDF, df, by = "ensembl_gene_id")
-df <- QueryBiomaRt(mnExDF$ensembl_gene_id, "ensembl_gene_id"
-  , c("ensembl_gene_id", "cds_length"))
-# Take longest CDS
-df <- aggregate(cds_length ~ ensembl_gene_id, data = df, max)
-mnExDF <- merge(mnExDF, df, by = "ensembl_gene_id", all = TRUE)
-str(mnExDF)
-head(mnExDF)
-# # Convert ensembl ID to gene symbol
-# df <- EnsemblToGeneSymbol(mnExDF$Row.names)
-# mnExDF$hgnc_symbol <- df$hgnc_symbol[match(mnExDF$Row.names, df$ensembl_gene_id)]
-# head(mnExDF)
-# Convert NAs to 0s
-mnExDF[is.na(mnExDF)] <- 0
-head(mnExDF)
-
-save(list = ls(), file = paste0(outAnalysis, "Workspace.RData"))
-
+## Scatter plots of pooled vs bulk with fit and spearman
 # Format for ggplot
-df1 <- melt(mnExDF[c("MEAN_BULK", "MEAN_BULK_GZ", "MEAN_POOLED_DROPSEQ"
-  , "MEAN_POOLED_FLUIDIGM_HT", "MEAN_POOLED_FLUIDIGM_LT")]
-  , measure.vars = c("MEAN_POOLED_DROPSEQ"
-  , "MEAN_POOLED_FLUIDIGM_HT", "MEAN_POOLED_FLUIDIGM_LT"))
-df2 <- melt(mnExDF[c("MEAN_BULK", "MEAN_BULK_GZ", "MEAN_POOLED_DROPSEQ_GZ"
-  , "MEAN_POOLED_POLLEN", "MEAN_POOLED_FLUIDIGM_HT_GZ")]
-  , measure.vars = c("MEAN_POOLED_DROPSEQ_GZ"
-  , "MEAN_POOLED_POLLEN", "MEAN_POOLED_FLUIDIGM_HT_GZ"))
-df2$MEAN_BULK <- df2$MEAN_BULK_GZ
+df1 <- melt(mnExDF[
+      c("Bulk", "Bulk_GZ", "Dropseq", "Fluidigm_HT", "Fluidigm_LT")
+      ]
+    , measure.vars = c("Dropseq", "Fluidigm_HT", "Fluidigm_LT")
+  )
+df2 <- melt(mnExDF[
+    c("Bulk", "Bulk_GZ", "Dropseq_GZ" "Pollen", "Fluidigm_HT_GZ")
+  ]
+  , measure.vars = c("Dropseq_GZ", "Pollen", "Fluidigm_HT_GZ")
+)
+df2$Bulk <- df2$Bulk_GZ
 ggDF <- rbind(df1, df2)
 # Spearman
 sprL <- lapply(split(ggDF, ggDF$variable), function(df) {
-  cor(df$MEAN_BULK, df$value, method = "spearman")})
+  cor(df$Bulk, df$value, method = "spearman")})
 sprL <- lapply(sprL, round, 2)
 ggDF$value <- log(ggDF$value + 1, 2)
-ggDF$MEAN_BULK <- log(ggDF$MEAN_BULK + 1, 2)
+ggDF$Bulk <- log(ggDF$Bulk + 1, 2)
 labelsDatasetSpr <- c(paste0(unique(ggDF$variable), "\nSpearman: ", sprL))
 names(labelsDatasetSpr) <- unique(ggDF$variable)
 # ggplot
-ggplot(ggDF, aes(x = value, y = MEAN_BULK)) +
+ggplot(ggDF, aes(x = value, y = Bulk, color = variable)) +
   facet_wrap("variable", ncol = 2
     , labeller = labeller(variable = labelsDatasetSpr)) +
   geom_point(alpha = 0.15, shape = 1, size = 0.25) +
-  stat_smooth() +
+  stat_smooth(col = "black") +
   ylab("Bulk: log2(mean CPM + 1)") +
   xlab("Pooled: log2(mean CPM + 1)") +
   ggtitle(paste0(graphCodeTitle
@@ -813,160 +808,44 @@ ggplot(ggDF, aes(x = value, y = MEAN_BULK)) +
     , "\nMean of CPM across samples and pools"))
 ggsave(paste0(outGraph, "Scatter.png"), dpi = 600, width = 6.5, height = 12)
 
-## Drop-seq union genes versus intersection genes
-# Intersection (only genes in both)
-mnBothDF <- merge(mnBuExDF, mnPoDsExDF, by.x = "row.names"
-  , by.y = "ensembl_gene_id")
-# Convert NAs to 0s
-mnBothDF[is.na(mnBothDF)] <- 0
-# Spearman correlation
-# Union
-sprUn <- round(cor(mnExDF$MEAN_BULK, mnExDF$MEAN_POOLED_DROPSEQ
-  , method = "spearman"), 2)
-sprUn
-# Intersection
-sprIn <- round(cor(mnBothDF$MEAN_BULK, mnBothDF$MEAN_POOLED
-  , method = "spearman"), 2)
-sprIn
-# Format for ggplot2
-df1 <- data.frame(Pooled = log(mnExDF$MEAN_BULK + 1, 2)
-  , Bulk = log(mnExDF$MEAN_POOLED_DROPSEQ + 1, 2))
-df1$DATASET <- "Union genes"
-df2 <- data.frame(Pooled = log(mnBothDF$MEAN_BULK + 1, 2)
-  , Bulk = log(mnBothDF$MEAN_POOLED + 1, 2))
-df2$DATASET <- "Intersection genes"
-ggDF <- rbind(df1, df2)
-# Add spearman to labels
-sprL <- c(sprUn, sprIn)
-labelsDatasetSpr <- c(paste0(unique(ggDF$DATASET), "\nSpearman: ", sprL))
-names(labelsDatasetSpr) <- unique(ggDF$DATASET)
-# ggplot
-ggplot(ggDF, aes(x = Pooled, y = Bulk, col = DATASET)) +
-  facet_wrap("DATASET", ncol = 2
-    , labeller = labeller(DATASET = labelsDatasetSpr)) +
-  geom_point(alpha = 0.5, shape = 1, size = 0.25) +
-  stat_smooth(col = "black") +
-  scale_color_manual(values = c("#e41a1c", "#377eb8")) +
-  theme(legend.position = "none") +
-  ylab("Bulk: log2(Mean CPM + 1)") +
-  xlab("Pooled: log2(Mean CPM + 1)") +
-  ggtitle(paste0(graphCodeTitle
-    , "\n"
-    , "\nPooled Drop-seq vs Bulk RNAseq"
-    , "\n"
-    , "\nIntersection (genes only detected in both) or union (genes in either)"
-    , "\nHuman Fetal Brain CP + GZ"
-    , "\nMean of CPM across samples and pools"))
-ggsave(paste0(outGraph, "ScatterIntersectionUnion.png"), width = 8, height = 5
-  , dpi = 600)
-################################################################################
-
-### Subset to higher in pooled or higher in bulk
-
-# log2(mean CPM + 1)
-l2MnCpmDF <- data.frame(ENSEMBL_ID = mnExDF$ensembl_gene_id
-  , HGNC_SYMBOL = mnExDF$hgnc_symbol
-  , MEAN_POOLED_DROPSEQ = log(mnExDF$MEAN_POOLED_DROPSEQ + 1, 2)
-  , MEAN_POOLED_DROPSEQ_GZ = log(mnExDF$MEAN_POOLED_DROPSEQ_GZ + 1, 2)
-  , MEAN_POOLED_POLLEN = log(mnExDF$MEAN_POOLED_POLLEN + 1, 2)
-  , MEAN_POOLED_FLUIDIGM_HT = log(mnExDF$MEAN_POOLED_FLUIDIGM_HT + 1, 2)
-  , MEAN_POOLED_FLUIDIGM_HT_GZ = log(mnExDF$MEAN_POOLED_FLUIDIGM_HT_GZ + 1, 2)
-  , MEAN_POOLED_FLUIDIGM_LT = log(mnExDF$MEAN_POOLED_FLUIDIGM_LT + 1, 2)
-  , MEAN_BULK = log(mnExDF$MEAN_BULK + 1, 2)
-  , MEAN_BULK_GZ = log(mnExDF$MEAN_BULK_GZ + 1, 2))
-
-# Ratio pooled vs bulk
-l2MnCpmDF$RATIO_DROPSEQ <- l2MnCpmDF$MEAN_POOLED_DROPSEQ - l2MnCpmDF$MEAN_BULK
-l2MnCpmDF$RATIO_DROPSEQ_GZ <- l2MnCpmDF$MEAN_POOLED_DROPSEQ_GZ - l2MnCpmDF$MEAN_BULK_GZ
-l2MnCpmDF$RATIO_POLLEN <- l2MnCpmDF$MEAN_POOLED_POLLEN - l2MnCpmDF$MEAN_BULK_GZ
-l2MnCpmDF$RATIO_FLUIDIGM_HT <- l2MnCpmDF$MEAN_POOLED_FLUIDIGM_HT - l2MnCpmDF$MEAN_BULK
-l2MnCpmDF$RATIO_FLUIDIGM_HT_GZ <- l2MnCpmDF$MEAN_POOLED_FLUIDIGM_HT_GZ - l2MnCpmDF$MEAN_BULK_GZ
-l2MnCpmDF$RATIO_FLUIDIGM_LT <- l2MnCpmDF$MEAN_POOLED_FLUIDIGM_LT - l2MnCpmDF$MEAN_BULK
-
-# # Subset to genes not detected in pooled and top 10% quantile in bulk
-# # ssP0b20df <- subset(l2MnCpmDF, BULK >= quantile(BULK, 0.9) & POOLED == 0)
-# ssPlBhdf <- subset(l2MnCpmDF, BULK >= quantile(BULK, 0.6) & POOLED <= quantile(POOLED, 0.4))
-# ssPlBhdf <- subset(l2MnCpmDF, RATIO >= quantile(RATIO, 0.1, na.rm = TRUE))
-# # ssPlBhdf <- subset(l2MnCpmDF, RATIO < (mean(RATIO) - 2*sd(RATIO)) & BULK >= quantile(BULK, 0.75))
-
-# Subset
-ssl2MnCpmDF <- l2MnCpmDF
-ssl2MnCpmDF$SUBSET_DROPSEQ <- "All other genes"
-idxDF <- Subset_Two_SD(l2MnCpmDF$RATIO_DROPSEQ)
-ssl2MnCpmDF$SUBSET_DROPSEQ[idxDF$HIGH_POOL] <- "Pool high"
-ssl2MnCpmDF$SUBSET_DROPSEQ[idxDF$HIGH_BULK] <- "Bulk high"
-
-ssl2MnCpmDF$SUBSET_DROPSEQ_0 <- "All other genes"
-ssl2MnCpmDF$SUBSET_DROPSEQ_0[ssl2MnCpmDF$MEAN_BULK == 0 & ssl2MnCpmDF$SUBSET_DROPSEQ == "Pool high"] <- "Pool high"
-ssl2MnCpmDF$SUBSET_DROPSEQ_0[ssl2MnCpmDF$MEAN_POOLED_DROPSEQ == 0 & ssl2MnCpmDF$SUBSET_DROPSEQ == "Bulk high"] <- "Bulk high"
-
-ssl2MnCpmDF$SUBSET_FLUIDIGM_HT <- "All other genes"
-idxDF <- Subset_Two_SD(l2MnCpmDF$RATIO_FLUIDIGM_HT)
-ssl2MnCpmDF$SUBSET_FLUIDIGM_HT[idxDF$HIGH_POOL] <- "Pool high"
-ssl2MnCpmDF$SUBSET_FLUIDIGM_HT[idxDF$HIGH_BULK] <- "Bulk high"
-
-ssl2MnCpmDF$SUBSET_FLUIDIGM_LT <- "All other genes"
-idxDF <- Subset_Two_SD(l2MnCpmDF$RATIO_FLUIDIGM_LT)
-ssl2MnCpmDF$SUBSET_FLUIDIGM_LT[idxDF$HIGH_POOL] <- "Pool high"
-ssl2MnCpmDF$SUBSET_FLUIDIGM_LT[idxDF$HIGH_BULK] <- "Bulk high"
-
-ssl2MnCpmDF$SUBSET_DROPSEQ_GZ <- "All other genes"
-idxDF <- Subset_Two_SD(l2MnCpmDF$RATIO_DROPSEQ_GZ)
-ssl2MnCpmDF$SUBSET_DROPSEQ_GZ[idxDF$HIGH_POOL] <- "Pool high"
-ssl2MnCpmDF$SUBSET_DROPSEQ_GZ[idxDF$HIGH_BULK] <- "Bulk high"
-
-ssl2MnCpmDF$SUBSET_FLUIDIGM_HT_GZ <- "All other genes"
-idxDF <- Subset_Two_SD(l2MnCpmDF$RATIO_FLUIDIGM_HT_GZ)
-ssl2MnCpmDF$SUBSET_FLUIDIGM_HT_GZ[idxDF$HIGH_POOL] <- "Pool high"
-ssl2MnCpmDF$SUBSET_FLUIDIGM_HT_GZ[idxDF$HIGH_BULK] <- "Bulk high"
-
-ssl2MnCpmDF$SUBSET_POLLEN <- "All other genes"
-idxDF <- Subset_Two_SD(l2MnCpmDF$RATIO_POLLEN)
-ssl2MnCpmDF$SUBSET_POLLEN[idxDF$HIGH_POOL] <- "Pool high"
-ssl2MnCpmDF$SUBSET_POLLEN[idxDF$HIGH_BULK] <- "Bulk high"
-
-## Table of number of genes in each subset
-df <- cbind(data.frame(table(ssl2MnCpmDF$SUBSET_DROPSEQ))
-  , data.frame(table(ssl2MnCpmDF$SUBSET_DROPSEQ_0))[ ,2]
-  , data.frame(table(ssl2MnCpmDF$SUBSET_FLUIDIGM_HT))[ ,2]
-  , data.frame(table(ssl2MnCpmDF$SUBSET_FLUIDIGM_LT))[ ,2]
-  , data.frame(table(ssl2MnCpmDF$SUBSET_DROPSEQ_GZ))[ ,2]
-  , data.frame(table(ssl2MnCpmDF$SUBSET_FLUIDIGM_HT_GZ))[ ,2]
-  , data.frame(table(ssl2MnCpmDF$SUBSET_POLLEN))[ ,2])
-colnames(df) <- c("GENE_SET", "DROPSEQ", "DROPSEQ_0", "FLUIDIGM_HT"
-  , "FLUIDIGM_LT", "DROP_SEQ_GZ", "FLUIDIGM_HT_GZ", "POLLEN")
+## Table of number of genes biased toward bulk or single-cell
+dfl1 <- lapply(names(bias_flag_DF), function(name){
+  y <- bias_flag_DF[name]
+  df1 <- data.frame(table(y))
+  row.names(df1) <- df1$y
+  df1 <- df1[ -1]
+  names(df1) <- name
+  return(df1)
+})
+df1 <- do.call("cbind", dfl1)
 write.csv(df, file = paste0(outTable, "_NumberGenesSubset.csv"), quote = FALSE)
 
-## Plot subset scatter plots
-# Format for ggplot
-df1 <- ssl2MnCpmDF[c("MEAN_BULK", "MEAN_POOLED_DROPSEQ", "SUBSET_DROPSEQ")]
-names(df1)[2:3] <- c("MEAN_POOLED", "SUBSET")
-df1$DATASET <- "DROPSEQ"
-df7 <- ssl2MnCpmDF[c("MEAN_BULK", "MEAN_POOLED_DROPSEQ", "SUBSET_DROPSEQ_0")]
-names(df7)[2:3] <- c("MEAN_POOLED", "SUBSET")
-df7$DATASET <- "DROPSEQ_0"
-df2 <- ssl2MnCpmDF[c("MEAN_BULK", "MEAN_POOLED_FLUIDIGM_HT", "SUBSET_FLUIDIGM_HT")]
-names(df2)[2:3] <- c("MEAN_POOLED", "SUBSET")
-df2$DATASET <- "FLUIDIGM_HT"
-df3 <- ssl2MnCpmDF[c("MEAN_BULK", "MEAN_POOLED_FLUIDIGM_LT", "SUBSET_FLUIDIGM_LT")]
-names(df3)[2:3] <- c("MEAN_POOLED", "SUBSET")
-df3$DATASET <- "FLUIDIGM_LT"
-df4 <- ssl2MnCpmDF[c("MEAN_BULK_GZ", "MEAN_POOLED_DROPSEQ_GZ", "SUBSET_DROPSEQ_GZ")]
-names(df4)[1:3] <- c("MEAN_BULK", "MEAN_POOLED", "SUBSET")
-df4$DATASET <- "DROPSEQ_GZ"
-df5 <- ssl2MnCpmDF[c("MEAN_BULK_GZ", "MEAN_POOLED_FLUIDIGM_HT_GZ", "SUBSET_FLUIDIGM_HT_GZ")]
-names(df5)[1:3] <- c("MEAN_BULK", "MEAN_POOLED", "SUBSET")
-df5$DATASET <- "FLUIDIGM_HT_GZ"
-df6 <- ssl2MnCpmDF[c("MEAN_BULK_GZ", "MEAN_POOLED_POLLEN", "SUBSET_POLLEN")]
-names(df6)[1:3] <- c("MEAN_BULK", "MEAN_POOLED", "SUBSET")
-df6$DATASET <- "POLLEN"
-# Rbind
-ggDF <- rbind(df1, df7, df2, df3, df4, df5, df6)
-# ggplot
-ggplot(ggDF, aes(x = MEAN_POOLED, y = MEAN_BULK)) +
-  facet_wrap("DATASET", ncol = 2) +
-  geom_point(alpha = 0.15, shape = 1, size = 0.25, aes(col = SUBSET)) +
-  scale_colour_manual(values = c("#bdbdbd","#1f78b4", "#e31a1c")) +
+## Plot subset scatter plots and density plots
+ldf1 <- lapply(c("Dropseq", "Fluidigm_HT", "Fluidigm_LT"), function(name){
+  data.frame(
+    Mean_Pooled = log2_mean_cpm_DF[[name]]
+    , Mean_Bulk = log2_mean_cpm_DF$Bulk
+    , Subset = bias_flag_DF[[name]]
+    , Dataset = name
+  )
+})
+ldf2 <- lapply(c("Dropseq_GZ", "Fluidigm_HT_GZ", "Pollen"), function(name){
+  data.frame(
+    Mean_Pooled = log2_mean_cpm_DF[[name]]
+    , Mean_Bulk = log2_mean_cpm_DF$Bulk_GZ
+    , Subset = bias_flag_DF[[name]]
+    , Dataset = name
+  )
+})
+ggDF <- rbind(do.call("rbind", ldf1)
+  , do.call("rbind", ldf2)
+)
+# scatter
+ggplot(ggDF, aes(x = Mean_Pooled, y = Mean_Bulk)) +
+  facet_wrap("Dataset", ncol = 2) +
+  geom_point(alpha = 0.15, shape = 16, size = 0.25, aes(color = Subset)) +
+  scale_colour_manual(values = c("#e31a1c", "#bdbdbd", "#1f78b4")) +
+  guides(colour = guide_legend(override.aes = list(size = 3))) +
   ylab("Bulk: log2(Mean CPM + 1)") +
   xlab("Pooled: log2(Mean CPM + 1)") +
   ggtitle(paste0(graphCodeTitle
@@ -976,14 +855,12 @@ ggplot(ggDF, aes(x = MEAN_POOLED, y = MEAN_BULK)) +
     , "\nHuman fetal brain GZ and CP"
     , "\nMean of CPM across samples and pools"
     , "\nSubset 2 SD from mean ratio of pooled vs bulk"))
-ggsave(paste0(outGraph, "ScatterSubset.png"), dpi = 600, width = 8, height = 12)
-
-## Plot subset density plot
-
+ggsave(paste0(outGraph, "ScatterSubset.png"), dpi = 150, width = 6, height = 9)
+# density plot
 ggDF <- melt(ggDF)
 ggplot(ggDF, aes(x = value)) +
-  facet_grid(variable ~ DATASET) +
-  geom_density(aes(col = SUBSET)) +
+  facet_grid(variable ~ Dataset) +
+  geom_density(aes(col = Subset)) +
   scale_colour_manual(values = c("grey","#1f78b4", "#e31a1c")) +
   coord_cartesian(ylim = c(0, 1)) +
   ylab("Density") +
@@ -997,7 +874,72 @@ ggplot(ggDF, aes(x = value)) +
     , "\nSubset 2 SD from mean ratio of pooled vs bulk"))
 ggsave(paste0(outGraph, "DensitySubset.pdf"), width = 14, height = 8)
 
-save(list = ls(), file = paste0(outAnalysis, "Workspace.RData"))
+## Venn diagrams of gene intersections high in bulk or high in pooled
+pdf(paste0(outGraph, "VennDiagrams.pdf"))
+  Venn_Diagram_3_Wrapper(
+    datasets = c("Dropseq", "Fluidigm_HT", "Fluidigm_LT")
+    , bias_direction = "Bulk high"
+  )
+  Venn_Diagram_3_Wrapper(
+    datasets = c("Dropseq", "Fluidigm_HT", "Fluidigm_LT")
+    , bias_direction = "Pool high"
+  )
+  Venn_Diagram_3_Wrapper(
+    datasets = c("Dropseq_GZ", "Fluidigm_HT_GZ", "Pollen")
+    , bias_direction = "Bulk high"
+  )
+  Venn_Diagram_3_Wrapper(
+    datasets = c("Dropseq_GZ", "Fluidigm_HT_GZ", "Pollen")
+    , bias_direction = "Pool high"
+  )
+dev.off()
+
+# ## Drop-seq union genes versus intersection genes
+# # Intersection (only genes in both)
+# mnBothDF <- merge(mean_bulk_ex_DF, mnPods_ex_DF, by.x = "row.names"
+#   , by.y = "ensembl_gene_id")
+# # Convert NAs to 0s
+# mnBothDF[is.na(mnBothDF)] <- 0
+# # Spearman correlation
+# # Union
+# sprUn <- round(cor(mnExDF$Mean_Bulk, mnExDF$MEAN_POOLED_DROPSEQ
+#   , method = "spearman"), 2)
+# sprUn
+# # Intersection
+# sprIn <- round(cor(mnBothDF$Mean_Bulk, mnBothDF$MEAN_POOLED
+#   , method = "spearman"), 2)
+# sprIn
+# # Format for ggplot2
+# df1 <- data.frame(Pooled = log(mnExDF$Mean_Bulk + 1, 2)
+#   , Bulk = log(mnExDF$MEAN_POOLED_DROPSEQ + 1, 2))
+# df1$DATASET <- "Union genes"
+# df2 <- data.frame(Pooled = log(mnBothDF$Mean_Bulk + 1, 2)
+#   , Bulk = log(mnBothDF$MEAN_POOLED + 1, 2))
+# df2$DATASET <- "Intersection genes"
+# ggDF <- rbind(df1, df2)
+# # Add spearman to labels
+# sprL <- c(sprUn, sprIn)
+# labelsDatasetSpr <- c(paste0(unique(ggDF$DATASET), "\nSpearman: ", sprL))
+# names(labelsDatasetSpr) <- unique(ggDF$DATASET)
+# # ggplot
+# ggplot(ggDF, aes(x = Pooled, y = Bulk, col = DATASET)) +
+#   facet_wrap("DATASET", ncol = 2
+#     , labeller = labeller(DATASET = labelsDatasetSpr)) +
+#   geom_point(alpha = 0.5, shape = 1, size = 0.25) +
+#   stat_smooth(col = "black") +
+#   scale_color_manual(values = c("#e41a1c", "#377eb8")) +
+#   theme(legend.position = "none") +
+#   ylab("Bulk: log2(Mean CPM + 1)") +
+#   xlab("Pooled: log2(Mean CPM + 1)") +
+#   ggtitle(paste0(graphCodeTitle
+#     , "\n"
+#     , "\nPooled Drop-seq vs Bulk RNAseq"
+#     , "\n"
+#     , "\nIntersection (genes only detected in both) or union (genes in either)"
+#     , "\nHuman Fetal Brain CP + GZ"
+#     , "\nMean of CPM across samples and pools"))
+# ggsave(paste0(outGraph, "ScatterIntersectionUnion.png"), width = 8, height = 5
+#   , dpi = 600)
 ################################################################################
 
 ### Gene Biotype frequency
@@ -1049,317 +991,127 @@ ggplot(ggDF, aes(x = BIOTYPE, y = value)) +
 ggsave(paste0(outGraph, "Biotypes.pdf"), width = 8, height = 8)
 ################################################################################
 
-### Gene intersections high in bulk or high in pooled
-
-Venn_Diagram_3 <- function (v1, v2, v3, labels, title) {
-  print(length(intersect(v1, intersect(v2, v3))))
-  venn <- euler(c(
-    "A" = length(v1)
-    , "B" = length(v2)
-    , "C" = length(v3)
-    , "A&B" = length(intersect(v1, v2))
-    , "A&C" = length(intersect(v1, v3))
-    , "B&C" = length(intersect(v2, v3))
-    , "A&B&C" = length(intersect(v1, intersect(v2, v3)))))
-  plot(venn, counts = TRUE, labels = labels
-    , fill = c("#e41a1c", "#377eb8", "#4daf4a")
-    , main = paste0(graphCodeTitle
-      , "\n"
-      , "\n", title
-      , "\n"
-      , "\nHuman fetal brain"))
-}
-Venn_Diagram_4 <- function (v1, v2, v3, v4, labels, title) {
-  print(length(intersect(v4, intersect(v1, intersect(v2, v3)))))
-  venn <- euler(c(
-    "A" = length(v1)
-    , "B" = length(v2)
-    , "C" = length(v3)
-    , "D" = length(v4)
-    , "A&B" = length(intersect(v1, v2))
-    , "A&C" = length(intersect(v1, v3))
-    , "A&D" = length(intersect(v1, v4))
-    , "B&C" = length(intersect(v2, v3))
-    , "B&D" = length(intersect(v2, v4))
-    , "C&D" = length(intersect(v3, v4))
-    , "A&B&C" = length(intersect(v1, intersect(v2, v3)))
-    , "A&B&D" = length(intersect(v1, intersect(v2, v4)))
-    , "B&C&D" = length(intersect(v2, intersect(v3, v4)))
-    , "A&B&C&D" = length(intersect(v1, intersect(v2, intersect(v3, v4))))
-    ))
-  plot(venn, counts = TRUE, labels = labels
-    , fill = c("#e41a1c", "#377eb8", "#4daf4a", "#984ea3")
-    , main = paste0(graphCodeTitle
-      , "\n"
-      , "\n", title
-      , "\n"
-      , "\nHuman fetal brain"))
-}
-
-pdf(paste0(outGraph, "VennDiagrams.pdf"))
-# GZ
-# Bulk high
-Venn_Diagram_3(
-  ssl2MnCpmDF[ssl2MnCpmDF$SUBSET_DROPSEQ_GZ == "Bulk high", ]$ENSEMBL_ID
-  , ssl2MnCpmDF[ssl2MnCpmDF$SUBSET_FLUIDIGM_HT_GZ == "Bulk high", ]$ENSEMBL_ID
-  , ssl2MnCpmDF[ssl2MnCpmDF$SUBSET_POLLEN == "Bulk high", ]$ENSEMBL_ID
-  , c("Drop-seq GZ", "Fluidigm HT GZ", "Pollen")
-  , "Genes high in bulk versus pooled"
-)
-# Pool high
-Venn_Diagram_3(
-  ssl2MnCpmDF[ssl2MnCpmDF$SUBSET_DROPSEQ_GZ == "Pool high", ]$ENSEMBL_ID
-  , ssl2MnCpmDF[ssl2MnCpmDF$SUBSET_FLUIDIGM_HT_GZ == "Pool high", ]$ENSEMBL_ID
-  , ssl2MnCpmDF[ssl2MnCpmDF$SUBSET_POLLEN == "Pool high", ]$ENSEMBL_ID
-  , c("Drop-seq GZ", "Fluidigm HT GZ", "Pollen")
-  , "Genes high in pool versus bulk"
-)
-# GZ CP
-# Bulk high
-Venn_Diagram_3(
-  ssl2MnCpmDF[ssl2MnCpmDF$SUBSET_DROPSEQ == "Bulk high", ]$ENSEMBL_ID
-  , ssl2MnCpmDF[ssl2MnCpmDF$SUBSET_FLUIDIGM_HT == "Bulk high", ]$ENSEMBL_ID
-  , ssl2MnCpmDF[ssl2MnCpmDF$SUBSET_FLUIDIGM_LT == "Bulk high", ]$ENSEMBL_ID
-  , c("Drop-seq", "Fluidigm HT", "Fluidigm LT")
-  , "Genes high in bulk versus pooled"
-)
-# Pool high
-Venn_Diagram_3(
-  ssl2MnCpmDF[ssl2MnCpmDF$SUBSET_DROPSEQ == "Pool high", ]$ENSEMBL_ID
-  , ssl2MnCpmDF[ssl2MnCpmDF$SUBSET_FLUIDIGM_HT == "Pool high", ]$ENSEMBL_ID
-  , ssl2MnCpmDF[ssl2MnCpmDF$SUBSET_FLUIDIGM_LT == "Pool high", ]$ENSEMBL_ID
-  , c("Drop-seq", "Fluidigm HT", "Fluidigm LT")
-  , "Genes high in pool versus bulk"
-)
-# Drop-seq GZ CP + Pollen
-Venn_Diagram_3(
-  ssl2MnCpmDF[ssl2MnCpmDF$SUBSET_DROPSEQ == "Bulk high", ]$ENSEMBL_ID
-  , ssl2MnCpmDF[ssl2MnCpmDF$SUBSET_DROPSEQ_GZ == "Bulk high", ]$ENSEMBL_ID
-  , ssl2MnCpmDF[ssl2MnCpmDF$SUBSET_POLLEN == "Bulk high", ]$ENSEMBL_ID
-  , c("Drop-seq", "Drop-seq GZ", "Pollen")
-  , "Genes high in Bulk versus pool"
-)
-Venn_Diagram_3(
-  ssl2MnCpmDF[ssl2MnCpmDF$SUBSET_DROPSEQ == "Bulk high", ]$ENSEMBL_ID
-  , ssl2MnCpmDF[ssl2MnCpmDF$SUBSET_DROPSEQ_GZ == "Bulk high", ]$ENSEMBL_ID
-  , ssl2MnCpmDF[ssl2MnCpmDF$SUBSET_POLLEN == "Bulk high", ]$ENSEMBL_ID
-  , c("Drop-seq", "Drop-seq GZ", "Pollen")
-  , "Genes high in Bulk versus pool"
-)
-# Fluidigm HT GZ CP + Pollen
-Venn_Diagram_3(
-  ssl2MnCpmDF[ssl2MnCpmDF$SUBSET_FLUIDIGM_HT == "Pool high", ]$ENSEMBL_ID
-  , ssl2MnCpmDF[ssl2MnCpmDF$SUBSET_FLUIDIGM_HT_GZ == "Pool high", ]$ENSEMBL_ID
-  , ssl2MnCpmDF[ssl2MnCpmDF$SUBSET_POLLEN == "Pool high", ]$ENSEMBL_ID
-  , c("Fluidigm HT", "Fluidigm HT GZ", "Pollen")
-  , "Genes high in pool versus bulk"
-)
-Venn_Diagram_3(
-  ssl2MnCpmDF[ssl2MnCpmDF$SUBSET_FLUIDIGM_HT == "Pool high", ]$ENSEMBL_ID
-  , ssl2MnCpmDF[ssl2MnCpmDF$SUBSET_FLUIDIGM_HT_GZ == "Pool high", ]$ENSEMBL_ID
-  , ssl2MnCpmDF[ssl2MnCpmDF$SUBSET_POLLEN == "Pool high", ]$ENSEMBL_ID
-  , c("Fluidigm HT", "Fluidigm HT GZ", "Pollen")
-  , "Genes high in pool versus bulk"
-)
-# Drop-seq + Fluidigm LT GZ CP + Pollen
-Venn_Diagram_3(
-  ssl2MnCpmDF[ssl2MnCpmDF$SUBSET_FLUIDIGM_HT == "Pool high", ]$ENSEMBL_ID
-  , ssl2MnCpmDF[ssl2MnCpmDF$SUBSET_FLUIDIGM_LT == "Pool high", ]$ENSEMBL_ID
-  , ssl2MnCpmDF[ssl2MnCpmDF$SUBSET_POLLEN == "Pool high", ]$ENSEMBL_ID
-  , c("Drop-seq", "Fluidigm LT", "Pollen")
-  , "Genes high in pool versus bulk"
-)
-Venn_Diagram_3(
-  ssl2MnCpmDF[ssl2MnCpmDF$SUBSET_FLUIDIGM_HT == "Pool high", ]$ENSEMBL_ID
-  , ssl2MnCpmDF[ssl2MnCpmDF$SUBSET_FLUIDIGM_LT == "Pool high", ]$ENSEMBL_ID
-  , ssl2MnCpmDF[ssl2MnCpmDF$SUBSET_POLLEN == "Pool high", ]$ENSEMBL_ID
-  , c("Drop-seq", "Fluidigm LT", "Pollen")
-  , "Genes high in pool versus bulk"
-)
-# # Drop-seq GZ, Fluidigm HT GZ, Fluidigm LT, Pollen
-#   # Bulk high
-# Venn_Diagram_4(
-#   ssl2MnCpmDF[ssl2MnCpmDF$SUBSET_DROPSEQ_GZ == "Bulk high", ]$ENSEMBL_ID
-#   , ssl2MnCpmDF[ssl2MnCpmDF$SUBSET_FLUIDIGM_HT_GZ == "Bulk high", ]$ENSEMBL_ID
-#   , ssl2MnCpmDF[ssl2MnCpmDF$SUBSET_FLUIDIGM_LT == "Bulk high", ]$ENSEMBL_ID
-#   , ssl2MnCpmDF[ssl2MnCpmDF$SUBSET_POLLEN == "Bulk high", ]$ENSEMBL_ID
-#   , c("Drop-seq GZ", "Fluidigm HT GZ", "Fluidigm LT", "Pollen")
-#   , "Genes high in bulk versus pooled"
-# )
-#   # Pool high
-# Venn_Diagram_4(
-#   ssl2MnCpmDF[ssl2MnCpmDF$SUBSET_DROPSEQ_GZ == "Pool high", ]$ENSEMBL_ID
-#   , ssl2MnCpmDF[ssl2MnCpmDF$SUBSET_FLUIDIGM_HT_GZ == "Pool high", ]$ENSEMBL_ID
-#   , ssl2MnCpmDF[ssl2MnCpmDF$SUBSET_FLUIDIGM_LT == "Pool high", ]$ENSEMBL_ID
-#   , ssl2MnCpmDF[ssl2MnCpmDF$SUBSET_POLLEN == "Pool high", ]$ENSEMBL_ID
-#   , c("Drop-seq GZ", "Fluidigm HT GZ", "Fluidigm LT", "Pollen")
-#   , "Genes high in pool versus bulk"
-# )
-dev.off()
-
-intersect(ssl2MnCpmDF[ssl2MnCpmDF$SUBSET_FLUIDIGM_LT == "Bulk high", ]$ENSEMBL_ID
-, ssl2MnCpmDF[ssl2MnCpmDF$SUBSET_POLLEN == "Bulk high", ]$ENSEMBL_ID)
-################################################################################
-
 ### GC, length, MT genes, brain expressed, and biotype of gene intersections
 ### high in bulk or pooled
 
-# Intersect Dropseq GZ, Fluidigm HT GZ, Pollen
-ssl2MnCpmDF$SINGLE_CELL_BIAS_GZ <- "All other genes"
-ssl2MnCpmDF$SINGLE_CELL_BIAS_GZ[
-  ssl2MnCpmDF$SUBSET_DROPSEQ_GZ == "Bulk high" &
-    ssl2MnCpmDF$SUBSET_FLUIDIGM_HT_GZ == "Bulk high" &
-    ssl2MnCpmDF$SUBSET_POLLEN == "Bulk high"] <- "Bulk high"
-ssl2MnCpmDF$SINGLE_CELL_BIAS_GZ[
-  ssl2MnCpmDF$SUBSET_DROPSEQ_GZ == "Pool high" &
-    ssl2MnCpmDF$SUBSET_FLUIDIGM_HT_GZ == "Pool high" &
-    ssl2MnCpmDF$SUBSET_POLLEN == "Pool high"] <- "Pool high"
-
-# Intersect Dropseq, Fluidigm HT, Fluidigm LT
-ssl2MnCpmDF$SINGLE_CELL_BIAS <- "All other genes"
-ssl2MnCpmDF$SINGLE_CELL_BIAS[
-  ssl2MnCpmDF$SUBSET_DROPSEQ == "Bulk high" &
-    ssl2MnCpmDF$SUBSET_FLUIDIGM_HT == "Bulk high" &
-    ssl2MnCpmDF$SUBSET_FLUIDIGM_LT == "Bulk high"] <- "Bulk high"
-ssl2MnCpmDF$SINGLE_CELL_BIAS[
-  ssl2MnCpmDF$SUBSET_DROPSEQ == "Pool high" &
-    ssl2MnCpmDF$SUBSET_FLUIDIGM_HT == "Pool high" &
-    ssl2MnCpmDF$SUBSET_FLUIDIGM_LT == "Pool high"] <- "Pool high"
-
-# # Dropseq GZ, Fluidigm HT GZ, Fluidigm LT, Exclude Pollen
-# ssl2MnCpmDF$LAB_BIAS_GESCHWIND <- "All other genes"
-# ssl2MnCpmDF$LAB_BIAS_GESCHWIND[
-#   ssl2MnCpmDF$SUBSET_DROPSEQ_GZ == "Bulk high" &
-#     ssl2MnCpmDF$SUBSET_FLUIDIGM_HT_GZ == "Bulk high" &
-#     ssl2MnCpmDF$SUBSET_FLUIDIGM_LT == "Bulk high" &
-#     ! ssl2MnCpmDF$SUBSET_POLLEN == "Bulk high"] <- "Bulk high"
-# ssl2MnCpmDF$LAB_BIAS_GESCHWIND[
-#   ssl2MnCpmDF$SUBSET_DROPSEQ_GZ == "Pool high" &
-#     ssl2MnCpmDF$SUBSET_FLUIDIGM_HT_GZ == "Pool high" &
-#     ssl2MnCpmDF$SUBSET_FLUIDIGM_LT == "Pool high" &
-#     ! ssl2MnCpmDF$SUBSET_POLLEN == "Pool high"] <- "Pool high"
-#
-# # Include Pollen, Exclude Dropseq GZ, Fluidigm HT GZ, Fluidigm LT
-# ssl2MnCpmDF$LAB_BIAS_POLLEN <- "All other genes"
-# ssl2MnCpmDF$LAB_BIAS_POLLEN[
-#   ! ssl2MnCpmDF$SUBSET_DROPSEQ_GZ == "Bulk high" &
-#     ! ssl2MnCpmDF$SUBSET_FLUIDIGM_HT_GZ == "Bulk high" &
-#     ! ssl2MnCpmDF$SUBSET_FLUIDIGM_LT == "Bulk high" &
-#     ssl2MnCpmDF$SUBSET_POLLEN == "Bulk high"] <- "Bulk high"
-# ssl2MnCpmDF$LAB_BIAS_POLLEN[
-#   ! ssl2MnCpmDF$SUBSET_DROPSEQ_GZ == "Pool high" &
-#     ! ssl2MnCpmDF$SUBSET_FLUIDIGM_HT_GZ == "Pool high" &
-#     ! ssl2MnCpmDF$SUBSET_FLUIDIGM_LT == "Pool high" &
-#     ssl2MnCpmDF$SUBSET_POLLEN == "Pool high"] <- "Pool high"
-#
-# # Include Drop-seq, Exclude Fluidigm HT GZ, Fluidigm LT
-# ssl2MnCpmDF$DROPSEQ_BIAS <- "All other genes"
-# ssl2MnCpmDF$DROPSEQ_BIAS[
-#   ssl2MnCpmDF$SUBSET_DROPSEQ == "Bulk high" &
-#     ! ssl2MnCpmDF$SUBSET_FLUIDIGM_HT == "Bulk high" &
-#     ! ssl2MnCpmDF$SUBSET_FLUIDIGM_LT == "Bulk high"] <- "Bulk high"
-# ssl2MnCpmDF$DROPSEQ_BIAS[
-#   ssl2MnCpmDF$SUBSET_DROPSEQ == "Pool high" &
-#     ! ssl2MnCpmDF$SUBSET_FLUIDIGM_HT == "Pool high" &
-#     ! ssl2MnCpmDF$SUBSET_FLUIDIGM_LT == "Pool high"] <- "Pool high"
-
+## CDS length of biased gene sets
 # Format for ggplot
-ggDF <- data.frame(ssl2MnCpmDF, mnExDF$percentage_gc_content, mnExDF$cds_length)
-ggDF <- ggDF[! ggDF$mnExDF.cds_length == 0, ]
-
-## Length
-ggL <- list(
-  Plot_CDS_Length("SINGLE_CELL_BIAS"
-  , "Single-cell bias\nIntersect Drop-seq, Fluidigm HT, Fluidigm LT")
-  , Plot_CDS_Length("SINGLE_CELL_BIAS_GZ"
-    , "Single-cell bias\nIntersect Drop-seq GZ, Fluidigm HT GZ, Pollen")
-  , Plot_CDS_Length("SUBSET_DROPSEQ", "Drop-seq")
-  , Plot_CDS_Length("SUBSET_DROPSEQ_0", "Drop-seq not detected")
-  , Plot_CDS_Length("SUBSET_DROPSEQ_GZ", "Drop-seq GZ")
-  , Plot_CDS_Length("SUBSET_FLUIDIGM_HT", "Fluidigm HT")
-  , Plot_CDS_Length("SUBSET_FLUIDIGM_HT_GZ", "Fluidigm HT GZ")
-  , Plot_CDS_Length("SUBSET_FLUIDIGM_LT", "Fluidigm LT")
-  , Plot_CDS_Length("SUBSET_POLLEN", "Pollen")
+ggDF <- bias_flag_DF
+ggDF$ensembl_gene_id <- row.names(ggDF)
+ggDF <- melt(ggDF, id.vars = "ensembl_gene_id")
+idx <- match(ggDF$ensembl_gene_id, mean_cpm_DF$ensembl_gene_id)
+ggDF$cds_length <- mean_cpm_DF$cds_length[idx]
+ggDF <- ggDF[! is.na(ggDF$cds_length), ]
+ggDF$value[ggDF$value == "None"] <- "All other genes"
+ggDF$value <- as.factor(ggDF$value)
+# Plot
+ggplot(ggDF, aes(x = variable, y = cds_length, fill = value)) +
+  geom_boxplot(outlier.shape = NA) +
+  scale_fill_manual(name = "Gene subset"
+    , values = c("#e31a1c", "#bdbdbd", "#1f78b4")) +
+  coord_cartesian(ylim = c(0, 5000)) +
+  # theme(text = element_text(size = 12)) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  xlab("Dataset") +
+  ylab("CDS length") +
+  ggtitle(paste0(graphCodeTitle
+    , "\n"
+    , "\nCDS length of genes biased towards single-cell or bulk RNA-seq"
+    , "\n")
   )
-pdf(paste0(outGraph, "Length.pdf"), width = 8, height = 12)
-do.call("grid.arrange", c(ggL, ncol = 2))
-dev.off()
+ggsave(paste0(outGraph, "Length_Boxplot.pdf"), width = 8, height = 5)
+# Subset for paper
+ggDF <- ggDF[ggDF$variable %in% c("GZ_Datasets", "GZCP_Datasets"), ]
+ggplot(ggDF, aes(x = variable, y = cds_length, fill = value)) +
+  geom_boxplot(outlier.shape = NA) +
+  scale_fill_manual(name = "Gene subset"
+    , values = c("#e31a1c", "#bdbdbd", "#1f78b4")) +
+  coord_cartesian(ylim = c(0, 5000)) +
+  # theme(text = element_text(size = 12)) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  xlab("Dataset") +
+  ylab("CDS length") +
+  ggtitle(paste0(graphCodeTitle
+    , "\n"
+    , "\nCDS length of genes biased towards single-cell or bulk RNA-seq"
+    , "\n")
+  )
+ggsave(paste0(outGraph, "Length_Boxplot_paper.pdf"), width = 5, height = 5)
 
-# CDS length from biomart, using longest CDS
+# CDS length for each dataset
 Plot_CDS_Length_Histogram <- function(exM, title, geneIdType){
   cGene <- rowSums(exM)
   ggDF <- data.frame(GENE = names(cGene), COUNTS = cGene)
-  ggDF <- merge(ggDF, mnExDF[c(geneIdType, "cds_length")]
-    , by.x = "GENE", by.y = geneIdType)
+  ggDF <- merge(ggDF, mean_cpm_DF[c("ensembl_gene_id", "cds_length")]
+    , by.x = "GENE", by.y = "ensembl_gene_id")
   ggDF <- data.frame(CDS_LENGTH = rep(ggDF$cds_length, ggDF$COUNTS))
   gg <- ggplot(ggDF, aes(x = CDS_LENGTH)) +
     geom_histogram(binwidth = 500) +
     # coord_cartesian(xlim = c(0, 10000)) +
-    scale_x_continuous(limits = c(0, 10000)) +
-    theme(text = element_text(size = 12)) +
+    # scale_x_continuous(limits = c(0, 10000)) +
     xlab("CDS length") +
     ylab("Counts") +
-    ggtitle(paste0(graphCodeTitle
-      , "\n"
-      , "\nHistogram of raw counts versus CDS length"
-      , "\n", title
-      , "\n"))
+    ggtitle(title)
   return(gg)
 }
-
 ggL <- list(
-  Plot_CDS_Length_Histogram(blExDF, "Bulk RNA-seq", "ensembl_gene_id")
-  # , Plot_CDS_Length_Histogram(dsExM, "Drop-seq", "hgnc_symbol")
-  # , Plot_CDS_Length_Histogram(gzDsExM, "Drop-seq GZ", "hgnc_symbol")
-  , Plot_CDS_Length_Histogram(dsExM, "Drop-seq", "ensembl_gene_id")
-  , Plot_CDS_Length_Histogram(gzDsExM, "Drop-seq GZ", "ensembl_gene_id")
-  , Plot_CDS_Length_Histogram(fhExDF, "Fluidigm HT", "ensembl_gene_id")
-  , Plot_CDS_Length_Histogram(gzFhExDF, "Fluidigm HT GZ", "ensembl_gene_id")
-  , Plot_CDS_Length_Histogram(flExDF, "Fluidigm LT", "ensembl_gene_id")
-  , Plot_CDS_Length_Histogram(pnExDF, "Pollen", "ensembl_gene_id")
+  Plot_CDS_Length_Histogram(bulk_ex_DF, "Bulk RNA-seq")
+  , Plot_CDS_Length_Histogram(ds_ex_DF, "Drop-seq")
+  , Plot_CDS_Length_Histogram(gz_df_ex_DF, "Drop-seq GZ")
+  , Plot_CDS_Length_Histogram(fldm_HT_ex_DF, "Fluidigm HT")
+  , Plot_CDS_Length_Histogram(gz_fldm_HT_ex_DF, "Fluidigm HT GZ")
+  , Plot_CDS_Length_Histogram(fldm_LT_ex_DF, "Fluidigm LT")
+  , Plot_CDS_Length_Histogram(pollen_ex_DF, "Pollen")
 )
-# pdf(paste0(outGraph, "LengthCounts_Histogram.pdf"), width = 8, height = 12)
-# ggL[[1]]
-# dev.off()
-
-png(paste0(outGraph, "LengthCounts_Histogram.png"), width = 8, height = 20
-  , units = "in", res = 300)
-do.call("grid.arrange", c(ggL, ncol = 2))
-dev.off()
-
-
-# CDS length from biomart, using longest CDS
-Plot_CDS_Length <- function(geneSet, title) {
-  gg <- ggplot(ggDF, aes_string(x = geneSet, y = "mnExDF.cds_length")) +
-    geom_boxplot(fill = c("#e41a1c", "#377eb8", "#4daf4a")) +
-    coord_cartesian(ylim = c(0, 5000)) +
-    theme(text = element_text(size = 12)) +
-    xlab("Gene subset") +
-    ylab("CDS length") +
-    ggtitle(paste0(graphCodeTitle
-      , "\n"
-      , "\n", title
-      , "\n"))
-  return(gg)
-}
-
-## GC
-ggL <- list(
-  Plot_GC("SINGLE_CELL_BIAS"
-    , "Single-cell bias\nIntersect Drop-seq, Fluidigm HT, Fluidigm LT")
-  , Plot_GC("SINGLE_CELL_BIAS_GZ"
-    , "Single-cell bias GZ\nIntersect Drop-seq GZ, Fluidigm HT GZ, Pollen")
-  , Plot_GC("SUBSET_DROPSEQ", "Drop-seq")
-  , Plot_GC("SUBSET_DROPSEQ_0", "Drop-seq not detected")
-  , Plot_GC("SUBSET_DROPSEQ_GZ", "Drop-seq GZ")
-  , Plot_GC("SUBSET_FLUIDIGM_HT", "Fluidigm HT")
-  , Plot_GC("SUBSET_FLUIDIGM_HT_GZ", "Fluidigm HT GZ")
-  , Plot_GC("SUBSET_FLUIDIGM_LT", "Fluidigm LT")
-  , Plot_GC("SUBSET_POLLEN", "Pollen")
+Plot_Grid(ggL, ncol = 3, rel_height = 0.1, title = paste0(graphCodeTitle
+  , "\n"
+  , "\nHistogram of raw counts versus CDS length"
+  , "\n")
 )
-pdf(paste0(outGraph, "GC.pdf"), width = 8, height = 12)
-do.call("grid.arrange", c(ggL, ncol = 2))
-dev.off()
+ggsave(paste0(outGraph, "LengthCounts_Histogram.png"), width = 8, height = 20)
+
+## GC content for each dataset
+ggDF <- bias_flag_DF
+ggDF$percentage_gc_content <- row.names(ggDF)
+ggDF <- melt(ggDF, id.vars = "percentage_gc_content")
+idx <- match(ggDF$percentage_gc_content, mean_cpm_DF$percentage_gc_content)
+ggDF$cds_length <- mean_cpm_DF$cds_length[idx]
+ggDF <- ggDF[! is.na(ggDF$cds_length), ]
+ggDF$value[ggDF$value == "None"] <- "All other genes"
+ggDF$value <- as.factor(ggDF$value)
+# Plot
+ggplot(ggDF, aes(x = variable, y = cds_length, fill = value)) +
+  geom_boxplot(outlier.shape = NA) +
+  scale_fill_manual(name = "Gene subset"
+    , values = c("#e31a1c", "#bdbdbd", "#1f78b4")) +
+  coord_cartesian(ylim = c(0, 5000)) +
+  # theme(text = element_text(size = 12)) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  xlab("Dataset") +
+  ylab("Percent GC") +
+  ggtitle(paste0(graphCodeTitle
+    , "\n"
+    , "\nCDS length of genes biased towards single-cell or bulk RNA-seq"
+    , "\n")
+  )
+ggsave(paste0(outGraph, "GC_boxplot.pdf"), width = 8, height = 5)
+# Subset for paper
+ggDF <- ggDF[ggDF$variable %in% c("GZ_Datasets", "GZCP_Datasets"), ]
+ggplot(ggDF, aes(x = variable, y = cds_length, fill = value)) +
+  geom_boxplot(outlier.shape = NA) +
+  scale_fill_manual(name = "Gene subset"
+    , values = c("#e31a1c", "#bdbdbd", "#1f78b4")) +
+  coord_cartesian(ylim = c(0, 100)) +
+  # theme(text = element_text(size = 12)) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  xlab("Dataset") +
+  ylab("Percent GC") +
+  ggtitle(paste0(graphCodeTitle
+    , "\n"
+    , "\nCDS length of genes biased towards single-cell or bulk RNA-seq"
+    , "\n")
+  )
+ggsave(paste0(outGraph, "GC_boxplot_paper.pdf"), width = 5, height = 5)
 
 ## Biotype
 # Format for ggplot2 and calculate percent of each biotype in each subset
@@ -1425,13 +1177,13 @@ Plot_Brain_Expressed_Percent <- function(geneSet, title) {
   # Percent
   df <- ssl2MnCpmDF[ssl2MnCpmDF[[geneSet]] == "All other genes", ]
   genes <- df$ENSEMBL_ID
-  pct <- sum(brexpDF[ ,1] %in% genes) / length(genes)
+  pct <- sum(brain_exp_DF[ ,1] %in% genes) / length(genes)
   df <- ssl2MnCpmDF[ssl2MnCpmDF[[geneSet]] == "Bulk high", ]
   genes <- df$ENSEMBL_ID
-  pct <- c(pct, sum(brexpDF[ ,1] %in% genes) / length(genes))
+  pct <- c(pct, sum(brain_exp_DF[ ,1] %in% genes) / length(genes))
   df <- ssl2MnCpmDF[ssl2MnCpmDF[[geneSet]] == "Pool high", ]
   genes <- df$ENSEMBL_ID
-  pct <- c(pct, sum(brexpDF[ ,1] %in% genes) / length(genes))
+  pct <- c(pct, sum(brain_exp_DF[ ,1] %in% genes) / length(genes))
   pct <- pct*100
   # Format for ggplot
   ggDF <- data.frame(SUBSET = c("All other genes", "Bulk high", "Pool high")
