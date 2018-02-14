@@ -18,7 +18,7 @@
 #$ -N PoolBulk
 #$ -o logs/Pooled_Vs_Bulk_QSUB_$JOB_ID_$TASK_ID.log
 #$ -e logs/Pooled_Vs_Bulk_QSUB_$JOB_ID_$TASK_ID.error
-#$ -l h_data=128G,h_rt=12:00:00,highp
+#$ -l h_data=256G,h_rt=12:00:00,highp
 #$ -t 1-1
 ################################################################################
 echo ""
