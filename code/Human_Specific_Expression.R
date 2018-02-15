@@ -55,6 +55,21 @@ hsDF <- read.csv("../source/Bakken_2016_AllenDevMacaque_ST10_HumanSpecific.csv"
 # Known marker Luis table
 kmDF <- read.csv("../source/MarkersforSingleCell_2017-10-11_Markers.csv")
 
+# Miller
+# Downloaded data
+allen_lcm_DF <- read.csv("../allen_brain_data/FISH_genes/Expression.csv", header = FALSE)
+allen_lcm_cols_DF <- read.csv("../allen_brain_data/FISH_genes/Columns.csv")
+allen_lcm_rows_DF <- read.csv("../allen_brain_data/FISH_genes/Rows.csv")
+
+# BrainSpan developmental transcriptome
+bsDF <- read.csv(
+  "../source/BrainSpan_DevTranscriptome/genes_matrix_csv/expression_matrix.csv", header = FALSE)
+rnames <- read.csv(
+  "../source/BrainSpan_DevTranscriptome/genes_matrix_csv/rows_metadata.csv")
+row.names(bsDF) <- rnames$gene_symbol
+bsMtDF <- read.csv(
+  "../source/BrainSpan_DevTranscriptome/genes_matrix_csv/columns_metadata.csv")
+
 ## Variables
 graphCodeTitle <- "Human_Specific_Expression.R"
 outGraph <- "../analysis/graphs/Human_Specific_Expression/DS2-11_FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Human_Specific_Expression_"
@@ -166,25 +181,25 @@ Intersection_tSNE_Plots <- function(genes) {
 Number_Of_Cells_Intersection_Heatmap <- function(genes, title){
   m1 <- noCentExM[row.names(noCentExM) %in% genes, ] > 0.5
   l1 <- apply(m1, 2, function(col) row.names(m1)[col])
-  
+
   ldf <- lapply(l1, function(genes) {
     v2 <- genes[genes %in% genes]
     v3 <- genes[genes %in% genes]
     expand.grid(v2, v3)
   })
   df1 <- do.call("rbind", ldf)
-  
+
   # Format for matrix
   df3 <- dcast(df1, Var1 ~ Var2)
   row.names(df3) <- df3$Var1
   df3 <- df3[ ,-1]
-  
+
   # Format for ggplot
   df3$Gene <- row.names(df3)
   df3 <- melt(df3)
   df3$Gene <- factor(df3$Gene, levels = genes)
   df3$variable <- factor(df3$variable, levels = genes)
-  
+
   # Plot counts of intersections
   gg <- ggplot(df3, aes(x = Gene, y = variable, fill = value)) +
     geom_tile() +
@@ -194,9 +209,77 @@ Number_Of_Cells_Intersection_Heatmap <- function(genes, title){
     xlab("Genes") +
     ylab("Genes") +
     ggtitle(title)
-  
+
   return(gg)
 }
+################################################################################
+
+### Figures for paper
+
+# Allen LCM heatmap
+Allen_LCM_Format_For_GGplot <- function(){
+  colnames(allen_lcm_DF)[2:ncol(allen_lcm_DF)] <-
+    paste(as.character(allen_lcm_cols_DF$structure_name), c(1:nrow(allen_lcm_cols_DF)))
+  allen_lcm_DF[ ,1] <- allen_lcm_rows_DF$gene.symbol
+  allen_lcm_DF <- allen_lcm_DF[allen_lcm_DF[ ,1] %in% c("LYN", "ITGA6"), ]
+  allen_lcm_DF <- melt(allen_lcm_DF)
+  allen_lcm_DF$value[allen_lcm_DF$value > 1.5] <- 1.5
+  allen_lcm_DF$value[allen_lcm_DF$value < -1.5] <- -1.5
+  return(allen_lcm_DF)
+}
+ggDF <- Allen_LCM_Format_For_GGplot()
+ggplot(ggDF, aes(x = variable, y = V1, fill = value)) +
+  geom_tile() +
+  scale_fill_distiller(name = "Normalized\nexpression", type = "div"
+      , palette = 5, direction = -1) +
+  xlab("Region") +
+  ylab("Gene") +
+  theme_bw() +
+  theme(axis.line = element_line(colour = "black"),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.border = element_blank(),
+    panel.background = element_blank()) +
+  theme(axis.text.x = element_blank()) +
+  ggtitle(paste0(graphCodeTitle
+    , "\nAllen LCM expression"))
+ggsave(paste0(outGraph, "Miller_Heatmap_paper.png")
+  , width = 8, height = 2, dpi = 600)
+
+# Brainspan line plot
+# Subset to cortex, remove visual and cerebellar
+df <- bsMtDF[grep("cortex", bsMtDF$structure_name), ]
+df <- df[df$structure_name != "cerebellar cortex" &
+    df$structure_name != "primary visual cortex (striate cortex, area V1/17)", ]
+ssBsDF <- bsDF[ ,df$column_num]
+# Log2 transform
+ssBsDF <- log(ssBsDF, 2)
+# Subset to genes of interest
+idx <- match(c("LYN", "ITGA6"), rnames$gene_symbol)
+df1 <- rnames[idx, ]
+ssBsDF <- ssBsDF[df1$row_num, ]
+row.names(ssBsDF) <- df1$gene_symbol
+# Genes as columns
+ssBsDF <- as.data.frame(t(ssBsDF))
+# Remove outliers by stdev
+ssBsDF <- as.data.frame(apply(ssBsDF, 2, function(x) {
+  Remove_Outliers_By_SD(x, nStdev = 2.5)
+  }))
+# Add age
+ssBsDF$AGE <- factor(df$age, levels = unique(bsMtDF$age))
+
+# ggplot fit line
+df1 <- melt(ssBsDF)
+ggplot(df1, aes(x = AGE, y = value, group = 1)) +
+  facet_wrap(~variable, scales = "free", ncol = 3) +
+  geom_jitter(size = 0.1, width = 0.2) +
+  geom_smooth(color = "red") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)) +
+  # ggtitle(df$variable[1])
+  xlab("Age") +
+  ylab("Normalized expression")
+ggsave(paste0(outGraph, "BrainSpan_Fit.pdf"), width = 7, height = 3)
+ggsave(paste0(outGraph, "BrainSpan_Fit.png"), width = 7, height = 3)
 ################################################################################
 
 ### metaMat cluster DE oRG human specific genes and expression ranking in RG
