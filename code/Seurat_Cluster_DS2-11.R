@@ -26,14 +26,14 @@ source("Function_Library.R")
 args <- commandArgs(trailingOnly = TRUE)
 print(args)
 
-# load("../analysis/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_seuratO.Robj")
+# load("../analysis/analyzed_data/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_seuratO.Robj")
 
 ## Input data
 # Digital gene expression
 
 # DS-002-003-004-005-006-007-008-009-011: exDF and metDF
-load("../analysis/Expression_Matrix_Compile_dge_FtMm250_DS-2-3-4-5-6-7-8-9-11.Rdata")
-# load("../analysis/Expression_Matrix_Compile_dge_FtMm250_Magic_DS-2-3-4-5-6-7-8-9-11_exon_FtMm250_200-3sdgd.Rdata")
+load("../analysis/analyzed_data/Expression_Matrix_Compile_dge_FtMm250_DS-2-3-4-5-6-7-8-9-11.Rdata")
+# load("../analysis/analyzed_data/Expression_Matrix_Compile_dge_FtMm250_Magic_DS-2-3-4-5-6-7-8-9-11_exon_FtMm250_200-3sdgd.Rdata")
 # exDF <- as.data.frame(exDF)
 # # Subsetting for testing
 # idx <- sample(1:ncol(exDF), 2000)
@@ -45,7 +45,7 @@ bmDF <- read.csv("../source/BiomaRt_Compile_GeneInfo_GRCh38_Ensembl87.csv"
   , header = TRUE)
 
 # Seurat clustering of DS-002-003 to compare cluster identities
-load("../analysis/Cluster_Seurat/Cluster_Seurat_exon_FtMm250_fetb_seurat.Robj")
+load("../analysis/analyzed_data/Cluster_Seurat/Cluster_Seurat_exon_FtMm250_fetb_seurat.Robj")
 
 # Cell cycle markers from Macosko 2015 Table S2 to remove from variable gene
 # list used for clustering
@@ -61,19 +61,19 @@ g2m.genes <- cc.genes[44:98]
 graphCodeTitle <- "Seurat_Cluster_DS2-11.R"
 # outGraph <- "../analysis/graphs/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrainCC/Seurat_Cluster_DS2-11_FtMm250_200-3sdgd_Mt5_RegNumiLibBrainCC_"
 # outTable <- "../analysis/tables/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrainCC/Seurat_Cluster_DS2-11_FtMm250_200-3sdgd_Mt5_RegNumiLibBrainCC_"
-# outData <- "../analysis/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrainCC/Seurat_Cluster_DS2-11_FtMm250_200-3sdgd_Mt5_RegNumiLibBrainCC_PC1to40_"
+# outData <- "../analysis/analyzed_data/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrainCC/Seurat_Cluster_DS2-11_FtMm250_200-3sdgd_Mt5_RegNumiLibBrainCC_PC1to40_"
 outGraph <- "../analysis/graphs/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC/Seurat_Cluster_DS2-11_"
 outTable <- "../analysis/tables/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC/Seurat_Cluster_DS2-11_"
-outData <- "../analysis/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_"
+outData <- "../analysis/analyzed_data/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_"
 # outGraph <- "../analysis/graphs/Seurat_Cluster_DS2-11/Seurat_Cluster_DS2-11_FtMm250_Magic_200-3sdgd_Mt5_RegNumiLibBrain_"
 # outTable <- "../analysis/tables/Seurat_Cluster_DS2-11/Seurat_Cluster_DS2-11_FtMm250_Magic_200-3sdgd_Mt5_RegNumiLibBrain_"
-# outData <- "../analysis/Seurat_Cluster_DS2-11/Seurat_Cluster_DS2-11_FtMm250_Magic_200-3sdgd_Mt5_RegNumiLibBrain_PC1to20_"
+# outData <- "../analysis/analyzed_data/Seurat_Cluster_DS2-11/Seurat_Cluster_DS2-11_FtMm250_Magic_200-3sdgd_Mt5_RegNumiLibBrain_PC1to20_"
 # outGraph <- "../analysis/graphs/Seurat_Cluster_DS2-11/Seurat_Cluster_DS2-11_FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_"
 # outTable <- "../analysis/tables/Seurat_Cluster_DS2-11/Seurat_Cluster_DS2-11_FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_"
-# outData <- "../analysis/Seurat_Cluster_DS2-11/Seurat_Cluster_DS2-11_FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_PC1to40_"
+# outData <- "../analysis/analyzed_data/Seurat_Cluster_DS2-11/Seurat_Cluster_DS2-11_FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_PC1to40_"
 # outGraph <- "../analysis/graphs/Seurat_Cluster_DS2-11/Seurat_Cluster_DS2-11_FtMm250_200-3sdgd_Mt5_RegNumi_"
 # outTable <- "../analysis/tables/Seurat_Cluster_DS2-11/Seurat_Cluster_DS2-11_FtMm250_200-3sdgd_Mt5_RegNumi_"
-# outData <- "../analysis/Seurat_Cluster_DS2-11/Seurat_Cluster_DS2-11_FtMm250_200-3sdgd_Mt5_RegNumi_PC1to40_"
+# outData <- "../analysis/analyzed_data/Seurat_Cluster_DS2-11/Seurat_Cluster_DS2-11_FtMm250_200-3sdgd_Mt5_RegNumi_PC1to40_"
 
 ## Output Directories
 outDir <- dirname(outGraph)
@@ -97,7 +97,7 @@ theme_update(axis.line = element_line(colour = "black")
 
 print("### Convert Ensembl ID to Gene symbol")
 
-# In case of multiple ensembl IDs mapping to the same gene symbol, counts are 
+# In case of multiple ensembl IDs mapping to the same gene symbol, counts are
 # summed across each ensembl ID associated with that gene symbol. If there is no
 # gene symbol then ensembl ID is kept
 
@@ -283,7 +283,7 @@ tb <- table(centSO@meta.data$Phase)
 write.csv(tb, file = paste0(outTable, "CellCycle.csv"), quote = FALSE)
 
 # # Visualize the distribution of cell cycle markers across
-# JoyPlot(object = centSO, features.plot = c("PCNA", "TOP2A", "MCM6", "MKI67"), 
+# JoyPlot(object = centSO, features.plot = c("PCNA", "TOP2A", "MCM6", "MKI67"),
 #   nCol = 2, do.return = TRUE)
 # ggsave(paste0(outGraph, "QC_CellCycle_DensityPlot.png"), width = 8, height = 4)
 
@@ -420,6 +420,15 @@ ggsave(paste0(outGraph, "QC_violinPlot.png"), width = 8, height = 4)
 # VlnPlot(centSO, c("nGene", "nUMI", "percent.mito"), ident.include = NULL
 #   ,nCol = 3, point.size.use = 0.1, group.by = "orig.ident")
 # dev.off()
+ggDF <- fmetDF[ ,c("nGene", "nUMI", "percent.mito", "FILTERED")]
+ggDF <- ggDF[ggDF$FILTERED == TRUE, ]
+ggDF <- melt(ggDF)
+# ggplot
+ggplot(ggDF, aes(x = FILTERED, y = value)) +
+geom_violin(aes(fill = variable)) +
+# geom_jitter(size = 0.1, alpha = 0.1) +
+facet_wrap(~variable, ncol = 3, scales = "free_y")
+ggsave(paste0(outGraph, "QC_violinPlot2.png"), width = 6, height = 6)
 
 # Variance and per gene histogram
 # Raw counts
@@ -428,7 +437,7 @@ ggDF <- data.frame(v1)
 p1 <- ggplot(ggDF, aes(x = v1)) +
   geom_histogram(binwdith = 0.01) +
   xlim(c(-0.1,2)) +
-  coord_cartesian(ylim = c(0, 4e4)) + 
+  coord_cartesian(ylim = c(0, 4e4)) +
   xlab("Variance") +
   ggtitle(paste0("Raw counts"
     , "\n"))
@@ -467,7 +476,7 @@ gg1DF <- data.frame(cvL)
 p1 <- ggplot(gg1DF, aes(x = cvL)) +
   geom_histogram(binwidth = 100) +
   # xlim(c(-0.1,2)) +
-  # coord_cartesian(ylim = c(0, 4e4)) + 
+  # coord_cartesian(ylim = c(0, 4e4)) +
   xlab("Coefficient of variation") +
   ggtitle(paste0("Raw counts"
     , "\n"))
@@ -634,14 +643,14 @@ print("Number of variable genes used for clustering:")
 length(centSO@var.genes)
 
 # ## Remove CC genes from variable genes
-# 
+#
 # # Cleanup CC marker data frame
 # ccDF <- data.frame(lapply(ccDF, as.character), stringsAsFactors=FALSE)
 # cc <- c(unlist(ccDF))
 # cc <- gsub(" *", "", cc)
 # idx <- centSO@var.genes %in% cc
 # centSO@var.genes <- centSO@var.genes[! idx]
-# 
+#
 # print("Number of variable genes used for clustering after removing CC genes:")
 # length(centSO@var.genes)
 
@@ -928,6 +937,11 @@ centSO <- FindClusters(centSO, dims.use = 1:40, resolution = 0.6
 
 PrintFindClustersParams(object = centSO)
 
+TSNEPlot(centSO, do.label = FALSE, pt.size = 0.6, do.return = TRUE
+  , no.legend = TRUE)
+ggsave(paste0(outGraph, "tSNE_NoLabels.png")
+  , width = 7, height = 7)
+
 ## Plot tSNE graph colored by lanes, samples, or GZ CP
 # Collect tSNE values
 ggDF <- as.data.frame(centSO@dr$tsne@cell.embeddings)
@@ -1031,8 +1045,35 @@ png(paste0(outGraph, "tSNE_MetadataGrid_PC1-40.png")
   , width = 12, height = 16, units = "in", res = 300)
 # plot_grid(ggC, ggP, ggB, ggS, ggL, ggR, ncol = 2)
 layout <- rbind(c(1,1,2,2), c(3,3,3,NA), c(4,4,5,5))
-grid.arrange(ggC, ggR, ggP, ggB, ggL, layout_matrix = layout) 
+grid.arrange(ggC, ggR, ggP, ggB, ggL, layout_matrix = layout)
 dev.off()
+
+# tSNE for paper
+ggDF <- as.data.frame(centSO@dr$tsne@cell.embeddings)
+# Add cluster identity
+ggDF$CLUSTER <- centSO@ident
+# Add metadata
+ggDF <- data.frame(ggDF, metDF[match(row.names(ggDF), metDF$CELL), ])
+# Plot
+gg1 <- ggplot(ggDF, aes(x = tSNE_1, y = tSNE_2, col = CLUSTER)) +
+  geom_point(size = 0.01, alpha = 0.5) +
+  guides(colour = guide_legend(override.aes = list(size = 7))) +
+  theme(
+    panel.grid.major = element_blank(),
+    , panel.grid.minor = element_blank()
+  ) +
+  ggtitle("Seurat clusters")
+gg2 <- ggplot(ggDF, aes(x = tSNE_1, y = tSNE_2, col = REGION)) +
+  geom_point(size = 0.01, alpha = 0.5) +
+  guides(colour = guide_legend(override.aes = list(size = 7))) +
+  theme(
+    panel.grid.major = element_blank(),
+    , panel.grid.minor = element_blank()
+  ) +
+  ggtitle("Region (GZ / CP)")
+plot_grid(gg1, gg2, ncol = 2)
+ggsave(paste0(outGraph, "tSNE_PC1-40_paper.png")
+  , dpi = 150, width = 8, height = 3)
 
 # You can save the object at this point so that it can easily be loaded back in
 # without having to rerun the computationally intensive steps performed above,
@@ -1080,6 +1121,39 @@ ssNoCentExM <- noCentExM[ ,colnames(noCentExM) %in% cellIDs]
 
 save(ssCentSO, ssNoCentExM, metDF, high.thresholds
   , file = paste0(outData, "TEST_seuratO.Robj"))
+
+# Sample cell IDs
+cellIDs <- names(centSO@ident)[centSO@ident %in% c(7,8,9,10)]
+# Subset
+ssCentSO <- SubsetData(centSO, cells.use = cellIDs)
+ssCentSO@raw.data <- ssCentSO@raw.data[
+  ,colnames(ssCentSO@raw.data) %in% cellIDs]
+ssNoCentExM <- noCentExM[ ,colnames(noCentExM) %in% cellIDs]
+
+save(ssCentSO, ssNoCentExM, metDF, high.thresholds
+  , file = paste0(outData, "TESTcluster78910_seuratO.Robj"))
+
+# Sample cell IDs
+cellIDs <- names(centSO@ident)[centSO@ident %in% c(2,7,8,9,10)]
+# Subset
+ssCentSO <- SubsetData(centSO, cells.use = cellIDs)
+ssCentSO@raw.data <- ssCentSO@raw.data[
+  ,colnames(ssCentSO@raw.data) %in% cellIDs]
+ssNoCentExM <- noCentExM[ ,colnames(noCentExM) %in% cellIDs]
+
+save(ssCentSO, ssNoCentExM, metDF, high.thresholds
+  , file = paste0(outData, "TESTcluster278910_seuratO.Robj"))
+
+# Sample cell IDs
+cellIDs <- names(centSO@ident)[centSO@ident %in% c(0,2,7,8,9,10)]
+# Subset
+ssCentSO <- SubsetData(centSO, cells.use = cellIDs)
+ssCentSO@raw.data <- ssCentSO@raw.data[
+  ,colnames(ssCentSO@raw.data) %in% cellIDs]
+ssNoCentExM <- noCentExM[ ,colnames(noCentExM) %in% cellIDs]
+
+save(ssCentSO, ssNoCentExM, metDF, high.thresholds
+  , file = paste0(outData, "TESTcluster0278910_seuratO.Robj"))
 ################################################################################
 
 ### Feature plot of top PC scores
@@ -1154,7 +1228,7 @@ colnames(genesDF) <- c("GENE", "GROUP")
 ggL <- Heatmaps_By_Cluster_Combined(geneGroupDF = genesDF
   , exprM = centSO@scale.data, seuratO = centSO
   , lowerLimit = -1.5, upperLimit = 1.5
-  , clusters1 = c(0:1), clusters2 = c(2:10), clusters3 = c(11:length(unique(centSO@ident)))) 
+  , clusters1 = c(0:1), clusters2 = c(2:10), clusters3 = c(11:length(unique(centSO@ident))))
 # Change legend title
 ggL <- lapply(ggL, function(gg) {
   gg + scale_fill_distiller(name = "Normalized\nExpression\nz-score")
@@ -1179,7 +1253,7 @@ ggsave(paste0(outGraph, "PC1-40_DoHeatmap_HighestLoading_CenterScale.png")
 ggL <- Heatmaps_By_Cluster_Combined(geneGroupDF = genesDF
   , exprM = noCentExM, seuratO = centSO
   , lowerLimit = -1, upperLimit = 3
-  , clusters1 = c(0:1), clusters2 = c(2:10), clusters3 = c(11:length(unique(centSO@ident)))) 
+  , clusters1 = c(0:1), clusters2 = c(2:10), clusters3 = c(11:length(unique(centSO@ident))))
 # plot grid
 pg <- plot_grid(plotlist = ggL, align = "h", axis = "b", ncol = 3)
 # now add the title
@@ -1227,9 +1301,116 @@ df <- data.frame(
   , NUMBER_CELLS_GZ = as.vector(table(centSO@ident[centSO@meta.data$REGION == "GZ"]))
   , MEAN_UMI = tapply(centSO@meta.data$nUMI, centSO@ident, mean)
   , MEAN_GENES_DETECTED = tapply(centSO@meta.data$nGene, centSO@ident, mean)
+  , PERCENT_CELLS = (as.vector(table(centSO@ident)) /
+    sum(as.vector(table(centSO@ident)))) * 100
 )
 write.csv(df, paste0(outTable, "PC1-40_Cluster_Metrics.csv")
   , quote = FALSE, row.names = FALSE)
+
+# Dot plot of percent of cell classes
+v1 <- c(
+  "Radial glia" = sum(df$NUMBER_CELLS[df$CLUSTER %in% c(7,9)])/sum(df$NUMBER_CELLS) * 100
+  , "Cycling progenitor" = sum(df$NUMBER_CELLS[df$CLUSTER %in% c(8,10)])/sum(df$NUMBER_CELLS) * 100
+  , "Intermediate progenitor" = sum(df$NUMBER_CELLS[df$CLUSTER %in% c(2)])/sum(df$NUMBER_CELLS) * 100
+  , "Excitatory Neuron" = sum(df$NUMBER_CELLS[df$CLUSTER %in% c(0,1,3,4,12,14)])/sum(df$NUMBER_CELLS) * 100
+  , "Interneuron" = sum(df$NUMBER_CELLS[df$CLUSTER %in% c(5,6)])/sum(df$NUMBER_CELLS) * 100
+  , "Oligodendrocyte precursor" = sum(df$NUMBER_CELLS[df$CLUSTER %in% c(11)])/sum(df$NUMBER_CELLS) * 100
+  , "Endothelial" = sum(df$NUMBER_CELLS[df$CLUSTER %in% c(13)])/sum(df$NUMBER_CELLS) * 100
+  , "Pericyte" = sum(df$NUMBER_CELLS[df$CLUSTER %in% c(15)])/sum(df$NUMBER_CELLS) * 100
+  , "Microglia" = sum(df$NUMBER_CELLS[df$CLUSTER %in% c(16)])/sum(df$NUMBER_CELLS) * 100
+)
+df1 <- data.frame(Class = names(v1), Percent = v1)
+df1$Class <- factor(df1$Class, levels = c("Radial glia", "Cycling progenitor"
+  , "Intermediate progenitor"
+  , "Excitatory Neuron", "Interneuron", "Oligodendrocyte precursor"
+  , "Endothelial", "Pericyte", "Microglia"))
+ggplot(df1, aes(x = Percent, y = Class, color = Class)) +
+geom_point(size = 3) +
+scale_color_brewer(type = "qual", palette = "Set3", direction = 1) +
+scale_y_discrete(limits = rev(levels(df1$Class))) +
+theme(legend.position = "none") +
+ylab("") +
+ggtitle(paste0(graphCodeTitle
+  , "\nPercentages of cell classes"))
+ggsave(paste0(outGraph, "PC1-40_Cluster_Metrics_Percent_CellType.png")
+  , height = 2.5, width = 4)
+
+# Bar plot of percent of cells in clusters
+df1 <- df[df$CLUSTER != 17, ]
+df1$CLUSTER <- factor(df1$CLUSTER
+  , levels = c(7,9,8,10,2,0,1,3,4,12,14,5,6,11,13,15,16))
+df1 <- df1[order(df1$CLUSTER), ]
+df1$Cluster2 <- as.factor(c(0:16))
+df1$Class = factor(c(
+      rep("Radial glia", 2)
+      , rep("Cycling progenitor", 2)
+      , "Intermediate progenitor"
+      , rep("Excitatory Neuron", 6)
+      , rep("Interneuron", 2)
+      , "Oligodendrocyte precursor"
+    , "Endothelial", "Pericyte", "Microglia"
+    )
+  , levels = c("Radial glia", "Cycling progenitor", "Intermediate progenitor"
+    , "Excitatory Neuron", "Interneuron", "Oligodendrocyte precursor"
+    , "Endothelial", "Pericyte", "Microglia")
+)
+ggplot(df1, aes(x = Cluster2, y = PERCENT_CELLS, fill = Class)) +
+  geom_bar(stat = "identity") +
+  scale_fill_brewer(type = "qual", palette = "Set3", direction = 1) +
+  # scale_y_discrete(limits = rev(levels(df1$Cluster2))) +
+  theme(legend.position = "none") +
+  xlab("Cluster") +
+  ylab("Percent") +
+  theme(panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank()
+  )
+  ggtitle(paste0(graphCodeTitle
+    , "\nPercentages of cell classes"))
+ggsave(paste0(outGraph, "PC1-40_Cluster_Metrics_Percent_CellType_Barplot.pdf")
+  , height = 2.5, width = 6)
+
+# GZ/CP ratio bar plot
+df1 <- data.frame(Cluster = df$CLUSTER
+  , GZCP_Log2_Ratio = log(df$NUMBER_CELLS_CP/df$NUMBER_CELLS_GZ, 2)
+)
+df1 <- df1[df1$Cluster != 17, ]
+df1$Cluster <- factor(df1$Cluster, levels = c(7,9,8,10,2,0,1,3,4,12,14,5,6,11,13,15,16))
+df1 <- df1[order(df1$Cluster), ]
+df1$Cluster2 = as.factor(c(0:16))
+df1$Class = factor(c(
+      rep("Radial glia", 2)
+      , rep("Cycling progenitor", 2)
+      , "Intermediate progenitor"
+      , rep("Excitatory Neuron", 6)
+      , rep("Interneuron", 2)
+      , "Oligodendrocyte precursor"
+    , "Endothelial", "Pericyte", "Microglia"
+    )
+  , levels = c("Radial glia", "Cycling progenitor", "Intermediate progenitor"
+    , "Excitatory Neuron", "Interneuron", "Oligodendrocyte precursor"
+    , "Endothelial", "Pericyte", "Microglia")
+)
+ggplot(df1, aes(x = Cluster2, y = GZCP_Log2_Ratio, fill = Class)) +
+  geom_bar(stat = "identity") +
+  scale_fill_brewer(type = "qual", palette = "Set3", direction = 1) +
+  theme(panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank()
+  ) +
+  ggtitle(paste0(graphCodeTitle
+    , "\nLog2 ratio number of cell GZ / CP for each cluster"))
+ggsave(paste0(outGraph, "PC1-40_Cluster_Metrics_GZCP_Ratio.png")
+  , height = 3, width = 5.5)
+# For paper
+ggplot(df1, aes(x = Cluster2, y = GZCP_Log2_Ratio, fill = Class)) +
+  geom_bar(stat = "identity") +
+  scale_fill_brewer(type = "qual", palette = "Set3", direction = 1) +
+  theme(
+    legend.position = "none"
+    , panel.grid.major = element_blank()
+    , panel.grid.minor = element_blank()
+  )
+ggsave(paste0(outGraph, "PC1-40_Cluster_Metrics_GZCP_Ratio_paper.pdf")
+  , height = 2.5, width = 6)
 
 # Number of cells per cluster versus mean genes detected per cluster
 ggDF <- data.frame(table(centSO@ident)
@@ -1278,15 +1459,15 @@ ggsave(paste0(outGraph, "PC1-40_hclust.pdf"))
 ################################################################################
 
 # ### Finding differentially expressed genes (cluster biomarkers)
-# 
+#
 # print("### Finding differentially expressed genes (cluster biomarkers)")
-# 
+#
 # # Seurat can help you find markers that define clusters via differential
 # # expression. By default, it identifes positive and negative markers of a single
-# # cluster (specified in ident.1), compared to all other cells. 
+# # cluster (specified in ident.1), compared to all other cells.
 # # **FindAllMarkers()** automates this process for all clusters, but you can also
 # # test groups of clusters vs. each other, or against all cells.
-# 
+#
 # # The min.pct argument requires a gene to be detected at a minimum percentage in
 # # either of the two groups of cells, and the thresh.test argument requires a
 # # gene to be differentially expressed (on average) by some amount between the
@@ -1297,7 +1478,7 @@ ggsave(paste0(outGraph, "PC1-40_hclust.pdf"))
 # # have no more cells than whatever this is set to. While there is generally
 # # going to be a loss in power, the speed increases can be signficiant and the
 # # most highly differentially expressed genes will likely still rise to the top.
-# 
+#
 # # # find all markers of cluster 1
 # ldf <- lapply(unique(centSO@ident), function(i) {
 #   df <- FindMarkers(centSO, ident.1 = i, only.pos = TRUE
@@ -1307,8 +1488,8 @@ ggsave(paste0(outGraph, "PC1-40_hclust.pdf"))
 #   return(df)
 # })
 # clusterDeDF <- do.call("rbind", ldf)
-# 
-# 
+#
+#
 # # find markers for every cluster compared to all remaining cells, report only the positive ones
 # # clusterDeDF <- FindAllMarkers(centSO, only.pos = TRUE, min.pct = 0.25, thresh.use = 0.25)
 # # clusterDeDF <- FindAllMarkers(centSO, only.pos = TRUE, test.use = "negbinom"
@@ -1316,25 +1497,25 @@ ggsave(paste0(outGraph, "PC1-40_hclust.pdf"))
 # #   , min.pct = 0.25, thresh.use = 0.25)
 # # clusterDeDF %>% group_by(cluster) %>% top_n(2, avg_diff)
 # clusterDe20DF <- data.frame(clusterDeDF %>% group_by(cluster) %>% top_n(20, avg_diff))
-# 
+#
 # write.table(x = clusterDeDF
 #   , file = paste0(outTable, "PC1-40_Marker_Genes_Clusters_Vs_All.txt")
 #   , sep = "\t", quote = FALSE, row.names = FALSE)
 # write.table(x = clusterDe20DF
 #   , file = paste0(outTable, "PC1-40_Marker_Genes_Clusters_Vs_All_Top20.txt")
 #   , sep = "\t", quote = FALSE, row.names = FALSE)
-# 
+#
 # save(centSO, noCentExM, metDF, clusterDeDF, file = paste0(outData, "seuratO.Robj"))
-# 
+#
 # # Seurat has four tests for differential expression which can be set with the
 # # test.use parameter: ROC test ("roc"), t-test ("t"), LRT test based on
 # # zero-inflated data ("bimod", default), LRT test based on tobit-censoring
 # # models ("tobit") The ROC test returns the 'classification power' for any
 # # individual marker (ranging from 0 - random, to 1 - perfect).
-# 
+#
 # # cluster1.markers <- FindMarkers(centSO, ident.1 = 0, thresh.use = 0.25
 # # , test.use = "roc", only.pos = T)
-# 
+#
 # # There are several tools for visualizing marker expression. **VlnPlot()**
 # # generates a violin plot which shows the probability density at different
 # # expression levels of the gene for each cluster. As seen below, good marker
@@ -1344,28 +1525,28 @@ ggsave(paste0(outGraph, "PC1-40_hclust.pdf"))
 # # **FeaturePlot()** function is useful for viewing the expression of the gene in
 # # the context of all the cells and helps validate the specificity of the marker
 # # or the quality of the clustering.
-# 
+#
 # # VlnPlot(centSO, c("STMN2","LIMCH1"))
-# # 
+# #
 # # #you can plot raw UMI counts as well
 # # VlnPlot(centSO, c("STMN2", "LIMCH1"),use.raw = T,y.log = T)
-# # 
+# #
 # # FeaturePlot(centSO, c("STMN2", "LIMCH1","SATB2","GPM6A","CSRP2","PLXNA4")
 # # , cols.use = c("grey","blue"))
-# 
+#
 # # Heatmaps can also be a good way to examine heterogeneity within/between
 # # clusters. The **DoHeatmap()** function will generate a heatmap for given cells
 # # and genes. In this case, we are plotting the top 20 markers (or all markers if
 # # less than 20) for each cluster.
-# 
+#
 # # Top 10 markers for each cluster
 # clusterDeDF %>% group_by(cluster) %>% top_n(10, avg_diff) -> top10
-# 
+#
 # # Heatmap of top 10 markers
 # # setting slim.col.label to TRUE will print just the cluster IDS instead of every cell name
 # # DoHeatmap(centSO, genes.use = top10$gene, order.by.ident = TRUE
 # #   , slim.col.label = TRUE, remove.key = FALSE)
-# 
+#
 # # Centered and scaled
 # # Subset to genes, merge to keep duplicate genes (from more than 1 PC)
 # ggDF <- merge(top10, centSO@scale.data, by.x = "gene", by.y = "row.names"
@@ -1400,7 +1581,7 @@ ggsave(paste0(outGraph, "PC1-40_hclust.pdf"))
 #   # facet_grid(~CLUSTERS, space = "free", scales = "free") +
 #   # scale_fill_gradient2(name = "Normalized\nexpression"
 #   #   , high = "#d7191c", low = "white") +
-#   scale_y_discrete(labels = gsub(".*_", "", ggDF$Var1)) + 
+#   scale_y_discrete(labels = gsub(".*_", "", ggDF$Var1)) +
 #   scale_fill_distiller(name = "Normalized\nexpression", type = "div"
 #     , palette = 5, direction = -1) +
 #   theme_bw() +
@@ -1417,7 +1598,7 @@ ggsave(paste0(outGraph, "PC1-40_hclust.pdf"))
 #     , "\n"))
 # ggsave(paste0(outGraph, "PC1-40_DoHeatmap_Top10Markers_CenterScale.png")
 #   , width = 10, height = 4 + 0.15*nrow(top10), dpi = 300)
-# 
+#
 # # png(paste0(outGraph, "PC1-40_DoHeatmap_Top10Markers_CenterScale.png")
 # #   , width = 12, height = 12, units = "in", res = 300)
 # # grid.arrange(p1, p2, ncol = 2, top = paste0(graphCodeTitle
@@ -1426,7 +1607,7 @@ ggsave(paste0(outGraph, "PC1-40_hclust.pdf"))
 # #   , "\nMean centered, variance scaled, normalized expression"
 # #   , "\n"))
 # # dev.off()
-# 
+#
 # # No centered and scaled expression
 # # Subset to genes, merge to keep duplicate genes (from more than 1 PC)
 # ggDF <- merge(top10, noCentExM, by.x = "gene", by.y = "row.names"
@@ -1458,7 +1639,7 @@ ggsave(paste0(outGraph, "PC1-40_hclust.pdf"))
 #   # facet_grid(~CLUSTERS, space = "free", scales = "free") +
 #   # scale_fill_gradient2(name = "Normalized\nexpression"
 #   #   , high = "#d7191c", low = "white") +
-#   scale_y_discrete(labels = gsub(".*_", "", ggDF$Var1)) + 
+#   scale_y_discrete(labels = gsub(".*_", "", ggDF$Var1)) +
 #   scale_fill_distiller(name = "Normalized\nexpression", type = "div"
 #     , palette = 5, direction = -1) +
 #   theme_bw() +
@@ -1475,7 +1656,7 @@ ggsave(paste0(outGraph, "PC1-40_hclust.pdf"))
 #     , "\n"))
 # ggsave(paste0(outGraph, "PC1-40_DoHeatmap_Top10Markers.png")
 #   , width = 10, height = 4 + 0.15*nrow(top10), dpi = 300)
-# 
+#
 # # # Violin plots of top 10 markers
 # # pdf(paste0(outGraph, "ViolinPlot_Top10Markers.pdf"), width = 10)
 # # top10L <- split(top10, top10$cluster)
@@ -1483,7 +1664,7 @@ ggsave(paste0(outGraph, "PC1-40_hclust.pdf"))
 # #   VlnPlot(centSO, top10cluster$gene, size.use = 0.5)
 # # })
 # # dev.off()
-# # 
+# #
 # # # Feature plot of top 10 markers
 # # pdf(paste0(outGraph, "FeaturePlot_Top10Markers.pdf"), width = 10)
 # # top10L <- split(top10, top10$cluster)
@@ -1494,10 +1675,10 @@ ggsave(paste0(outGraph, "PC1-40_hclust.pdf"))
 # # dev.off()
 # ################################################################################
 
-# 
+#
 # ###Assigning cell type identity to clusters
 # # Fortunately in the case of this dataset, we can use canonical markers to easily match the unbiased clustering to known cell types:
-# 
+#
 # #   Cluster ID | Markers       | Cell Type
 # # -----------|---------------|----------
 # #   0          | IL7R          | CD4 T cells
@@ -1508,47 +1689,42 @@ ggsave(paste0(outGraph, "PC1-40_hclust.pdf"))
 # # 5          | GNLY, NKG7    | NK cells
 # # 6          | FCER1A, CST3  | Dendritic Cells
 # # 7          | PPBP          | Megakaryocytes
-# 
+#
 # current.cluster.ids <- c(0, 1, 2, 3, 4, 5, 6, 7)
 # new.cluster.ids <- c("CD4 T cells", "CD14+ Monocytes", "B cells", "CD8 T cells", "FCGR3A+ Monocytes", "NK cells", "Dendritic cells", "Megakaryocytes")
 # centSO@ident <- plyr::mapvalues(centSO@ident, from = current.cluster.ids, to = new.cluster.ids)
 # TSNEPlot(centSO, do.label = T, pt.size = 0.5)
-# 
+#
 # ###Further subdivisions within cell types If you perturb some of our parameter
 # #choices above (for example, setting  `resolution=0.8` or changing the number of
 # #PCs), you might see the CD4 T cells subdivide into two groups. You can explore
 # #this subdivision to find markers separating the two T cell subsets. However,
 # #before reclustering (which will overwrite `object@ident`), we can stash our
 # #renamed identities to be easily recovered later.
-# 
+#
 # #First lets stash our identities for later
 # centSO <- StashIdent(centSO, save.name = "ClusterNames_0.6")
-# 
+#
 # # Note that if you set save.snn=T above, you don't need to recalculate the SNN, and can simply put : centSO=FindClusters(centSO,resolution = 0.8)
 # centSO <- FindClusters(centSO, dims.use = 1:10, resolution = 0.8, print.output = F)
-# 
+#
 # # Demonstration of how to plot two tSNE plots side by side, and how to color points based on different criteria
 # plot1 <- TSNEPlot(centSO, do.return = T, no.legend = TRUE, do.label = T)
 # plot2 <- TSNEPlot(centSO, do.return = T, group.by = "ClusterNames_0.6", no.legend = TRUE, do.label = T)
 # plot_grid(list(plot1, plot2), cols = 2)
-# 
+#
 # #Find discriminating markers
 # tcell.markers <- FindMarkers(centSO, 0, 1)
-# 
+#
 # # Most of the markers tend to be expressed in C1 (i.e. S100A4). However, we can
 # # see that CCR7 is upregulated in C0, strongly indicating that we can
 # # differentiate memory from naive CD4 cells.
-# 
+#
 # # cols.use demarcates the color palette from low to high expression
 # FeaturePlot(centSO, c("LIMCH1", "MEF2C"), cols.use = c("green", "blue"))
-# 
+#
 # # The memory/naive split is bit weak, and we would probably benefit from looking
 # # at more cells to see if this becomes more convincing (stay tuned!). In the
 # # meantime, we can restore our old cluster identities for downstream processing.
-# 
+#
 # centSO <- SetAllIdent(centSO, id = "ClusterNames_0.6")
-
-
-
-
-
