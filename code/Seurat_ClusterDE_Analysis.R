@@ -26,8 +26,8 @@ source("Function_Library.R")
 ## Inputs
 
 # Seurat
-load("../analysis/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_seuratO.Robj")
-# load("../analysis/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_TEST_seuratO.Robj")
+load("../analysis/analyzed_dataSeurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_seuratO.Robj")
+# load("../analysis/analyzed_data/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_TEST_seuratO.Robj")
 # centSO <- ssCentSO
 # noCentExM <- ssNoCentExM
 
@@ -378,7 +378,7 @@ hclust_order <- as.numeric(as.character(dend_data$labels$label))
 
 # Plot dendrogram
 # ggplot
-ggplot(dend_data$segments) + 
+ggplot(dend_data$segments) +
   geom_segment(aes(x = x, y = y, xend = xend, yend = yend))+
   geom_text(data = dend_data$labels, aes(x, y, label = label),
     hjust = 1, angle = 90, size = 3)
@@ -438,11 +438,12 @@ ggLabels <- ggLabels + theme(
 )
 
 # Combine individual heatmaps and dendrogram
-# Determine relative widths by scaling to log 10 cluster size
-df <- data.frame(table(centSO@ident))
-df$rel_widths <- as.vector(log((df$Freq + 1), 10)) + 1
-df <- df[match(hclust_order, df$Var1), ]
-rel_widths <- c(10, df$rel_widths, 1)
+# # Determine relative widths by scaling to log 10 cluster size
+# df <- data.frame(table(centSO@ident))
+# df$rel_widths <- as.vector(log((df$Freq + 1), 10)) + 1
+# df <- df[match(hclust_order, df$Var1), ]
+# rel_widths <- c(30, df$rel_widths, 1)
+rel_widths <- c(30, rep(3, length(hclust_order)), 1)
 # Combine
 pg <- plot_grid(plotlist = append(list(ggLabels), ggL), ncol = 19
   , rel_widths = rel_widths, align = 'h', axis = 't')
@@ -464,15 +465,16 @@ ggsave(paste0(outGraph, "hclust_heatmap.png"), width = 12, height = 28)
 
 # Top 10 markers for each cluster
 clusterDeDF %>% group_by(CLUSTER) %>% top_n(10, LOG_FC) -> top10
-geneGroupDF <- data.frame(GENE = top10$GENE, GROUP = top10$CLUSTER)
+geneGroupDF <- data.frame(GENE = as.character(top10$GENE), GROUP = top10$CLUSTER)
 
 Heatmap_By_Cluster(geneGroupDF = geneGroupDF, exprM = centSO@scale.data
-  , seuratO = centSO, clusters = c(1:17), lowerLimit = -1.5, upperLimit = 1.5
-  , geneOrder = NULL
-  , clusterOrder = c(17,16,13,15,8,10,11,7,9,3,14,2,5,6,4,1,0,12))
+  , seuratO = centSO, clusters = c(1:16), lowerLimit = -1.5, upperLimit = 1.5
+  , geneOrder = FALSE
+  # , clusterOrder = c(16,13,15,8,10,11,7,9,3,14,2,5,6,4,1,0,12)
+)
 ggsave(paste0(outGraph, "Top10DE_ExprHeatmap_CentScale.png")
   , width = 13, height = 24)
-# 
+#
 # ggL <- Heatmaps_By_Cluster_Combined(geneGroupDF, exprM = centSO@scale.data
 #   , seuratO = centSO, lowerLimit = -1.5, upperLimit = 1.5
 #   , clusters1 = c(0:1), clusters2 = c(2:10), clusters3 = c(11:17)
@@ -586,7 +588,7 @@ title <- ggdraw() + draw_label(paste0(graphCodeTitle
 plot_grid(title, pg, ncol = 1, rel_heights = c(0.05, 1))
 ggsave(paste0(outGraph, "ExprMeanHeatmap_CentScale.png")
   , width = 16, height = length(ggL)*1.5)
-  
+
 
 # # Violin plots of top 10 markers
 # pdf(paste0(outGraph, "ViolinPlot_Top10Markers.pdf"), width = 10)
@@ -595,7 +597,7 @@ ggsave(paste0(outGraph, "ExprMeanHeatmap_CentScale.png")
 #   VlnPlot(centSO, top10cluster$gene, size.use = 0.5)
 # })
 # dev.off()
-# 
+#
 # # Feature plot of top 10 markers
 # pdf(paste0(outGraph, "FeaturePlot_Top10Markers.pdf"), width = 10)
 # top10L <- split(top10, top10$cluster)
@@ -610,10 +612,10 @@ ggsave(paste0(outGraph, "ExprMeanHeatmap_CentScale.png")
 ldf <- split(clusterDeDF, clusterDeDF$CLUSTER)
 
 lapply(names(ldf)[1], function(clusterID) {
-  
+
   print(clusterID)
   deDF <- ldf[[clusterID]]
-  
+
   # Expression heatmap of DE genes
   # Centered scaled
   p1 <- DE_Heatmap(clusterDeDF = deDF
@@ -647,17 +649,17 @@ lapply(names(ldf)[1], function(clusterID) {
   plot_grid(title, pg, ncol = 1, rel_heights = c(0.2, 1))
   ggsave(paste0(outGraph, "ExprHeatmap_Cluster", clusterID, ".png")
     , width = 12, height = 8)
-  
+
 })
 
 # Heatmap - mean expression
 lapply(names(ldf), function(clusterID) {
-  
+
   print(clusterID)
   deDF <- ldf[[clusterID]]
-  
+
   deDF <- deDF[1:40, ]
-  
+
   # Expression heatmap of DE genes
   # Centered scaled
   p1 <- DE_Mean_Heatmap(clusterDeDF = deDF
@@ -712,7 +714,7 @@ ggL <- lapply(sort(unique(clusterDeDF$CLUSTER)), function(cluster){
   # Plot
   gg <- ggplot(df, aes(x = Stage, y = value)) +
     geom_jitter(size = 0.01, alpha = 0.2) +
-    stat_summary(geom = "pointrange", fun.data = mean_cl_normal, 
+    stat_summary(geom = "pointrange", fun.data = mean_cl_normal,
       fun.args = list(conf.int = 0.95), color = "red", fatten = 0.25) +
     # stat_summary(fun.y = "mean", color = "red", size = 1, geom = "point") +
     # geom_smooth(method = "loess") +
@@ -823,7 +825,7 @@ ggL <- lapply(sort(unique(clusterDeDF$CLUSTER)), function(cluster){
   # Plot
   gg <- ggplot(df, aes(x = Zone, y = value)) +
     geom_jitter(size = 0.01, alpha = 0.2) +
-    stat_summary(geom = "pointrange", fun.data = mean_cl_normal, 
+    stat_summary(geom = "pointrange", fun.data = mean_cl_normal,
       fun.args = list(conf.int = 0.95), color = "lightcoral", alpha = 0.75) +
     stat_summary(fun.y = "mean", color = "red", size = 1, geom = "point") +
     # geom_smooth(method = "loess") +
@@ -840,7 +842,3 @@ Plot_Grid(ggPlotsL = ggL, ncol = 4, rel_height = 0.15
     , "\nBlack points = expression of each gene in each sample"))
 ggsave(paste0(outGraph, "MillerExpr.png"), width = 13, height = 18)
 ################################################################################
-
-
-
-
