@@ -15,12 +15,12 @@ DE_Filters_ClustersAvsB_ExpMatrix <- function(
   , clusterIDs1 = NULL
   , clusterIDs2 = NULL
 ) {
-  
+
   if (! is.null(minPercent)) {
     # Expressed > 0 counts in > X% of cells in cluster
     if (! is.null(clusterIDs1)) {
       # Subset expression matrix to cluster
-      cdf <- as.matrix(so@data)[ ,so@ident %in% clusterIDs1]  
+      cdf <- as.matrix(so@data)[ ,so@ident %in% clusterIDs1]
     }
     # Expressed > 0 counts in > X% of cells in cluster
     idxp <- (rowSums(cdf > 0) / ncol(cdf)) > (minPercent / 100)
@@ -29,7 +29,7 @@ DE_Filters_ClustersAvsB_ExpMatrix <- function(
   } else {
     idxp <- rep(TRUE, nrow(so@data))
   }
-  
+
   if (! is.null(foldChange)) {
     # Fold change > Y of gene in cluster versus all other cells
     if (! is.null(clusterIDs1)) {
@@ -46,7 +46,7 @@ DE_Filters_ClustersAvsB_ExpMatrix <- function(
   } else {
     idxf <- rep(TRUE, nrow(so@data))
   }
-  
+
   # Filter exDF
   exDF <- as.matrix(so@data[idxp & idxf, so@ident %in% c(clusterIDs1, clusterIDs2)])
   return(exDF)
@@ -61,16 +61,16 @@ DE_Filters_ExpMatrix <- function(
   , foldChange = NULL
   , clusterID = NULL
   , cellID = NULL) {
-  
+
   if (! is.null(minPercent)) {
     # Expressed > 0 counts in > X% of cells in cluster
     if (! is.null(clusterID)) {
       # Subset expression matrix to cluster
-      cdf <- as.matrix(so@data)[ ,so@ident == clusterID]  
+      cdf <- as.matrix(so@data)[ ,so@ident == clusterID]
     }
     if (! is.null(cellID)) {
       # Subset expression matrix to cluster
-      cdf <- as.matrix(so@data)[ ,colnames(so@data) %in% cellID]  
+      cdf <- as.matrix(so@data)[ ,colnames(so@data) %in% cellID]
     }
     # Expressed > 0 counts in > X% of cells in cluster
     idxp <- (rowSums(cdf > 0) / ncol(cdf)) > (minPercent / 100)
@@ -79,7 +79,7 @@ DE_Filters_ExpMatrix <- function(
   } else {
     idxp <- rep(TRUE, nrow(so@data))
   }
-  
+
   if (! is.null(foldChange)) {
     # Fold change > Y of gene in cluster versus all other cells
     if (! is.null(clusterID)) {
@@ -102,7 +102,7 @@ DE_Filters_ExpMatrix <- function(
   } else {
     idxf <- rep(TRUE, nrow(so@data))
   }
-  
+
   # Filter exDF
   exDF <- as.matrix(so@data[idxp & idxf, ])
   return(exDF)
@@ -119,12 +119,12 @@ DE_Filters_ExpMatrix <- function(
 # 6            VZ   9.1  0.27861748 -0.248868277
 # mod: "y~ExpCondition+RIN.y+Seq.PC1+Seq.PC2"
 DE_Linear_Model <- function (exDatDF, termsDF, mod) {
-  
+
   lmmod <- apply(as.matrix(exDatDF), 1
     , function(y) {
       mod <- as.formula(mod)
       lm(mod, data = termsDF)})
-  
+
   coefmat <- matrix(NA, nrow = nrow(exDatDF)
     , ncol = length(coef(lmmod[[1]])))
   pvalmat <- matrix(NA, nrow = nrow(exDatDF)
@@ -171,19 +171,20 @@ Format_DE <- function (deLM, so, clusterID) {
 Heatmap_By_Cluster_Format_Data <- function(
   geneGroupDF, exprM, seuratO, clusters, lowerLimit, upperLimit
   , geneOrder = FALSE, clusterOrder = NULL) {
-  
+
   # Subset expression matrix to genes of interest by merging
   ggDF <- merge(geneGroupDF[c("GENE", "GROUP")], exprM
     , by.x = 1, by.y = "row.names", all.x = TRUE)
-  
+
   if (geneOrder == TRUE) {
     # levels <- expand.grid(geneOrder, unique(ggDF$GROUP))
     # levels <- paste0(levels$Var1, "   ", levels$Var2)
     levels <- paste0(geneGroupDF$GENE, "   ", geneGroupDF$GROUP)
   }
-  
+
   # Set group factor levels
-  ggDF$GROUP <- as.factor(ggDF$GROUP)
+  ggDF$GROUP <- factor(ggDF$GROUP
+    , levels = unique(as.character(geneGroupDF$GROUP))[unique(as.character(geneGroupDF$GROUP)) %in% as.character(ggDF$GROUP)])
   # colnames(ggDF)[1:2] <- c("GENE", "GROUP")
   # Remove blanks
   ggDF <- ggDF[! ggDF$GENE == "", ]
@@ -200,23 +201,23 @@ Heatmap_By_Cluster_Format_Data <- function(
   ggDF <- ggDF[ggDF$SEURAT_CLUSTERS %in% clusters, ]
   # Add group to gene name
   ggDF$GENE_GROUP <- paste0(ggDF$GENE, "   ", ggDF$GROUP)
-  
-  # Order genes by setting levels 
+
+  # Order genes by setting levels
   if (! is.null(geneOrder)) {
     ggDF$GENE_GROUP <- factor(ggDF$GENE_GROUP, levels = levels)
   }
   # Set limits
   ggDF$value[ggDF$value < lowerLimit] <- lowerLimit
   ggDF$value[ggDF$value > upperLimit] <- upperLimit
-  
+
   return(ggDF)
 }
 
 # Expression heatmap, cells ordered by cluster
 Heatmap_By_Cluster <- function(
   geneGroupDF, exprM, seuratO, clusters, lowerLimit, upperLimit
-  , geneOrder = NULL, clusterOrder = NULL) {
-  
+  , geneOrder = FALSE, clusterOrder = NULL) {
+
   ggDF <- Heatmap_By_Cluster_Format_Data(
     geneGroupDF = geneGroupDF
     , exprM = exprM
@@ -227,7 +228,7 @@ Heatmap_By_Cluster <- function(
     , geneOrder = geneOrder
     , clusterOrder = clusterOrder
   )
-  
+
   # ggplot
   gg <- ggplot(ggDF, aes(x = variable, y = GENE_GROUP, fill = value)) +
     geom_tile() +
@@ -253,7 +254,7 @@ Heatmap_By_Cluster <- function(
 # Uses plot_grid to combine 3 heatmaps to deal with cell number scaling
 Heatmaps_By_Cluster_Combined <- function(geneGroupDF, exprM, seuratO
   , clusters1, clusters2, clusters3, lowerLimit, upperLimit, geneOrder = NULL) {
-  
+
   p1 <- Heatmap_By_Cluster(geneGroupDF = geneGroupDF, exprM = exprM
     , seuratO = seuratO, clusters = clusters1
     , lowerLimit = lowerLimit, upperLimit = upperLimit
@@ -332,14 +333,14 @@ Heatmap_By_Gene_Expression <- function (genes, exprM, limLow, limHigh) {
 #   ylab("Genes") +
 #   xlab("Cells ordered by PAX6 expression") +
 #   ggtitle("Normalized mean centered and scaled expression")
-# 
+#
 # # Normalized
 # p2 <- Heatmap_By_Gene_Expression(genes = genes, exprM = noCentExM
 #   , limLow = -1, limHigh = 3)
 # p2 <- p2 + ylab("Genes") +
 #   xlab("Cells ordered by PAX6 expression") +
 #   ggtitle("Normalized expression")
-# 
+#
 # # plot_grid
 # pg <- plot_grid(p1, p2, ncol = 2)
 # # now add the title
@@ -378,7 +379,7 @@ Mean_Expression <- function(tsneDF, genes, exM) {
 Set_Limits <- function(tsneDF, limHigh, limLow) {
   tsneDF$EXPRESSION[tsneDF$EXPRESSION < limLow] <- limLow
   tsneDF$EXPRESSION[tsneDF$EXPRESSION > limHigh] <- limHigh
-  return(tsneDF)  
+  return(tsneDF)
 }
 
 # Color tSNE plot by expression from Mean_Expression()
@@ -422,7 +423,7 @@ TSNE_Plot <- function(seuratO) {
     theme_set(theme_get() + theme(text = element_text(size = 16))) +
     theme_update(plot.title = element_text(size = 12)) +
     theme_update(axis.line = element_line(colour = "black")
-      , plot.background = element_blank() 
+      , plot.background = element_blank()
       , panel.border = element_blank()
     )
   return(ggTsne)
@@ -457,12 +458,12 @@ FeaturePlot <- function(genes, tsneDF, seuratO, exM, limLow, limHigh
   # CCGTTTGTGATA  6.102554  3.158785
   # GGCACAAGTGGC  3.886729  7.046055
   # Loop through and plot each group of genes
-  
+
   # Mean expression of gene group if grouping is provided
   if (! is.null(geneGrouping)) {
-    
+
     genesGroupingDF <- data.frame(Gene = genes, Grouping = geneGrouping)
-    
+
     ggL <- lapply(unique(genesGroupingDF$Grouping), function(grouping) {
       print(grouping)
       genes <- genesGroupingDF$Gene[genesGroupingDF$Grouping == grouping]
@@ -480,7 +481,7 @@ FeaturePlot <- function(genes, tsneDF, seuratO, exM, limLow, limHigh
       return(ggFp)
     })
   }
-  
+
   # If grouping is not provided plot each gene individually
   else {
     ggL <- lapply(genes, function(gene) {
@@ -498,7 +499,7 @@ FeaturePlot <- function(genes, tsneDF, seuratO, exM, limLow, limHigh
       return(ggFp)
     })
   }
-  
+
   ggTsne <- TSNE_Plot(seuratO) + theme(legend.position = "none")
   ggL <- append(list(ggTsne), ggL)
   return(ggL)
@@ -540,7 +541,7 @@ Convert_Mixed_GeneSym_EnsID_To_EnsID <- function(ids){
 }
 
 # Cowplot plot_grid and add title
-Plot_Grid <- function(ggPlotsL, ncol, title, rel_height, ...) {
+Plot_Grid <- function(ggPlotsL, ncol, title, rel_height = 0.1, ...) {
   # cowplot plot_grid ...: align = 'v', axis = 'l'
   # Plot grid
   pg <- plot_grid(plotlist = ggPlotsL, ncol = ncol, ...)
@@ -560,34 +561,49 @@ Remove_Outliers_By_SD <- function(x, nStdev, na.rm = TRUE, ...) {
 }
 ################################################################################
 
+# ggplot
+
+# Publication theme
+ggplot_set_theme_publication <-
+  theme_bw() +
+  theme(
+    , text = element_text(size = 10, colour = "black")
+    , plot.title = element_text(size = 10)
+    , axis.line = element_line(colour = "black")
+    , panel.border = element_blank()
+    , panel.grid.major = element_blank()
+    , panel.grid.minor = element_blank()
+  )
+################################################################################
+
 ### Monocle functions
 
 # Format expression of gene list for plotting trajectory
 # For Plot_Trajectory_Gene_Expression
 Add_Expr_To_MonocleObj <- function (monocleO, genes, exprM, limHigh, limLow) {
-  
+
   # Subset expression matrix to genes of interest
   m <- exprM
   m <- m[row.names(m) %in% genes, ]
-  
+
   # Mean expression
   if (class(m) != "numeric") {
     m <- colMeans(m)
   }
-  
+
   # Set expression limits
   m[m > limHigh] <- limHigh
   m[m < limLow] <- limLow
-  
+
   # Merge with monocle cells to filter any cells not in monocle object
   m <- data.frame(CELLS = names(m), EXPRESSION = m)
   m <- merge(pData(monocleO), m, by.x = "row.names"
-    , by.y = "CELLS", all.x = TRUE)
-  
+    , by.y = "CELLS")
+
   # Order cells like monocle object
   idx <- match(row.names(pData(monocleO)), m$CELL)
   m <- m[idx, ]
-  
+
   # Add column with expression values to monocle object pData slot
   pData(monocleO)$EXPRESSION = m$EXPRESSION
   return(monocleO)
@@ -595,13 +611,12 @@ Add_Expr_To_MonocleObj <- function (monocleO, genes, exprM, limHigh, limLow) {
 
 # Color monocle trajectory by expression of gene list
 Plot_Trajectory_Gene_Expression <- function (monocleO, genes, exprM
-  , limHigh, limLow, title) {
-  
+  , limHigh, limLow, title, cell_size = 0.01, ...) {
+
   mo <- Add_Expr_To_MonocleObj(monocleO = monocleO, genes = genes
     , exprM = exprM, limHigh, limLow)
-  
-  gg <- plot_cell_trajectory(mo, 1, 2
-    , color_by = "EXPRESSION", cell_size = 0.01)
+
+  gg <- plot_cell_trajectory(mo, color_by = "EXPRESSION", cell_size = cell_size, ...)
   gg <- gg +
     scale_color_distiller(name = "Normalized\nexpression", type = "div"
       , palette = 5, direction = -1, limits = c(limLow, limHigh)) +
@@ -614,7 +629,7 @@ Plot_Trajectory_Gene_Expression <- function (monocleO, genes, exprM
 Heatmap_By_State <- function(
   geneGroupDF, exprM, monocleO, clusters, lowerLimit, upperLimit
   , geneOrder = NULL, centScale = NULL) {
-  
+
   # Subset expression matrix to genes of interest by merging
   ggDF <- merge(geneGroupDF[c("GENE", "GROUP")], exprM
     , by.x = 1, by.y = "row.names", all.x = TRUE)
@@ -673,7 +688,7 @@ Heatmap_By_State <- function(
 # Uses plot_grid to combine 3 heatmaps to deal with cell number scaling
 Heatmaps_By_State_Combined <- function(geneGroupDF, exprM, monocleO
   , clusters1, clusters2, clusters3, lowerLimit, upperLimit, geneOrder = NULL) {
-  
+
   p1 <- Heatmap_By_Cluster(geneGroupDF = geneGroupDF, exprM = exprM
     , monocleO = monocleO, clusters = clusters1
     , lowerLimit = lowerLimit, upperLimit = upperLimit
@@ -755,7 +770,7 @@ ScatterPlot_Expression <- function (genes, exprM, limLow, limHigh){
 ## Violin plots of expression by cluster
 Gene_Expression_By_Cluster_ViolinPlot <- function(genes, exprM, clusterIDs
   , geneOrder = NULL, grouping = NULL){
-  
+
   # Normalized, no mean centering scaling
   ggDF <- merge(genes, exprM
     , by.x = 1, by.y = "row.names", all.x = TRUE)
@@ -777,7 +792,7 @@ Gene_Expression_By_Cluster_ViolinPlot <- function(genes, exprM, clusterIDs
       , mean, na.rm = TRUE)
     colnames(ggDF) <- c("x", "variable", "CLUSTER", "value")
   }
-  
+
   # Violin plots of expression by cluster
   gg <- ggplot(ggDF, aes(x = CLUSTER, y = value)) +
     geom_violin(aes(fill = CLUSTER)) +
@@ -787,14 +802,14 @@ Gene_Expression_By_Cluster_ViolinPlot <- function(genes, exprM, clusterIDs
     theme(legend.position = "none") +
     ylab("Normalized expression") +
     xlab("Clusters")
-  
+
   return(gg)
 }
 
 ## Violin plots of expression faceted by cluster
 Gene_Expression_Facet_By_Cluster_ViolinPlot <- function(genes, exprM, clusterIDs
   , geneOrder = NULL, grouping = NULL, ggtitle = NULL, ncol){
-  
+
   # Normalized, no mean centering scaling
   ggDF <- merge(genes, exprM
     , by.x = 1, by.y = "row.names", all.x = TRUE)
@@ -816,7 +831,7 @@ Gene_Expression_Facet_By_Cluster_ViolinPlot <- function(genes, exprM, clusterIDs
       , mean, na.rm = TRUE)
     colnames(ggDF) <- c("x", "variable", "CLUSTER", "value")
   }
-  
+
   # Violin plots of expression by cluster
   gg <- ggplot(ggDF, aes(x = x, y = value)) +
     geom_violin(aes(fill = x)) +
@@ -827,7 +842,7 @@ Gene_Expression_Facet_By_Cluster_ViolinPlot <- function(genes, exprM, clusterIDs
     ylab("Normalized expression") +
     xlab("Genes") +
     ggtitle(ggtitle)
-  
+
   return(gg)
 }
 ################################################################################
