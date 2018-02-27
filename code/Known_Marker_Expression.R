@@ -1,6 +1,6 @@
 # Damon Polioudakis
 # 2017-02-21
-# Test Seurat PCA method and clustering parameters
+# Plot known marker lists as heatmaps, violin plots, feature plots
 
 # Must load modules:
 #  module load gcc/4.9.3
@@ -34,8 +34,8 @@ source("Function_Library.R")
 
 # Seurat
 # PC 1-40
-load("../analysis/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_seuratO.Robj")
-# load("../analysis/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_TEST_seuratO.Robj")
+load("../analysis/analyzed_data/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_seuratO.Robj")
+# load("../analysis/analyzed_data/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_TEST_seuratO.Robj")
 # centSO <- ssCentSO
 # noCentExM <- ssNoCentExM
 
@@ -66,8 +66,7 @@ outGraph <- "../analysis/graphs/Known_Marker_Expression/DS2-11_FtMm250_200-3sdgd
 # outGraph <- "../analysis/graphs/Known_Marker_Expression/DS2-11_FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Known_Marker_Expression_"
 
 ## Output Directories
-outGraphDir <- dirname(outGraph)
-dir.create(outGraphDir, recursive = TRUE)
+dir.create(dirname(outGraph), recursive = TRUE)
 
 ## Set ggplot2 theme
 theme_set(theme_bw())
@@ -80,155 +79,177 @@ theme_update(axis.line = element_line(colour = "black")
 
 ### Functions
 
-# Calculate mean expression of group of genes for each cell using seurat scaled
-# expression values
-Mean_Expression <- function(ggDF, genes, exM) {
-  genesExDF <- exM[which(row.names(exM) %in% genes), ]
-  # genesExDF <- as.matrix(seuratO@data)[which(row.names(as.matrix(seuratO@data)) %in% genes), ]
-  # Only calculate column means if there are multiple genes
-  print("Length genes:")
-  print(length(genes))
-  if (is.matrix(genesExDF)) {
-    mnExDF <- colMeans(genesExDF)
-  } else {
-    mnExDF <- genesExDF
-  }
-  # Add to ggplot data frame
-  ggDF$EXPRESSION <- mnExDF[match(row.names(ggDF), names(mnExDF))]
-  return(ggDF)
+Format_Cell_Cycle_Genes_Table <- function(){
+  print("Format_Cell_Cycle_Genes_Table")
+  ccDF <- melt(ccDF, measure.vars = c("G1.S", "S", "G2.M", "M", "M.G1"))
+  colnames(ccDF) <- c("Grouping", "Gene.Symbol")
+  ccDF$Gene.Symbol <- gsub(" *", "", ccDF$Gene.Symbol)
+  ccDF <- ccDF[! ccDF$Gene.Symbol == "", ]
+  ccDF <- ccDF[! is.na(ccDF$Grouping), ]
+  ccDF$Grouping <- gsub(" *", "", ccDF$Grouping)
+  ccDF$Grouping <- factor(ccDF$Grouping, levels = unique(ccDF$Grouping))
+  return(ccDF)
 }
+################################################################################
 
-# Transform data to desired limits for ggplot2
-Set_Limits <- function(ggDF, limHigh, limLow) {
-  ggDF$EXPRESSION[ggDF$EXPRESSION < limLow] <- limLow
-  ggDF$EXPRESSION[ggDF$EXPRESSION > limHigh] <- limHigh
-  return(ggDF)  
-}
+### Plots for paper
 
-# Color tSNE plot by expression from Mean_Expression()
-Feature_Plot <- function(ggDF, title, limLow, limHigh) {
-  ggFp <- ggplot(ggDF, aes(x = tSNE_1, y = tSNE_2, col = EXPRESSION)) +
-    geom_point(size = 0.1) +
-    # scale_colour_gradient(name = "Normalized\nExpression", low = "#a6cee3"
-    #   , high = "#e31a1c", limits = c(0, 2)) +
-    # scale_color_distiller(name = "Normalized\nexpression", type = "div"
-    #   , palette = 5, direction = -1) +
-    scale_colour_gradient(name = "Normalized\nExpression", low = "#a6cee3"
-      , high = "red", limits = c(limLow, limHigh)) +
-    ggtitle(title)
-  return(ggFp)
-}
+## Subset of marker genes heatmap
 
-# Color tSNE plot by expression from Mean_Expression()
-Feature_Plot_CentScale <- function(ggDF, title, limLow, limHigh) {
-  ggFp <- ggplot(ggDF, aes(x = tSNE_1, y = tSNE_2, col = EXPRESSION)) +
-    geom_point(size = 0.1) +
-    # scale_colour_gradient(name = "Normalized\nExpression", low = "#a6cee3"
-    #   , high = "#e31a1c", limits = c(0, 2)) +
-    scale_color_distiller(name = "Normalized\nexpression\nz-score", type = "div"
-      , palette = 5, direction = -1, limits = c(limLow, limHigh)) +
-    # scale_colour_gradient(name = "Normalized\nExpression", low = "#a6cee3"
-    #   , high = "red", limits = c(limLow, limHigh)) +
-    ggtitle(title)
-  return(ggFp)
-}
-
-# tSNE plot colored by Seurat clustering
-TSNE_Plot <- function(seuratO) {
-  # tSNE graph colored by cluster
-  ggTsne <- TSNEPlot(seuratO, do.label = TRUE, pt.size = 0.1, do.return = TRUE
-    , no.legend = TRUE)
-  ggTsne <- ggTsne + theme_set(theme_bw()) +
-    theme_set(theme_get() + theme(text = element_text(size = 10))) +
-    theme_update(plot.title = element_text(size = 10)) +
-    theme_update(
-      axis.line = element_line(colour = "black")
-      , plot.background = element_blank() 
-      , panel.border = element_blank()
-    ) +
-    theme(legend.position = "none")
-  # ggTsne <- ggTsne + scale_fill_manual(name = "Cluster:")
-  # ggTsne <- ggTsne + guides(color = guide_legend(override.aes = list(size = 1)))
-  ggTsne <- ggTsne + ggtitle(paste0(
-    "tSNE plot, each point is a cell"
-    , "\nColor indicates cluster assignment"
-  ))
-  return(ggTsne)
-}
-
-# Expression heatmap
-Heatmap_By_Cluster <- function(
-  ggDF, seuratO, clusters, lowerLimit, upperLimit, ggTitle) {
-  
-  colnames(ggDF)[1:2] <- c("GENE", "GROUP")
-  # Remove blanks
-  ggDF <- ggDF[! ggDF$GENE == "", ]
-  ggDF <- melt(ggDF)
-  # Add seurat clusters
-  idx <- match(ggDF$variable, names(seuratO@ident))
-  ggDF$SEURAT_CLUSTERS <- seuratO@ident[idx]
-  # Subset clusters
-  ggDF <- ggDF[ggDF$SEURAT_CLUSTERS %in% clusters, ]
-  ggDF$GENE_GROUP <- paste0(ggDF$GENE, "   ", ggDF$GROUP)
-  # Set limits
-  ggDF$value[ggDF$value < lowerLimit] <- lowerLimit
-  ggDF$value[ggDF$value > upperLimit] <- upperLimit
-  # ggplot
-  ggplot(ggDF, aes(x = variable, y = GENE_GROUP, fill = value)) +
-    geom_tile() +
-    facet_grid(GROUP~SEURAT_CLUSTERS, space = "free", scales = "free") +
-    # scale_fill_gradient2(high = "#d7191c", low = "#2c7bb6")
-    scale_fill_distiller(name = "Normalized\nexpression", type = "div"
-      , palette = 5, direction = -1, limits = c(lowerLimit, upperLimit)) +
-    theme_bw() +
-    theme(strip.text.x = element_text(angle = 90)) +
-    theme(strip.text.y = element_text(angle = 0)) +
-    theme(strip.background = element_blank()) +
-    theme(axis.text.x = element_blank()) +
-    theme(axis.ticks = element_blank()) +
-    theme(text = element_text(size = 12)) +
-    theme(axis.text.y = element_text(size = 10)) +
-    ylab("Genes") +
-    xlab("Cells ordered by cluster")
-}
-
-# Use plot_grid to combine 3 heatmaps to deal with cell number scaling
-Heatmaps_Combined <- function(ggDF, seuratO, clusters1, clusters2, clusters3
-  , lowerLimit, upperLimit, title) {
-  p1 <- Heatmap_By_Cluster(ggDF, seuratO = centSO, clusters = clusters1
-    , lowerLimit = lowerLimit, upperLimit = upperLimit
+Plot_marker_genes_heatmap <- function(){
+  genesL <- list(
+    vRG = c("CRYAB")
+    , oRG = c("HOPX")
+    , RG = c("VIM", "PAX6", "HES1", "SOX2")
+    , IPC = c("EOMES")
+    , Neuron = c("STMN2", "NEUROD6")
+    , "Excitatory deep layer" = c("BCL11B", "TBR1", "SOX5")
+    , "Excitatory upper layer" = c("SATB2")
+    , Interneuron = c("DLX1", "DLX2", "SST", "CALB2")
+    , OPC = c("OLIG1", "OLIG2")
+    , Endothelial = c("ITM2A", "CLDN5")
+    , Pericyte = c("RGS5")
+    , Microglia = c("AIF1", "CX3CR1")
   )
-  p1 <- p1 + theme(
-    axis.title.x = element_blank()
-    , strip.text.y = element_blank()
+  df1 <- melt(genesL)
+
+  # Heatmap plot
+  # Normalized, mean centered and scaled
+  geneGroupDF <- data.frame(GENE = df1$value, GROUP = df1$L1)
+  ggL <- lapply(c(9,7,8,10,2,0,1,12,4,3,14,5,6,11,13,15,16), function(cluster){
+    # tryCatch(
+      Heatmap_By_Cluster(
+        geneGroupDF = geneGroupDF
+        , exprM = as.matrix(centSO@scale.data)
+        , seuratO = centSO
+        , clusters = cluster
+        , lowerLimit = -1.5
+        , upperLimit = 1.5
+        , geneOrder = TRUE
+      )
+      # , error = function(e) NULL)
+  })
+  # Remove nulls from ggplot list
+  ggL <- ggL[! sapply(ggL, is.null)]
+  # Extract legend
+  legend <- get_legend(ggL[[1]])
+  # Format - remove axis labels
+  # ggL[[1]] <- ggL[[1]] + theme(
+  #   axis.title.x = element_blank()
+  #   , legend.position = "none"
+  #   , strip.text.y = element_blank())
+  labels <- ggL[[1]]
+  # margin: top, right, bottom, and left
+  labels <- ggL[[1]] + theme(
+    plot.margin = unit(c(1, -1, 1, 1), "cm")
     , legend.position = "none"
+    , axis.title.x = element_blank()
+    , strip.text.y = element_blank())
+  ggL[1:length(ggL)] <- lapply(ggL[1:length(ggL)], function(gg) {
+    gg + theme(
+      strip.text.y = element_blank()
+      , legend.position = "none"
+      , axis.title.y = element_blank()
+      , axis.text.y = element_blank()
+      , axis.ticks.y = element_blank()
+      , axis.title.x = element_blank()
+      # margin: top, right, bottom, and left
+      , plot.margin = unit(c(1, 0.05, 1, 0.05), "cm")
+    )
+  })
+
+  # Combine individual heatmaps and dendrogram
+  rel_widths <- data.frame(log((table(centSO@ident) + 1), 5))
+  rel_widths <- rel_widths[match(c(9,7,8,10,2,0,1,12,4,3,14,5,6,11,13,15,16), rel_widths$Var1), ]
+  rel_widths <- as.vector(rel_widths$Freq) + 1
+
+  rel_widths <- c(30, rel_widths)
+  # Combine
+  pg <- plot_grid(plotlist = append(list(labels), ggL)
+    , ncol = length(rel_widths), rel_widths = rel_widths
+    , align = 'h', axis = 't'
   )
-  p2 <- Heatmap_By_Cluster(ggDF, seuratO = centSO, clusters = clusters2
-    , lowerLimit = lowerLimit, upperLimit = upperLimit
-  )
-  p2 <- p2 + theme(
-    strip.text.y = element_blank()
-    , legend.position = "none"
-    , axis.title.y = element_blank()
-    , axis.text.y = element_blank()
-    , axis.ticks.y = element_blank()
-  )
-  p3 <- Heatmap_By_Cluster(ggDF, seuratO = centSO, clusters = clusters3
-    , lowerLimit = lowerLimit, upperLimit = upperLimit
-  )
-  p3 <- p3 + theme(
-    axis.title.x = element_blank()
-    , axis.title.y = element_blank()
-    , axis.text.y = element_blank()
-    , axis.ticks.y = element_blank())
-  # plot_grid combine
-  pg <- plot_grid(p1, p2, p3, ncol = 3, align = 'h', axis = 'b')
-  # now add the title
-  title <- ggdraw() + draw_label(title)
-  # rel_heights values control title margins
-  pg <- plot_grid(title, pg, ncol = 1, rel_heights = c(0.1, 1))
   return(pg)
 }
+Plot_marker_genes_heatmap()
+ggsave(paste0(outGraph
+    , "KnownMarksSubset_Heatmap_NormalizedCenteredScaled_paper.png"
+  )
+  , width = 10, height = 7
+)
+
+## Subset of marker genes feature plots
+
+# Genes
+gene_group_DF <- kmDF[kmDF$Grouping %in% c("vRG", "oRG", "RG", "IP", "Neuron"
+  , "Excitatory Deep Layer Cortical", "Excitatory Upper Layer Cortical"
+  , "GABAergic interneuron "), ]
+# Collect tSNE values for ggplot
+tsneDF <- as.data.frame(centSO@dr$tsne@cell.embeddings)
+# Normalized centered scaled
+ggL <- FeaturePlot(
+  genes = gene_group_DF$Gene.Symbol
+  , tsneDF = tsneDF
+  , seuratO = centSO
+  , exM = centSO@scale.data
+  , limLow = -1.5
+  , limHigh = 1.5
+  , geneGrouping = gene_group_DF$Grouping
+  , centScale = TRUE
+)
+ggL <- lapply(ggL, function(gg){
+  gg <- gg + ggplot_set_theme_publication
+  return(gg)
+})
+ggL[[1]] <- ggL[[1]] + theme(legend.position = "none")
+Plot_Grid(
+  ggPlotsL = ggL, ncol = 3, rel_height = 0.1, align = 'v', axis = 'r'
+  , title = paste0(graphCodeTitle
+    , "\n\nExpression of marker genes"
+    , "\nNormalized centered scaled expression"
+    , "\n")
+)
+ggsave(paste0(outGraph
+    , "KnownMarksSubset_FeaturePlot_NormalizedCenteredScaled_paper.png"
+  )
+  , width = 12, height = 9, limitsize = FALSE
+)
+
+## Cell cycle genes feature plots
+
+# Genes
+gene_group_DF <- Format_Cell_Cycle_Genes_Table()
+
+# Collect tSNE values for ggplot
+tsneDF <- as.data.frame(centSO@dr$tsne@cell.embeddings)
+# Normalized centered scaled
+ggL <- FeaturePlot(
+  genes = gene_group_DF$Gene.Symbol
+  , tsneDF = tsneDF
+  , seuratO = centSO
+  , exM = centSO@scale.data
+  , limLow = -1.5
+  , limHigh = 1.5
+  , geneGrouping = gene_group_DF$Grouping
+  , centScale = TRUE
+)
+ggL <- lapply(ggL, function(gg){
+  gg <- gg + ggplot_set_theme_publication
+  return(gg)
+})
+ggL[[1]] <- ggL[[1]] + theme(legend.position = "none")
+Plot_Grid(
+  ggPlotsL = ggL, ncol = 3, rel_height = 0.2, align = 'v', axis = 'r'
+  , title = paste0(graphCodeTitle
+    , "\n\nExpression of Macosko 2015 cell cycle marker genes"
+    , "\nNormalized centered scaled expression"
+    , "\n")
+)
+ggsave(paste0(outGraph
+    , "CellCycleSubset_FeaturePlot_NormalizedCenteredScaled_paper.png"
+  )
+  , width = 12, height = 7, limitsize = FALSE
+)
 ################################################################################
 
 ### Luis marker genes
@@ -260,6 +281,65 @@ kmDF <- kmDF[! kmDF$Gene.Symbol == "", ]
 kmDF <- kmDF[! is.na(kmDF$Grouping), ]
 kmDF$Grouping <- factor(kmDF$Grouping, levels = unique(kmDF$Grouping))
 kmDFL <- split(kmDF, kmDF$Grouping)
+
+genes <- c("FBOX32"
+  , "CRYAB"
+  , "HOPX"
+  , "LGALS3"
+  , "VIM"
+  , "PAX6"
+  , "HES1"
+  , "SOX2"
+  , "EOMES"
+  , "STMN2"
+  , "NEUROD6"
+  , "SATB2"
+  , "DLX1"
+  , "DLX2"
+  , "SST"
+  , "CALB2"
+  , "LXH6"
+  , "PPP1R1B"
+  , "DCX"
+  , "BCL11B"
+  , "TBR1"
+  , "SOX5"
+  , "ITM2A"
+  , "ELTD1"
+  , "RGS5"
+  , "PDBGRB"
+  , "OLIG1"
+  , "OLIG2"
+  , "AIF1"
+  , "CX3CR1"
+)
+# Heatmap
+# Normalized, mean centered and scaled
+ssKmDF <- kmDF[c("Gene.Symbol", "Grouping")]
+ssKmDF <- ssKmDF[ssKmDF$Gene.Symbol %in% genes, ]
+ggDF <- merge(ssKmDF[c("Gene.Symbol", "Grouping")], centSO@scale.data
+  , by.x = 1, by.y = "row.names", all.x = TRUE)
+Heatmaps_Combined(
+  ggDF = ggDF, seuratO = centSO, lowerLimit = -1.5, upperLimit = 1.5
+  , clusters1 = c(0:1), clusters2 = c(2:10), clusters3 = c(11:17)
+  , title = paste0(graphCodeTitle
+    , "\n\nExpression of published marker genes by cluster"
+    , "\nx-axis: Marker genes"
+    , "\ny-axis: Cells ordered by cluster"
+    , "\nNormalized expression, mean centered, variance scaled"
+    , "\n\nRemove cells < 200 genes detected"
+    , "\nRemove cells > 3192 (3 SD) genes detected"
+    , "\nRemove genes detected in < 3 cells"
+    , "\nNormalize expression"
+    , "\nRegress out nUMI, donor, library lab"
+    , "\nMean center variance scale expression"
+    , "\nSeurat clustering with PC1-40"
+    , "\n"))
+ggsave(paste0(outGraph, "KnownMarksSubset_Heatmap_NormalizedCenteredScaled.png")
+  , width = 15, height = 13, limitsize = FALSE)
+
+
+## Full marker gene list
 
 # Feature plot
 # Normalized, no mean centering scaling
@@ -332,7 +412,7 @@ Gene_Expression_By_Cluster_ViolinPlot(
   , exprM = as.matrix(centSO@scale.data)
   , clusterIDs = centSO@ident
   , grouping = kmDF$Grouping
-  ) +
+) +
   ggtitle(paste0(graphCodeTitle
     , "\n"
     , "\nMarker gene expression by cluster"
@@ -347,7 +427,7 @@ Gene_Expression_By_Cluster_ViolinPlot(
   , exprM = noCentExM
   , clusterIDs = centSO@ident
   , grouping = kmDF$Grouping
-  ) +
+) +
   ggtitle(paste0(graphCodeTitle
     , "\n"
     , "\nMarker gene expression by cluster"
@@ -401,65 +481,6 @@ Heatmaps_Combined(
     , "\n"))
 ggsave(paste0(outGraph, "KnownMarks_Heatmap_NormalizedCenteredScaled.png")
   , width = 16, height = 60, limitsize = FALSE)
-
-
-## Subset of marker genes for paper
-
-genes <- c("FBOX32"
-  , "CRYAB"
-  , "HOPX"
-  , "LGALS3"
-  , "VIM"
-  , "PAX6"
-  , "HES1"
-  , "SOX2"
-  , "EOMES"
-  , "STMN2"
-  , "NEUROD6"
-  , "SATB2"
-  , "DLX1"
-  , "DLX2"
-  , "SST"
-  , "CALB2"
-  , "LXH6"
-  , "PPP1R1B"
-  , "DCX"
-  , "BCL11B"
-  , "TBR1"
-  , "SOX5"
-  , "ITM2A"
-  , "ELTD1"
-  , "BGS5"
-  , "PDBGRB"
-  , "OLIG1"
-  , "OLG2"
-  , "AIF1"
-  , "CX3CR1"
-)
-# Heatmap
-# Normalized, mean centered and scaled
-ssKmDF <- kmDF[c("Gene.Symbol", "Grouping")]
-ssKmDF[ssKmDF$Gene.Symbol %in% genes, ]
-ggDF <- merge(ssKmDF[c("Gene.Symbol", "Grouping")], centSO@scale.data
-  , by.x = 1, by.y = "row.names", all.x = TRUE)
-Heatmaps_Combined(
-  ggDF = ggDF, seuratO = centSO, lowerLimit = -1.5, upperLimit = 1.5
-  , clusters1 = c(0:1), clusters2 = c(2:10), clusters3 = c(11:17)
-  , title = paste0(graphCodeTitle
-    , "\n\nExpression of published marker genes by cluster"
-    , "\nx-axis: Marker genes"
-    , "\ny-axis: Cells ordered by cluster"
-    , "\nNormalized expression, mean centered, variance scaled"
-    , "\n\nRemove cells < 200 genes detected"
-    , "\nRemove cells > 3192 (3 SD) genes detected"
-    , "\nRemove genes detected in < 3 cells"
-    , "\nNormalize expression"
-    , "\nRegress out nUMI, donor, library lab"
-    , "\nMean center variance scale expression"
-    , "\nSeurat clustering with PC1-40"
-    , "\n"))
-ggsave(paste0(outGraph, "KnownMarks_Heatmap_NormalizedCenteredScaled.png")
-  , width = 16, height = 30, limitsize = FALSE)
 ################################################################################
 
 ### Cell cycle genes
@@ -601,7 +622,7 @@ ggsave(paste0(outGraph, "CellCycle_Heatmap_NormalizedCenteredScaled.png")
 
 # Collect tSNE values for ggplot
 ggDF <- as.data.frame(centSO@dr$tsne@cell.embeddings)
-  
+
 ## Feature plot - normalized, mean centered scaled on full dataset
 # Loop through and plot each group of genes
 ggL <- apply(mmDF, 1, function(v1) {
@@ -642,7 +663,7 @@ plot_grid(title, pg, ncol = 1
 ggsave(paste0(
   outGraph, "MolyneauxMarks_FeaturePlot_NormalizedCenteredScaled.png")
   , width = 14, height = length(ggL), limitsize = FALSE)
-  
+
 ## Feature plot - normalized, not mean centered scaled on cluster
 # Loop through and plot each group of genes
 ggL <- apply(df, 1, function(v1) {
@@ -882,14 +903,14 @@ ggsave(paste0(outGraph, "Lake_Heatmap_NormalizedCenteredScaled.png")
 ################################################################################
 
 # ### Genes of interest
-# 
+#
 # # Collect tSNE values for ggplot
 # ggDF <- as.data.frame(centSO@dr$tsne@cell.embeddings)
-# 
+#
 # ## Additional genes of interest not in marker table
 # genes <- c("CALB1", "CALB2", "PVALB", "SST")
 # genes[genes %in% row.names(seuratO@scale.data)]
-# 
+#
 # # Loop through and plot each group of genes
 # pdf(paste0(outGraph, "_CALB1_CALB2_PVALB_SST.pdf"), width = 13, height = 6)
 # lapply(genes, function(gene) {
@@ -930,7 +951,7 @@ ggsave(paste0(outGraph, "LuisLayerMarks_ViolinPlot_Normalized.png")
 uplGenes <- kmDF$Gene.Symbol[kmDF$Grouping %in% c(
   "Excitatory Upper Layer Cortical")]
 lowlGenes <- kmDF$Gene.Symbol[kmDF$Grouping %in% c(
-    "Excitatory Deep Layer Cortical")]
+  "Excitatory Deep Layer Cortical")]
 genes <- kmDF$Gene.Symbol[kmDF$Grouping %in% c(
   "Excitatory Upper Layer Cortical", "Excitatory Deep Layer Cortical")]
 
@@ -958,7 +979,7 @@ colnames(m2) <- colnames(df3)
 rownames(m2) <- rownames(df3)
 for (cName in colnames(m2)) {
   for (rName in rownames(m2)) {
-    m2[rName,cName] <- v1[[cName]] + v1[[rName]]  
+    m2[rName,cName] <- v1[[cName]] + v1[[rName]]
   }
 }
 # Normalize for frequency
