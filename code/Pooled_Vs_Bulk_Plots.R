@@ -301,7 +301,9 @@ idx <- match(ggDF$ensembl_gene_id, mean_cpm_DF$ensembl_gene_id)
 ggDF$cds_length <- mean_cpm_DF$cds_length[idx]
 ggDF <- ggDF[! is.na(ggDF$cds_length), ]
 ggDF$value[ggDF$value == "None"] <- "All other genes"
-ggDF$value <- as.factor(ggDF$value)
+ggDF$value <- factor(ggDF$value
+  , levels = c("Bulk high", "All other genes", "Pool high")
+)
 # Plot
 ggplot(ggDF, aes(x = variable, y = cds_length, fill = value)) +
   geom_boxplot(outlier.shape = NA) +
@@ -324,12 +326,13 @@ ggDF <- droplevels(ggDF)
 # T test
 pval_DF <- Ttest_Table(
   data_table = ggDF, facet_col = "variable", group_col = "value"
+  , value_col = "cds_length"
 )
 ggt <- tableGrob(pval_DF)
 gg <- ggplot(ggDF, aes(x = variable, y = cds_length, fill = value)) +
   geom_boxplot(outlier.shape = NA) +
   scale_fill_manual(name = "Gene subset"
-    , values = c("#bdbdbd", "#e31a1c", "#1f78b4")) +
+    , values = c("#e31a1c", "#bdbdbd", "#1f78b4")) +
   coord_cartesian(ylim = c(0, 7000)) +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
   xlab("Dataset") +
@@ -383,7 +386,9 @@ idx <- match(ggDF$ensembl_gene_id, mean_cpm_DF$ensembl_gene_id)
 ggDF$percentage_gc_content <- mean_cpm_DF$percentage_gc_content[idx]
 ggDF <- ggDF[! is.na(ggDF$percentage_gc_content), ]
 ggDF$value[ggDF$value == "None"] <- "All other genes"
-ggDF$value <- as.factor(ggDF$value)
+ggDF$value <- factor(ggDF$value
+  , levels = c("Bulk high", "All other genes", "Pool high")
+)
 # Plot
 ggplot(ggDF, aes(x = variable, y = percentage_gc_content, fill = value)) +
   geom_boxplot(outlier.shape = NA) +
