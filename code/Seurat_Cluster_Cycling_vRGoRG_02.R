@@ -317,29 +317,29 @@ GGplot_GenesGroups_Pseudotime <- function(ggDF, title) {
     , width = 11)
 }
 
-Monocle_Plot_Trajectory_By_Pseudotime <- function(mo){
+Monocle_Plot_Trajectory_By_Pseudotime <- function(mo, ...){
   print("Monocle_Plot_Trajectory_By_Pseudotime")
-  gg <- plot_cell_trajectory(mo, 1, 2, color_by = "Pseudotime"
-    , cell_size = 1) +
+  gg <- plot_cell_trajectory(mo, color_by = "Pseudotime"
+    , cell_size = 1, ...) +
     scale_color_viridis() +
     theme(legend.position = "right") +
     ggtitle("Pseudotime")
   return(gg)
 }
 
-Monocle_Plot_Trajectory_By_Seurat_Cluster <- function(mo){
+Monocle_Plot_Trajectory_By_Seurat_Cluster <- function(mo, ...){
   print("Monocle_Plot_Trajectory_By_Seurat_Cluster")
-  gg <- plot_cell_trajectory(mo, 1, 2, color_by = "res.0.6"
-    , cell_size = 1) +
+  gg <- plot_cell_trajectory(mo, color_by = "res.0.6"
+    , cell_size = 1, ...) +
     theme(legend.position = "right") +
     ggtitle("Seurat cluster")
   return(gg)
 }
 
-Monocle_Plot_Trajectory_By_State <- function(mo, title) {
+Monocle_Plot_Trajectory_By_State <- function(mo, title, ...) {
   print("Monocle_Plot_Trajectory_By_State")
   # Plot faceted by state
-  plot_cell_trajectory(mo, 1, 2, color_by = "State", cell_size = 0.5) +
+  plot_cell_trajectory(mo, color_by = "State", cell_size = 0.5, ...) +
     facet_wrap(~State, ncol = 4) +
     theme(legend.position = "none") +
     ggtitle(paste0(graphCodeTitle
@@ -349,7 +349,7 @@ Monocle_Plot_Trajectory_By_State <- function(mo, title) {
   ggsave(paste0(outGraph, "Monocle_Trajectory_State_Comp12_", title, ".png"))
 }
 
-Monocle_Plot_Trajectory_By_Expression <- function(mo, genesGroupsDF){
+Monocle_Plot_Trajectory_By_Expression <- function(mo, genesGroupsDF, ...){
   print("Monocle_Plot_Trajectory_By_Expression")
   # Plot Luis markers - Seurat norm center scaled expression
   ggL <- lapply(unique(genesGroupsDF$Grouping), function(Group) {
@@ -360,7 +360,7 @@ Monocle_Plot_Trajectory_By_Expression <- function(mo, genesGroupsDF){
       # , exprM = as.matrix(exprs(mo_filtered))
       # , exprM = as.matrix(centSO@scale.data)
       , exprM = noCentExM
-      , limHigh = 1.5, limLow = 0, title = Group, cell_size = 1)
+      , limHigh = 1, limLow = 0, title = Group, cell_size = 1, ...)
     gg <- gg + theme(text = element_text(size = 12))
     return(gg)
   })
@@ -384,6 +384,7 @@ Plot_Monocle_Analysis <- function(mo, ccDF, kmDF, deDF, fold_changes, title){
   print(head(ggDF))
   GGplot_GenesGroups_Pseudotime(ggDF, title)
   # Monocle trajectory
+  # Component 1 and 2
   Monocle_Plot_Trajectory_By_State(mo, title)
   gg1 <- Monocle_Plot_Trajectory_By_Pseudotime(mo)
   gg2 <- Monocle_Plot_Trajectory_By_Seurat_Cluster(mo)
@@ -398,14 +399,70 @@ Plot_Monocle_Analysis <- function(mo, ccDF, kmDF, deDF, fold_changes, title){
       , "\n", genesGroupDF$Comparison[! is.na(genesGroupDF$Comparison)][1])
     )
   ggsave(paste0(outGraph, "Monocle_Trajectory_NormCentScale_", title, ".png"), width = 13, height = 16)
+  # Component 1 and 3
+  gg1 <- Monocle_Plot_Trajectory_By_Pseudotime(mo, x = 1, y = 3)
+  gg2 <- Monocle_Plot_Trajectory_By_Seurat_Cluster(mo, x = 1, y = 3)
+  ggL <- Monocle_Plot_Trajectory_By_Expression(
+    mo = mo
+    , genesGroupsDF = genesGroupDF, x = 1, y = 3
+  )
+  ggL <- append(list(gg1), ggL)
+  ggL <- append(list(gg2), ggL)
+  Plot_Grid(ggL, ncol = 3, align = 'v', axis = 'r'
+    , title = paste0(title
+      , "\n", genesGroupDF$Comparison[! is.na(genesGroupDF$Comparison)][1])
+    )
+  ggsave(paste0(outGraph, "Monocle_Trajectory_NormCentScale_", title, "_1v3.png"), width = 13, height = 16)
 }
 ################################################################################
 
 ### Run
 
-# Monocle for RG+ Neuron- cluster 7, 8, 10 cells
+# Monocle for cluster 7, 8, 9, 10 cells
 # Subset cells
-clusters <- c(7,8,10)
+clusters <- c(7,8,9,10)
+df1 <- Average_MarkersExp_Per_Cell(
+  exM = noCentExM, seuratO = centSO)
+cellIDs <- names(centSO@ident[centSO@ident %in% clusters])
+# Run monocle testing multiple max_components
+lapply(c(6,8,10,20,40), function(max_components){
+  ssMO <- Monocle_Run(cellIDs = cellIDs, max_components = max_components)
+  Plot_Monocle_Analysis(
+    mo = ssMO
+    , ccDF = ccDF
+    , kmDF = kmDF
+    , deDF = deDF[deDF$Comparison == "RG_vs_IP", ]
+    , fold_changes = c(0, 0.25, 0.5)
+    , title = paste0("Cluster", paste0(clusters, collapse = "")
+      , "_RG_IP_N_Comp", max_components
+    )
+  )
+})
+
+# Monocle for cluster 2, 7, 8, 9, 10 cells
+# Subset cells
+clusters <- c(2,7,8,9,10)
+df1 <- Average_MarkersExp_Per_Cell(
+  exM = noCentExM, seuratO = centSO)
+cellIDs <- names(centSO@ident[centSO@ident %in% clusters])
+# Run monocle testing multiple max_components
+lapply(c(6,8,10,20,40), function(max_components){
+  ssMO <- Monocle_Run(cellIDs = cellIDs, max_components = max_components)
+  Plot_Monocle_Analysis(
+    mo = ssMO
+    , ccDF = ccDF
+    , kmDF = kmDF
+    , deDF = deDF[deDF$Comparison == "RG_vs_IP", ]
+    , fold_changes = c(0, 0.25, 0.5)
+    , title = paste0("Cluster", paste0(clusters, collapse = "")
+      , "_RG_IP_N_Comp", max_components
+    )
+  )
+})
+
+# RG -> IP: Monocle for RG+ Neuron- cluster 7, 8, 9, 10 cells
+# Subset cells
+clusters <- c(7,8,9,10)
 df1 <- Average_MarkersExp_Per_Cell(
   exM = noCentExM, seuratO = centSO)
 cellIDs <- row.names(df1)[df1$RG > 0.5 & df1$Neuron < 0.25]
@@ -413,7 +470,7 @@ cellIDs <- intersect(cellIDs
   , names(centSO@ident[centSO@ident %in% clusters])
 )
 # Run monocle testing multiple max_components
-lapply(c(4,6,8), function(max_components){
+lapply(c(6,8,10,20,40), function(max_components){
   ssMO <- Monocle_Run(cellIDs = cellIDs, max_components = max_components)
   Plot_Monocle_Analysis(
     mo = ssMO
@@ -427,66 +484,17 @@ lapply(c(4,6,8), function(max_components){
   )
 })
 
-# Monocle for RG+ Neuron- cluster 8, 9, 10 cells
-# Subset cells
-clusters <- c(8,9,10)
-df1 <- Average_MarkersExp_Per_Cell(
-  exM = noCentExM, seuratO = centSO)
-cellIDs <- row.names(df1)[df1$RG > 0.5 & df1$Neuron < 0.25]
-cellIDs <- intersect(cellIDs
-  , names(centSO@ident[centSO@ident %in% clusters])
-)
-# Run monocle testing multiple max_components
-lapply(c(4,6,8), function(max_components){
-  ssMO <- Monocle_Run(cellIDs = cellIDs, max_components = max_components)
-  Plot_Monocle_Analysis(
-    mo = ssMO
-    , ccDF = ccDF
-    , kmDF = kmDF
-    , deDF = deDF[deDF$Comparison == "RG_vs_IP", ]
-    , fold_changes = c(0, 0.25, 0.5)
-    , title = paste0("Cluster", paste0(clusters, collapse = "")
-      , "_RGp_IP_Nn_Comp", max_components
-    )
-  )
-})
-
-# Monocle for RG+ Neuron- cluster 7, 8, 9, 10 cells
+# RG -> Neuron: Monocle for RG+ IP- cluster 7, 8, 9, 10 cells
 # Subset cells
 clusters <- c(7,8,9,10)
 df1 <- Average_MarkersExp_Per_Cell(
   exM = noCentExM, seuratO = centSO)
-cellIDs <- row.names(df1)[df1$RG > 0.5 & df1$Neuron < 0.25]
+cellIDs <- row.names(df1)[df1$RG > 0.5 & df1$IP < 0.25]
 cellIDs <- intersect(cellIDs
   , names(centSO@ident[centSO@ident %in% clusters])
 )
 # Run monocle testing multiple max_components
-lapply(c(4,6,8), function(max_components){
-  ssMO <- Monocle_Run(cellIDs = cellIDs, max_components = max_components)
-  Plot_Monocle_Analysis(
-    mo = ssMO
-    , ccDF = ccDF
-    , kmDF = kmDF
-    , deDF = deDF[deDF$Comparison == "RG_vs_IP", ]
-    , fold_changes = c(0, 0.25, 0.5)
-    , title = paste0("Cluster", paste0(clusters, collapse = "")
-      , "_RGp_IP_Nn_Comp", max_components
-    )
-  )
-})
-
-# Monocle for RG+/Neuron+ IP- cluster 0, 8, 9, 10 cells
-# Subset cells
-clusters <- c(0,8,9,10)
-df1 <- Average_MarkersExp_Per_Cell(
-  exM = noCentExM, seuratO = centSO)
-cellIDs <- row.names(df1)[df1$RG > 0.5 & df1$IP < 0.25 |
-  df1$Neuron > 0.5 & df1$IP < 0.25]
-cellIDs <- intersect(cellIDs
-  , names(centSO@ident[centSO@ident %in% clusters])
-)
-# Run monocle testing multiple max_components
-lapply(c(4,6,8), function(max_components){
+lapply(c(6,8,10,20,40), function(max_components){
   ssMO <- Monocle_Run(cellIDs = cellIDs, max_components = max_components)
   Plot_Monocle_Analysis(
     mo = ssMO
@@ -495,226 +503,22 @@ lapply(c(4,6,8), function(max_components){
     , deDF = deDF[deDF$Comparison == "RG_vs_Neuron", ]
     , fold_changes = c(0, 0.25, 0.5)
     , title = paste0("Cluster", paste0(clusters, collapse = "")
-      , "_RGp_IPn_Np_Comp", max_components
+      , "_RGp_IPn_N_Comp", max_components
     )
   )
 })
 
-# Monocle for IP+/Neuron+ RG- cluster 0, 2, 8, 10 cells
-# Subset cells
-clusters <- c(0,2,8,10)
-df1 <- Average_MarkersExp_Per_Cell(
-  exM = noCentExM, seuratO = centSO)
-cellIDs <- row.names(df1)[df1$IP > 0.5 & df1$RG < 0.25 |
-  df1$Neuron > 0.5 & df1$RG < 0.25]
-cellIDs <- intersect(cellIDs
-  , names(centSO@ident[centSO@ident %in% clusters])
-)
-# Run monocle testing multiple max_components
-lapply(c(4,6,8), function(max_components){
-  ssMO <- Monocle_Run(cellIDs = cellIDs, max_components = max_components)
-  Plot_Monocle_Analysis(
-    mo = ssMO
-    , ccDF = ccDF
-    , kmDF = kmDF
-    , deDF = deDF[deDF$Comparison == "IP_vs_Neuron", ]
-    , fold_changes = c(0, 0.25, 0.5)
-    , title = paste0("Cluster", paste0(clusters, collapse = "")
-      , "_RGn_IPp_Np_Comp", max_components
-    )
-  )
-})
-
-# Monocle for RG+ IP+ Neuron- cluster 7, 8, 10 cells
-# Subset cells
-clusters <- c(7,8,10)
-df1 <- Average_MarkersExp_Per_Cell(
-  exM = noCentExM, seuratO = centSO)
-cellIDs1 <- row.names(df1)[df1$RG > 0.5 & df1$Neuron < 0.25]
-cellIDs1 <- intersect(cellIDs1
-  , names(centSO@ident[centSO@ident %in% c(7)])
-)
-cellIDs2 <- row.names(df1)[df1$RG > 0.5 & df1$Neuron < 0.25 & df1$IP > 0.5]
-cellIDs2 <- intersect(cellIDs2
-  , names(centSO@ident[centSO@ident %in% c(8,10)])
-)
-cellIDs <- c(cellIDs1, cellIDs2)
-# Run monocle testing multiple max_components
-lapply(c(4,6,8), function(max_components){
-  ssMO <- Monocle_Run(cellIDs = cellIDs, max_components = max_components)
-  Plot_Monocle_Analysis(
-    mo = ssMO
-    , ccDF = ccDF
-    , kmDF = kmDF
-    , deDF = deDF[deDF$Comparison == "RG_vs_IP", ]
-    , fold_changes = c(0, 0.25, 0.5)
-    , title = paste0("Cluster", paste0(clusters, collapse = "")
-      , "_RGp_IPp_Nn_Comp", max_components
-    )
-  )
-})
-
-# Monocle for RG+ IP+ Neuron- cluster 8, 9, 10 cells
-# Subset cells
-clusters <- c(8,9,10)
-df1 <- Average_MarkersExp_Per_Cell(
-  exM = noCentExM, seuratO = centSO)
-cellIDs1 <- row.names(df1)[df1$RG > 0.5 & df1$Neuron < 0.25]
-cellIDs1 <- intersect(cellIDs1
-  , names(centSO@ident[centSO@ident %in% c(9)])
-)
-cellIDs2 <- row.names(df1)[df1$RG > 0.5 & df1$Neuron < 0.25 & df1$IP > 0.5]
-cellIDs2 <- intersect(cellIDs2
-  , names(centSO@ident[centSO@ident %in% c(8,10)])
-)
-cellIDs <- c(cellIDs1, cellIDs2)
-# Run monocle testing multiple max_components
-lapply(c(4,6,8), function(max_components){
-  ssMO <- Monocle_Run(cellIDs = cellIDs, max_components = max_components)
-  Plot_Monocle_Analysis(
-    mo = ssMO
-    , ccDF = ccDF
-    , kmDF = kmDF
-    , deDF = deDF[deDF$Comparison == "RG_vs_IP", ]
-    , fold_changes = c(0, 0.25, 0.5)
-    , title = paste0("Cluster", paste0(clusters, collapse = "")
-      , "_RGp_IPp_Nn_Comp", max_components
-    )
-  )
-})
-
-# Monocle for RG+ IP+ Neuron- cluster 7, 8, 9, 10 cells
-# Subset cells
-clusters <- c(7,8,9,10)
-df1 <- Average_MarkersExp_Per_Cell(
-  exM = noCentExM, seuratO = centSO)
-cellIDs1 <- row.names(df1)[df1$RG > 0.5 & df1$Neuron < 0.25]
-cellIDs1 <- intersect(cellIDs1
-  , names(centSO@ident[centSO@ident %in% c(7,9)])
-)
-cellIDs2 <- row.names(df1)[df1$RG > 0.5 & df1$Neuron < 0.25 & df1$IP > 0.5]
-cellIDs2 <- intersect(cellIDs2
-  , names(centSO@ident[centSO@ident %in% c(8,10)])
-)
-cellIDs <- c(cellIDs1, cellIDs2)
-# Run monocle testing multiple max_components
-lapply(c(4,6,8), function(max_components){
-  ssMO <- Monocle_Run(cellIDs = cellIDs, max_components = max_components)
-  Plot_Monocle_Analysis(
-    mo = ssMO
-    , ccDF = ccDF
-    , kmDF = kmDF
-    , deDF = deDF[deDF$Comparison == "RG_vs_IP", ]
-    , fold_changes = c(0, 0.25, 0.5)
-    , title = paste0("Cluster", paste0(clusters, collapse = "")
-      , "_RGp_IPp_Nn_Comp", max_components
-    )
-  )
-})
-
-# Monocle for RG+ Neuron+ IP- cluster 7, 8, 10 cells
-# Subset cells
-clusters <- c(7,8,10)
-df1 <- Average_MarkersExp_Per_Cell(
-  exM = noCentExM, seuratO = centSO)
-cellIDs1 <- row.names(df1)[df1$RG > 0.5 & df1$IP < 0.25]
-cellIDs1 <- intersect(cellIDs1
-  , names(centSO@ident[centSO@ident %in% c(7)])
-)
-cellIDs2 <- row.names(df1)[df1$RG > 0.5 & df1$IP < 0.25 & df1$Neuron > 0.5]
-cellIDs2 <- intersect(cellIDs2
-  , names(centSO@ident[centSO@ident %in% c(8,10)])
-)
-cellIDs <- c(cellIDs1, cellIDs2)
-# Run monocle testing multiple max_components
-lapply(c(4,6,8), function(max_components){
-  ssMO <- Monocle_Run(cellIDs = cellIDs, max_components = max_components)
-  Plot_Monocle_Analysis(
-    mo = ssMO
-    , ccDF = ccDF
-    , kmDF = kmDF
-    , deDF = deDF[deDF$Comparison == "RG_vs_Neuron", ]
-    , fold_changes = c(0, 0.25, 0.5)
-    , title = paste0("Cluster", paste0(clusters, collapse = "")
-      , "_RGp_IPn_Np_Comp", max_components
-    )
-  )
-})
-
-# Monocle for RG+ Neuron+ IP- cluster 8, 9, 10 cells
-# Subset cells
-clusters <- c(8,9,10)
-df1 <- Average_MarkersExp_Per_Cell(
-  exM = noCentExM, seuratO = centSO)
-cellIDs1 <- row.names(df1)[df1$RG > 0.5 & df1$IP < 0.25]
-cellIDs1 <- intersect(cellIDs1
-  , names(centSO@ident[centSO@ident %in% c(9)])
-)
-cellIDs2 <- row.names(df1)[df1$RG > 0.5 & df1$IP < 0.25 & df1$Neuron > 0.5]
-cellIDs2 <- intersect(cellIDs2
-  , names(centSO@ident[centSO@ident %in% c(8,10)])
-)
-cellIDs <- c(cellIDs1, cellIDs2)
-# Run monocle testing multiple max_components
-lapply(c(4,6,8), function(max_components){
-  ssMO <- Monocle_Run(cellIDs = cellIDs, max_components = max_components)
-  Plot_Monocle_Analysis(
-    mo = ssMO
-    , ccDF = ccDF
-    , kmDF = kmDF
-    , deDF = deDF[deDF$Comparison == "RG_vs_Neuron", ]
-    , fold_changes = c(0, 0.25, 0.5)
-    , title = paste0("Cluster", paste0(clusters, collapse = "")
-      , "_RGp_IPn_Np_Comp", max_components
-    )
-  )
-})
-
-# Monocle for RG+ Neuron+ IP- cluster 7, 8, 9, 10 cells
-# Subset cells
-clusters <- c(7,8,9,10)
-df1 <- Average_MarkersExp_Per_Cell(
-  exM = noCentExM, seuratO = centSO)
-cellIDs1 <- row.names(df1)[df1$RG > 0.5 & df1$IP < 0.25]
-cellIDs1 <- intersect(cellIDs1
-  , names(centSO@ident[centSO@ident %in% c(7,9)])
-)
-cellIDs2 <- row.names(df1)[df1$RG > 0.5 & df1$IP < 0.25 & df1$Neuron > 0.5]
-cellIDs2 <- intersect(cellIDs2
-  , names(centSO@ident[centSO@ident %in% c(8,10)])
-)
-cellIDs <- c(cellIDs1, cellIDs2)
-# Run monocle testing multiple max_components
-lapply(c(4,6,8), function(max_components){
-  ssMO <- Monocle_Run(cellIDs = cellIDs, max_components = max_components)
-  Plot_Monocle_Analysis(
-    mo = ssMO
-    , ccDF = ccDF
-    , kmDF = kmDF
-    , deDF = deDF[deDF$Comparison == "RG_vs_Neuron", ]
-    , fold_changes = c(0, 0.25, 0.5)
-    , title = paste0("Cluster", paste0(clusters, collapse = "")
-      , "_RGp_IPn_Np_Comp", max_components
-    )
-  )
-})
-
-# Monocle for IP+ Neuron+ RG- cluster 2, 8, 10 cells
+# IP -> Neuron: Monocle for IP+ RG- cluster 2, 8, 10 cells
 # Subset cells
 clusters <- c(2,8,10)
 df1 <- Average_MarkersExp_Per_Cell(
   exM = noCentExM, seuratO = centSO)
-cellIDs1 <- row.names(df1)[df1$IP > 0.5 & df1$RG < 0.25]
-cellIDs1 <- intersect(cellIDs1
-  , names(centSO@ident[centSO@ident %in% c(2)])
+cellIDs <- row.names(df1)[df1$IP > 0.5 & df1$RG < 0.25]
+cellIDs <- intersect(cellIDs
+  , names(centSO@ident[centSO@ident %in% clusters])
 )
-cellIDs2 <- row.names(df1)[df1$IP > 0.5 & df1$RG < 0.25 & df1$Neuron > 0.5]
-cellIDs2 <- intersect(cellIDs2
-  , names(centSO@ident[centSO@ident %in% c(8,10)])
-)
-cellIDs <- c(cellIDs1, cellIDs2)
 # Run monocle testing multiple max_components
-lapply(c(4,6,8), function(max_components){
+lapply(c(6,8,10,20,40), function(max_components){
   ssMO <- Monocle_Run(cellIDs = cellIDs, max_components = max_components)
   Plot_Monocle_Analysis(
     mo = ssMO
@@ -723,10 +527,408 @@ lapply(c(4,6,8), function(max_components){
     , deDF = deDF[deDF$Comparison == "IP_vs_Neuron", ]
     , fold_changes = c(0, 0.25, 0.5)
     , title = paste0("Cluster", paste0(clusters, collapse = "")
-      , "_RGn_IPp_Np_Comp", max_components
+      , "_RGn_IPp_N_Comp", max_components
     )
   )
 })
+
+#
+# # Monocle for RG+ IP- cluster 0, 8, 9, 10 cells
+# # Subset cells
+# clusters <- c(0,8,9,10)
+# df1 <- Average_MarkersExp_Per_Cell(
+#   exM = noCentExM, seuratO = centSO)
+# cellIDs <- row.names(df1)[df1$RG > 0.5 & df1$IP < 0.25]
+# cellIDs <- intersect(cellIDs
+#   , names(centSO@ident[centSO@ident %in% clusters])
+# )
+# # Run monocle testing multiple max_components
+# lapply(c(4,6,8), function(max_components){
+#   ssMO <- Monocle_Run(cellIDs = cellIDs, max_components = max_components)
+#   Plot_Monocle_Analysis(
+#     mo = ssMO
+#     , ccDF = ccDF
+#     , kmDF = kmDF
+#     , deDF = deDF[deDF$Comparison == "RG_vs_Neuron", ]
+#     , fold_changes = c(0, 0.25, 0.5)
+#     , title = paste0("Cluster", paste0(clusters, collapse = "")
+#       , "_RGp_IPn_N_Comp", max_components
+#     )
+#   )
+# })
+#
+# # Monocle for RG+ IP- cluster 8, 9, 10 cells
+# # Subset cells
+# clusters <- c(8,9,10)
+# df1 <- Average_MarkersExp_Per_Cell(
+#   exM = noCentExM, seuratO = centSO)
+# cellIDs <- row.names(df1)[df1$RG > 0.5 & df1$IP < 0.25]
+# cellIDs <- intersect(cellIDs
+#   , names(centSO@ident[centSO@ident %in% clusters])
+# )
+# # Run monocle testing multiple max_components
+# lapply(c(4,6,8), function(max_components){
+#   ssMO <- Monocle_Run(cellIDs = cellIDs, max_components = max_components)
+#   Plot_Monocle_Analysis(
+#     mo = ssMO
+#     , ccDF = ccDF
+#     , kmDF = kmDF
+#     , deDF = deDF[deDF$Comparison == "RG_vs_Neuron", ]
+#     , fold_changes = c(0, 0.25, 0.5)
+#     , title = paste0("Cluster", paste0(clusters, collapse = "")
+#       , "_RGp_IPn_N_Comp", max_components
+#     )
+#   )
+# })
+
+# # Monocle for RG+ IP- cluster 0, 8, 10 cells
+# # Subset cells
+# clusters <- c(0,8,10)
+# df1 <- Average_MarkersExp_Per_Cell(
+#   exM = noCentExM, seuratO = centSO)
+# cellIDs <- row.names(df1)[df1$RG > 0.5 & df1$IP < 0.25]
+# cellIDs <- intersect(cellIDs
+#   , names(centSO@ident[centSO@ident %in% clusters])
+# )
+# # Run monocle testing multiple max_components
+# lapply(c(4,6,8,10,15,20), function(max_components){
+#   ssMO <- Monocle_Run(cellIDs = cellIDs, max_components = max_components)
+#   Plot_Monocle_Analysis(
+#     mo = ssMO
+#     , ccDF = ccDF
+#     , kmDF = kmDF
+#     , deDF = deDF[deDF$Comparison == "RG_vs_Neuron", ]
+#     , fold_changes = c(0, 0.25, 0.5)
+#     , title = paste0("Cluster", paste0(clusters, collapse = "")
+#       , "_RGp_IPn_N_Comp", max_components
+#     )
+#   )
+# })
+
+# # Monocle for RG+ Neuron- cluster 7, 8, 10 cells
+# # Subset cells
+# clusters <- c(7,8,10)
+# df1 <- Average_MarkersExp_Per_Cell(
+#   exM = noCentExM, seuratO = centSO)
+# cellIDs <- row.names(df1)[df1$RG > 0.5 & df1$Neuron < 0.25]
+# cellIDs <- intersect(cellIDs
+#   , names(centSO@ident[centSO@ident %in% clusters])
+# )
+# # Run monocle testing multiple max_components
+# lapply(c(4,6,8), function(max_components){
+#   ssMO <- Monocle_Run(cellIDs = cellIDs, max_components = max_components)
+#   Plot_Monocle_Analysis(
+#     mo = ssMO
+#     , ccDF = ccDF
+#     , kmDF = kmDF
+#     , deDF = deDF[deDF$Comparison == "RG_vs_IP", ]
+#     , fold_changes = c(0, 0.25, 0.5)
+#     , title = paste0("Cluster", paste0(clusters, collapse = "")
+#       , "_RGp_IP_Nn_Comp", max_components
+#     )
+#   )
+# })
+#
+# # Monocle for RG+ Neuron- cluster 8, 9, 10 cells
+# # Subset cells
+# clusters <- c(8,9,10)
+# df1 <- Average_MarkersExp_Per_Cell(
+#   exM = noCentExM, seuratO = centSO)
+# cellIDs <- row.names(df1)[df1$RG > 0.5 & df1$Neuron < 0.25]
+# cellIDs <- intersect(cellIDs
+#   , names(centSO@ident[centSO@ident %in% clusters])
+# )
+# # Run monocle testing multiple max_components
+# lapply(c(4,6,8), function(max_components){
+#   ssMO <- Monocle_Run(cellIDs = cellIDs, max_components = max_components)
+#   Plot_Monocle_Analysis(
+#     mo = ssMO
+#     , ccDF = ccDF
+#     , kmDF = kmDF
+#     , deDF = deDF[deDF$Comparison == "RG_vs_IP", ]
+#     , fold_changes = c(0, 0.25, 0.5)
+#     , title = paste0("Cluster", paste0(clusters, collapse = "")
+#       , "_RGp_IP_Nn_Comp", max_components
+#     )
+#   )
+# })
+#
+# # Monocle for RG+ Neuron- cluster 7, 8, 9, 10 cells
+# # Subset cells
+# clusters <- c(7,8,9,10)
+# df1 <- Average_MarkersExp_Per_Cell(
+#   exM = noCentExM, seuratO = centSO)
+# cellIDs <- row.names(df1)[df1$RG > 0.5 & df1$Neuron < 0.25]
+# cellIDs <- intersect(cellIDs
+#   , names(centSO@ident[centSO@ident %in% clusters])
+# )
+# # Run monocle testing multiple max_components
+# lapply(c(4,6,8), function(max_components){
+#   ssMO <- Monocle_Run(cellIDs = cellIDs, max_components = max_components)
+#   Plot_Monocle_Analysis(
+#     mo = ssMO
+#     , ccDF = ccDF
+#     , kmDF = kmDF
+#     , deDF = deDF[deDF$Comparison == "RG_vs_IP", ]
+#     , fold_changes = c(0, 0.25, 0.5)
+#     , title = paste0("Cluster", paste0(clusters, collapse = "")
+#       , "_RGp_IP_Nn_Comp", max_components
+#     )
+#   )
+# })
+#
+# # Monocle for RG+/Neuron+ IP- cluster 0, 8, 9, 10 cells
+# # Subset cells
+# clusters <- c(0,8,9,10)
+# df1 <- Average_MarkersExp_Per_Cell(
+#   exM = noCentExM, seuratO = centSO)
+# cellIDs <- row.names(df1)[df1$RG > 0.5 & df1$IP < 0.25 |
+#   df1$Neuron > 0.5 & df1$IP < 0.25]
+# cellIDs <- intersect(cellIDs
+#   , names(centSO@ident[centSO@ident %in% clusters])
+# )
+# # Run monocle testing multiple max_components
+# lapply(c(4,6,8), function(max_components){
+#   ssMO <- Monocle_Run(cellIDs = cellIDs, max_components = max_components)
+#   Plot_Monocle_Analysis(
+#     mo = ssMO
+#     , ccDF = ccDF
+#     , kmDF = kmDF
+#     , deDF = deDF[deDF$Comparison == "RG_vs_Neuron", ]
+#     , fold_changes = c(0, 0.25, 0.5)
+#     , title = paste0("Cluster", paste0(clusters, collapse = "")
+#       , "_RGp_IPn_Np_Comp", max_components
+#     )
+#   )
+# })
+#
+# # Monocle for IP+/Neuron+ RG- cluster 0, 2, 8, 10 cells
+# # Subset cells
+# clusters <- c(0,2,8,10)
+# df1 <- Average_MarkersExp_Per_Cell(
+#   exM = noCentExM, seuratO = centSO)
+# cellIDs <- row.names(df1)[df1$IP > 0.5 & df1$RG < 0.25 |
+#   df1$Neuron > 0.5 & df1$RG < 0.25]
+# cellIDs <- intersect(cellIDs
+#   , names(centSO@ident[centSO@ident %in% clusters])
+# )
+# # Run monocle testing multiple max_components
+# lapply(c(4,6,8), function(max_components){
+#   ssMO <- Monocle_Run(cellIDs = cellIDs, max_components = max_components)
+#   Plot_Monocle_Analysis(
+#     mo = ssMO
+#     , ccDF = ccDF
+#     , kmDF = kmDF
+#     , deDF = deDF[deDF$Comparison == "IP_vs_Neuron", ]
+#     , fold_changes = c(0, 0.25, 0.5)
+#     , title = paste0("Cluster", paste0(clusters, collapse = "")
+#       , "_RGn_IPp_Np_Comp", max_components
+#     )
+#   )
+# })
+#
+# # Monocle for RG+ IP+ Neuron- cluster 7, 8, 10 cells
+# # Subset cells
+# clusters <- c(7,8,10)
+# df1 <- Average_MarkersExp_Per_Cell(
+#   exM = noCentExM, seuratO = centSO)
+# cellIDs1 <- row.names(df1)[df1$RG > 0.5 & df1$Neuron < 0.25]
+# cellIDs1 <- intersect(cellIDs1
+#   , names(centSO@ident[centSO@ident %in% c(7)])
+# )
+# cellIDs2 <- row.names(df1)[df1$RG > 0.5 & df1$Neuron < 0.25 & df1$IP > 0.5]
+# cellIDs2 <- intersect(cellIDs2
+#   , names(centSO@ident[centSO@ident %in% c(8,10)])
+# )
+# cellIDs <- c(cellIDs1, cellIDs2)
+# # Run monocle testing multiple max_components
+# lapply(c(4,6,8), function(max_components){
+#   ssMO <- Monocle_Run(cellIDs = cellIDs, max_components = max_components)
+#   Plot_Monocle_Analysis(
+#     mo = ssMO
+#     , ccDF = ccDF
+#     , kmDF = kmDF
+#     , deDF = deDF[deDF$Comparison == "RG_vs_IP", ]
+#     , fold_changes = c(0, 0.25, 0.5)
+#     , title = paste0("Cluster", paste0(clusters, collapse = "")
+#       , "_RGp_IPp_Nn_Comp", max_components
+#     )
+#   )
+# })
+#
+# # Monocle for RG+ IP+ Neuron- cluster 8, 9, 10 cells
+# # Subset cells
+# clusters <- c(8,9,10)
+# df1 <- Average_MarkersExp_Per_Cell(
+#   exM = noCentExM, seuratO = centSO)
+# cellIDs1 <- row.names(df1)[df1$RG > 0.5 & df1$Neuron < 0.25]
+# cellIDs1 <- intersect(cellIDs1
+#   , names(centSO@ident[centSO@ident %in% c(9)])
+# )
+# cellIDs2 <- row.names(df1)[df1$RG > 0.5 & df1$Neuron < 0.25 & df1$IP > 0.5]
+# cellIDs2 <- intersect(cellIDs2
+#   , names(centSO@ident[centSO@ident %in% c(8,10)])
+# )
+# cellIDs <- c(cellIDs1, cellIDs2)
+# # Run monocle testing multiple max_components
+# lapply(c(4,6,8), function(max_components){
+#   ssMO <- Monocle_Run(cellIDs = cellIDs, max_components = max_components)
+#   Plot_Monocle_Analysis(
+#     mo = ssMO
+#     , ccDF = ccDF
+#     , kmDF = kmDF
+#     , deDF = deDF[deDF$Comparison == "RG_vs_IP", ]
+#     , fold_changes = c(0, 0.25, 0.5)
+#     , title = paste0("Cluster", paste0(clusters, collapse = "")
+#       , "_RGp_IPp_Nn_Comp", max_components
+#     )
+#   )
+# })
+#
+# # Monocle for RG+ IP+ Neuron- cluster 7, 8, 9, 10 cells
+# # Subset cells
+# clusters <- c(7,8,9,10)
+# df1 <- Average_MarkersExp_Per_Cell(
+#   exM = noCentExM, seuratO = centSO)
+# cellIDs1 <- row.names(df1)[df1$RG > 0.5 & df1$Neuron < 0.25]
+# cellIDs1 <- intersect(cellIDs1
+#   , names(centSO@ident[centSO@ident %in% c(7,9)])
+# )
+# cellIDs2 <- row.names(df1)[df1$RG > 0.5 & df1$Neuron < 0.25 & df1$IP > 0.5]
+# cellIDs2 <- intersect(cellIDs2
+#   , names(centSO@ident[centSO@ident %in% c(8,10)])
+# )
+# cellIDs <- c(cellIDs1, cellIDs2)
+# # Run monocle testing multiple max_components
+# lapply(c(4,6,8), function(max_components){
+#   ssMO <- Monocle_Run(cellIDs = cellIDs, max_components = max_components)
+#   Plot_Monocle_Analysis(
+#     mo = ssMO
+#     , ccDF = ccDF
+#     , kmDF = kmDF
+#     , deDF = deDF[deDF$Comparison == "RG_vs_IP", ]
+#     , fold_changes = c(0, 0.25, 0.5)
+#     , title = paste0("Cluster", paste0(clusters, collapse = "")
+#       , "_RGp_IPp_Nn_Comp", max_components
+#     )
+#   )
+# })
+#
+# # Monocle for RG+ Neuron+ IP- cluster 7, 8, 10 cells
+# # Subset cells
+# clusters <- c(7,8,10)
+# df1 <- Average_MarkersExp_Per_Cell(
+#   exM = noCentExM, seuratO = centSO)
+# cellIDs1 <- row.names(df1)[df1$RG > 0.5 & df1$IP < 0.25]
+# cellIDs1 <- intersect(cellIDs1
+#   , names(centSO@ident[centSO@ident %in% c(7)])
+# )
+# cellIDs2 <- row.names(df1)[df1$RG > 0.5 & df1$IP < 0.25 & df1$Neuron > 0.5]
+# cellIDs2 <- intersect(cellIDs2
+#   , names(centSO@ident[centSO@ident %in% c(8,10)])
+# )
+# cellIDs <- c(cellIDs1, cellIDs2)
+# # Run monocle testing multiple max_components
+# lapply(c(4,6,8), function(max_components){
+#   ssMO <- Monocle_Run(cellIDs = cellIDs, max_components = max_components)
+#   Plot_Monocle_Analysis(
+#     mo = ssMO
+#     , ccDF = ccDF
+#     , kmDF = kmDF
+#     , deDF = deDF[deDF$Comparison == "RG_vs_Neuron", ]
+#     , fold_changes = c(0, 0.25, 0.5)
+#     , title = paste0("Cluster", paste0(clusters, collapse = "")
+#       , "_RGp_IPn_Np_Comp", max_components
+#     )
+#   )
+# })
+#
+# # Monocle for RG+ Neuron+ IP- cluster 8, 9, 10 cells
+# # Subset cells
+# clusters <- c(8,9,10)
+# df1 <- Average_MarkersExp_Per_Cell(
+#   exM = noCentExM, seuratO = centSO)
+# cellIDs1 <- row.names(df1)[df1$RG > 0.5 & df1$IP < 0.25]
+# cellIDs1 <- intersect(cellIDs1
+#   , names(centSO@ident[centSO@ident %in% c(9)])
+# )
+# cellIDs2 <- row.names(df1)[df1$RG > 0.5 & df1$IP < 0.25 & df1$Neuron > 0.5]
+# cellIDs2 <- intersect(cellIDs2
+#   , names(centSO@ident[centSO@ident %in% c(8,10)])
+# )
+# cellIDs <- c(cellIDs1, cellIDs2)
+# # Run monocle testing multiple max_components
+# lapply(c(4,6,8), function(max_components){
+#   ssMO <- Monocle_Run(cellIDs = cellIDs, max_components = max_components)
+#   Plot_Monocle_Analysis(
+#     mo = ssMO
+#     , ccDF = ccDF
+#     , kmDF = kmDF
+#     , deDF = deDF[deDF$Comparison == "RG_vs_Neuron", ]
+#     , fold_changes = c(0, 0.25, 0.5)
+#     , title = paste0("Cluster", paste0(clusters, collapse = "")
+#       , "_RGp_IPn_Np_Comp", max_components
+#     )
+#   )
+# })
+#
+# # Monocle for RG+ Neuron+ IP- cluster 7, 8, 9, 10 cells
+# # Subset cells
+# clusters <- c(7,8,9,10)
+# df1 <- Average_MarkersExp_Per_Cell(
+#   exM = noCentExM, seuratO = centSO)
+# cellIDs1 <- row.names(df1)[df1$RG > 0.5 & df1$IP < 0.25]
+# cellIDs1 <- intersect(cellIDs1
+#   , names(centSO@ident[centSO@ident %in% c(7,9)])
+# )
+# cellIDs2 <- row.names(df1)[df1$RG > 0.5 & df1$IP < 0.25 & df1$Neuron > 0.5]
+# cellIDs2 <- intersect(cellIDs2
+#   , names(centSO@ident[centSO@ident %in% c(8,10)])
+# )
+# cellIDs <- c(cellIDs1, cellIDs2)
+# # Run monocle testing multiple max_components
+# lapply(c(4,6,8), function(max_components){
+#   ssMO <- Monocle_Run(cellIDs = cellIDs, max_components = max_components)
+#   Plot_Monocle_Analysis(
+#     mo = ssMO
+#     , ccDF = ccDF
+#     , kmDF = kmDF
+#     , deDF = deDF[deDF$Comparison == "RG_vs_Neuron", ]
+#     , fold_changes = c(0, 0.25, 0.5)
+#     , title = paste0("Cluster", paste0(clusters, collapse = "")
+#       , "_RGp_IPn_Np_Comp", max_components
+#     )
+#   )
+# })
+#
+# # Monocle for IP+ Neuron+ RG- cluster 2, 8, 10 cells
+# # Subset cells
+# clusters <- c(2,8,10)
+# df1 <- Average_MarkersExp_Per_Cell(
+#   exM = noCentExM, seuratO = centSO)
+# cellIDs1 <- row.names(df1)[df1$IP > 0.5 & df1$RG < 0.25]
+# cellIDs1 <- intersect(cellIDs1
+#   , names(centSO@ident[centSO@ident %in% c(2)])
+# )
+# cellIDs2 <- row.names(df1)[df1$IP > 0.5 & df1$RG < 0.25 & df1$Neuron > 0.5]
+# cellIDs2 <- intersect(cellIDs2
+#   , names(centSO@ident[centSO@ident %in% c(8,10)])
+# )
+# cellIDs <- c(cellIDs1, cellIDs2)
+# # Run monocle testing multiple max_components
+# lapply(c(4,6,8), function(max_components){
+#   ssMO <- Monocle_Run(cellIDs = cellIDs, max_components = max_components)
+#   Plot_Monocle_Analysis(
+#     mo = ssMO
+#     , ccDF = ccDF
+#     , kmDF = kmDF
+#     , deDF = deDF[deDF$Comparison == "IP_vs_Neuron", ]
+#     , fold_changes = c(0, 0.25, 0.5)
+#     , title = paste0("Cluster", paste0(clusters, collapse = "")
+#       , "_RGn_IPp_Np_Comp", max_components
+#     )
+#   )
+# })
 
 
 
