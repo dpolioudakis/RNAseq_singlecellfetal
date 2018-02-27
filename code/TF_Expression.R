@@ -396,6 +396,9 @@ Allen_LCM_Format_For_GGplot <- function(){
   allen_lcm_DF <- melt(allen_lcm_DF)
   allen_lcm_DF$value[allen_lcm_DF$value > 1.5] <- 1.5
   allen_lcm_DF$value[allen_lcm_DF$value < -1.5] <- -1.5
+  allen_lcm_DF$V1 <- factor(allen_lcm_DF$V1
+    , levels = c("ZFHX4", "CARHSP1", "ST18", "CSRP2")
+  )
   return(allen_lcm_DF)
 }
 ggDF <- Allen_LCM_Format_For_GGplot()
@@ -1506,7 +1509,7 @@ genesL <- list(
   , Neuron = c("STMN2", "NEUROD6")
   , "Excitatory TFs" = c("CSRP2")
   , "Excitatory deep layer" = c("BCL11B", "TBR1", "SOX5")
-  , "Excitatory deep layer TFs" =  c("ST18", "KAT6B")
+  , "Excitatory deep layer TFs" =  c("ST18")
   , "Excitatory upper layer" = c("SATB2")
   , Interneuron = c("DLX1", "DLX2", "SST", "CALB2")
   , OPC = c("OLIG1", "OLIG2")
@@ -1563,7 +1566,8 @@ ggL[1:length(ggL)] <- lapply(ggL[1:length(ggL)], function(gg) {
 
 # Combine individual heatmaps and dendrogram
 rel_widths <- data.frame(log((table(centSO@ident) + 1), 5))
-rel_widths <- rel_widths[match(c(9,7,8,10,2,0,1,12,4,3,14,5,6,11,13,15,16), rel_widths$Var1), ]
+rel_widths <- rel_widths[match(c(9,7,8,10,2,0,1,12,4,3,14,5,6,11,13,15,16)
+  , rel_widths$Var1), ]
 rel_widths <- as.vector(rel_widths$Freq) + 1
 
 rel_widths <- c(30, rel_widths)
