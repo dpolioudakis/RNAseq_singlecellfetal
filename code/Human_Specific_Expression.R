@@ -20,23 +20,17 @@ require(gridExtra)
 require(ggplot2)
 require(cowplot)
 require(fdrtool)
+require(ggdendro)
 source("Function_Library.R")
 
-# Set variable to gene of interest
+options(stringsAsFactors = FALSE)
 
 ## Inputs
 
-# # Log normalized, regressed nUMI and percent mito
-# # seuratO
-# load("../analysis/DS002003_exon_FtMm250_Seurat_NoScale.Robj")
-# # Log normalized, regressed nUMI and percent mito, mean centered and scaled
-# # fetb
-# load("../analysis/Cluster_Seurat/Cluster_Seurat_exon_FtMm250_fetb_seurat.Robj")
-
 # Seurat
 # PC 1-40
-load("../analysis/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_seuratO.Robj")
-# load("../analysis/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_TEST_seuratO.Robj")
+load("../analysis/analyzed_data/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_seuratO.Robj")
+# load("../analysis/analyzed_data/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_TEST_seuratO.Robj")
 # centSO <- ssCentSO
 # noCentExM <- ssNoCentExM
 
@@ -62,11 +56,11 @@ allen_lcm_cols_DF <- read.csv("../allen_brain_data/FISH_genes/Columns.csv")
 allen_lcm_rows_DF <- read.csv("../allen_brain_data/FISH_genes/Rows.csv")
 
 # BrainSpan developmental transcriptome
+print("BrainSpan developmental transcriptome")
 bsDF <- read.csv(
   "../source/BrainSpan_DevTranscriptome/genes_matrix_csv/expression_matrix.csv", header = FALSE)
 rnames <- read.csv(
   "../source/BrainSpan_DevTranscriptome/genes_matrix_csv/rows_metadata.csv")
-row.names(bsDF) <- rnames$gene_symbol
 bsMtDF <- read.csv(
   "../source/BrainSpan_DevTranscriptome/genes_matrix_csv/columns_metadata.csv")
 
@@ -177,7 +171,6 @@ Intersection_tSNE_Plots <- function(genes) {
   return(ggL)
 }
 
-
 Number_Of_Cells_Intersection_Heatmap <- function(genes, title){
   m1 <- noCentExM[row.names(noCentExM) %in% genes, ] > 0.5
   l1 <- apply(m1, 2, function(col) row.names(m1)[col])
@@ -212,11 +205,108 @@ Number_Of_Cells_Intersection_Heatmap <- function(genes, title){
 
   return(gg)
 }
+
+Seurat_Heatmap_By_Cluster_Hclust_Genes <- function(genes, clusterOrder) {
+
+  print("Seurat_Heatmap_By_Cluster_Hclust_Genes")
+
+  # Subset expression matrix
+  exM <- centSO@scale.data
+  exM <- exM[row.names(exM) %in% genes, ]
+
+  # Obtain the dendrogram
+  print("Obtain the dendrogram")
+  dend <- as.dendrogram(hclust(d = dist(exM), method = "ward"))
+  dend_data <- dendro_data(dend)
+  # Setup the data, so that the layout is inverted (this is more
+  # "clear" than simply using coord_flip())
+  segment_data <- with(
+    segment(dend_data),
+    data.frame(x = y, y = x, xend = yend, yend = xend))
+  # Use the dendrogram label data to position the gene labels
+  gene_pos_table <- with(
+    dend_data$labels,
+    data.frame(y_center = x, gene = as.character(label), height = 1))
+  # Limits for the vertical axes
+  gene_axis_limits <- with(
+    gene_pos_table,
+    c(min(y_center - 0.5 * height), max(y_center + 0.5 * height))) + 0.1 * c(-1, 1) # extra spacing: 0.1
+  # Facet dendrogram so it lines up with faceted heatmaps
+  segment_data$Facet <- ""
+
+  # Dendrogram plot
+  print("Dendrogram plot")
+  plt_dendr <- ggplot(segment_data) +
+    geom_segment(aes(x = x, y = y, xend = xend, yend = yend)) +
+    scale_x_reverse(expand = c(0, 0.5)) +
+    scale_y_continuous(breaks = gene_pos_table$y_center,
+      labels = gene_pos_table$gene,
+      limits = gene_axis_limits,
+      expand = c(0, 0)) +
+    facet_wrap(~Facet) +
+    labs(x = "Distance", y = "", colour = "", size = "") +
+    theme_bw() +
+    theme(panel.grid.minor = element_blank()) +
+    theme(strip.background = element_blank())
+
+  # Heatmap plot
+  print("Heatmap plot")
+  geneGroupDF <- data.frame(GENE = gene_pos_table$gene, GROUP = "")
+  ggL <- lapply(clusterOrder, function(cluster){
+    tryCatch(
+      Heatmap_By_Cluster(
+        geneGroupDF = geneGroupDF
+        , exprM = as.matrix(centSO@scale.data)
+        , seuratO = centSO
+        , clusters = cluster
+        , lowerLimit = -1.5
+        , upperLimit = 1.5
+        , geneOrder = TRUE
+      )
+      , error = function(e) NULL)
+  })
+  # Remove nulls from ggplot list
+  ggL <- ggL[! sapply(ggL, is.null)]
+  # Extract legend
+  legend <- get_legend(ggL[[1]])
+  # Format - remove axis labels
+  # ggL[[1]] <- ggL[[1]] + theme(
+  #   axis.title.x = element_blank()
+  #   , legend.position = "none"
+  #   , strip.text.y = element_blank())
+  ggL[1:length(ggL)] <- lapply(ggL[1:length(ggL)], function(gg) {
+    gg + theme(
+      strip.text.y = element_blank()
+      , legend.position = "none"
+      , axis.title.y = element_blank()
+      , axis.text.y = element_blank()
+      , axis.ticks.y = element_blank()
+      , axis.title.x = element_blank()
+      # margin: top, right, bottom, and left
+      , plot.margin = unit(c(1, 0.05, 1, 0.05), "cm")
+    )
+  })
+
+  # Combine individual heatmaps and dendrogram
+  print("Combine individual heatmaps and dendrogram")
+  rel_widths <- data.frame(log((table(centSO@ident) + 1), 5))
+  rel_widths <- rel_widths[match(clusterOrder
+    , as.numeric(as.character(rel_widths$Var1))), ]
+  rel_widths <- rel_widths[! is.na(rel_widths$Freq), ]
+  rel_widths <- as.vector(rel_widths$Freq) + 1
+  rel_widths <- c(20, rel_widths, 1)
+  # Combine
+  pg <- plot_grid(plotlist = append(list(plt_dendr), ggL), ncol = length(rel_widths)
+    , rel_widths = rel_widths, align = 'h', axis = 't')
+
+  return(pg)
+}
 ################################################################################
 
 ### Figures for paper
 
 # Allen LCM heatmap
+print("Allen LCM heatmap")
 Allen_LCM_Format_For_GGplot <- function(){
   colnames(allen_lcm_DF)[2:ncol(allen_lcm_DF)] <-
     paste(as.character(allen_lcm_cols_DF$structure_name), c(1:nrow(allen_lcm_cols_DF)))
@@ -247,6 +337,7 @@ ggsave(paste0(outGraph, "Miller_Heatmap_paper.png")
   , width = 8, height = 2, dpi = 600)
 
 # Brainspan line plot
+print("Brainspan line plot")
 # Subset to cortex, remove visual and cerebellar
 df <- bsMtDF[grep("cortex", bsMtDF$structure_name), ]
 df <- df[df$structure_name != "cerebellar cortex" &
@@ -267,7 +358,6 @@ ssBsDF <- as.data.frame(apply(ssBsDF, 2, function(x) {
   }))
 # Add age
 ssBsDF$AGE <- factor(df$age, levels = unique(bsMtDF$age))
-
 # ggplot fit line
 df1 <- melt(ssBsDF)
 ggplot(df1, aes(x = AGE, y = value, group = 1)) +
@@ -280,6 +370,30 @@ ggplot(df1, aes(x = AGE, y = value, group = 1)) +
   ylab("Normalized expression")
 ggsave(paste0(outGraph, "BrainSpan_Fit.pdf"), width = 7, height = 3)
 ggsave(paste0(outGraph, "BrainSpan_Fit.png"), width = 7, height = 3)
+
+# Heatmap + hclust of human specific genes
+print("Heatmap + hclust of human specific genes")
+genes <- as.character(hsDF$Gene[hsDF$Set == "Human-specific"])
+pg <- Seurat_Heatmap_By_Cluster_Hclust_Genes(
+  genes = genes
+  # , clusterOrder = c(9,7,8,10,2,0,1,12,4,3,14,5,6,11,13,15,16)
+  , clusterOrder = c(9,7,8,10,2,0,1,12,4,3,14,5,6,11,13,15,16)
+)
+# Title
+title = paste0(graphCodeTitle
+  , "\n\nExpression of Allen human specific genes"
+  , "\nx-axis: Genes"
+  , "\ny-axis: Cells ordered by cluster"
+  , "\nNormalized expression, mean centered, variance scaled"
+  , "\n")
+# now add the title
+title <- ggdraw() + draw_label(title)
+# rel_heights values control title margins
+plot_grid(title, pg, ncol = 1, rel_heights = c(0.075, 1))
+# Save
+ggsave(paste0(
+  outGraph, "HeatmapDend_NormalizedCenteredScaled.png")
+  , width = 12, height = 28, limitsize = FALSE)
 ################################################################################
 
 ### metaMat cluster DE oRG human specific genes and expression ranking in RG
@@ -467,7 +581,7 @@ ggL <- FeaturePlot(
   genes = ssDeDF$GENE
   , tsneDF = tsneDF
   , seuratO = centSO
-  , exM = noCentExM
+  , exM = centSO@scale.data
   , limLow = -1.5
   , limHigh = 1.5
   , geneGrouping = NULL

@@ -74,8 +74,8 @@ kmDF <- read.csv("../source/MarkersforSingleCell_2017-10-11_Markers.csv")
 
 ## Variables
 graphCodeTitle <- "Human_Specific_ASD_Expression.R"
-outGraph <- "../analysis/graphs/Human_Specific_ASD_Expression/DS2-11_FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Human_Specific_ASD_Expression_"
-outTable <- "../analysis/tables/Human_Specific_ASD_Expression/DS2-11_FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Human_Specific_ASD_Expression_"
+outGraph <- "../analysis/graphs/Human_Specific_ASD_Expression/DS2-11_FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Human_Specific_ASD_Expression_WardD2Link_"
+outTable <- "../analysis/tables/Human_Specific_ASD_Expression/DS2-11_FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Human_Specific_ASD_Expression_WardD2Link_"
 # outGraph <- "../analysis/graphs/Human_Specific_ASD_Expression/DS2-11_FtMm250_200-3sdgd_Mt5_RegNumiLibBrainCC_PC1to40/Human_Specific_ASD_Expression_"
 # outGraph <- "../analysis/graphs/Human_Specific_ASD_Expression/DS2-11_FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Human_Specific_ASD_Expression_"
 
@@ -96,7 +96,7 @@ theme_update(axis.line = element_line(colour = "black")
 
 Subset_To_Specific_Clusters <- function(deDF, cluster, okayClusters, fcHigh, fcLow) {
   # Clusters gene cannot be DE in
-  clsNo <- c(0:17)[! c(0:17) %in% okayClusters]
+  clsNo <- clusterOrder[! c(0:17) %in% okayClusters]
   # Gene is > X FC in cluster
   genes1 <- deDF$GENE[deDF$LOG_FC > fcHigh & deDF$CLUSTER == cluster]
   # Genes in clusters genes cannot be DE in > 0.3
@@ -183,25 +183,25 @@ Intersection_tSNE_Plots <- function(genes) {
 Number_Of_Cells_Intersection_Heatmap <- function(genes, title){
   m1 <- noCentExM[row.names(noCentExM) %in% genes, ] > 0.5
   l1 <- apply(m1, 2, function(col) row.names(m1)[col])
-  
+
   ldf <- lapply(l1, function(genes) {
     v2 <- genes[genes %in% genes]
     v3 <- genes[genes %in% genes]
     expand.grid(v2, v3)
   })
   df1 <- do.call("rbind", ldf)
-  
+
   # Format for matrix
   df3 <- dcast(df1, Var1 ~ Var2)
   row.names(df3) <- df3$Var1
   df3 <- df3[ ,-1]
-  
+
   # Format for ggplot
   df3$Gene <- row.names(df3)
   df3 <- melt(df3)
   df3$Gene <- factor(df3$Gene, levels = genes)
   df3$variable <- factor(df3$variable, levels = genes)
-  
+
   # Plot counts of intersections
   gg <- ggplot(df3, aes(x = Gene, y = variable, fill = value)) +
     geom_tile() +
@@ -211,27 +211,27 @@ Number_Of_Cells_Intersection_Heatmap <- function(genes, title){
     xlab("Genes") +
     ylab("Genes") +
     ggtitle(title)
-  
+
   return(gg)
 }
 
-Seurat_Heatmap_By_Cluster_Hclust_Genes <- function(genes) {
-  
+Seurat_Heatmap_By_Cluster_Hclust_Genes <- function(genes, clusterOrder) {
+
   # Subset expression matrix
   exM <- centSO@scale.data
   exM <- exM[row.names(exM) %in% genes, ]
-  
+
   # Obtain the dendrogram
-  dend <- as.dendrogram(hclust(dist(exM)))
+  dend <- as.dendrogram(hclust(d = dist(exM), method = "ward.D2"))
   dend_data <- dendro_data(dend)
-  # Setup the data, so that the layout is inverted (this is more 
+  # Setup the data, so that the layout is inverted (this is more
   # "clear" than simply using coord_flip())
   segment_data <- with(
-    segment(dend_data), 
+    segment(dend_data),
     data.frame(x = y, y = x, xend = yend, yend = xend))
   # Use the dendrogram label data to position the gene labels
   gene_pos_table <- with(
-    dend_data$labels, 
+    dend_data$labels,
     data.frame(y_center = x, gene = as.character(label), height = 1))
   # Limits for the vertical axes
   gene_axis_limits <- with(
@@ -239,24 +239,24 @@ Seurat_Heatmap_By_Cluster_Hclust_Genes <- function(genes) {
     c(min(y_center - 0.5 * height), max(y_center + 0.5 * height))) + 0.1 * c(-1, 1) # extra spacing: 0.1
   # Facet dendrogram so it lines up with faceted heatmaps
   segment_data$Facet <- ""
-  
+
   # Dendrogram plot
-  plt_dendr <- ggplot(segment_data) + 
-    geom_segment(aes(x = x, y = y, xend = xend, yend = yend)) + 
-    scale_x_reverse(expand = c(0, 0.5)) + 
-    scale_y_continuous(breaks = gene_pos_table$y_center, 
-      labels = gene_pos_table$gene, 
+  plt_dendr <- ggplot(segment_data) +
+    geom_segment(aes(x = x, y = y, xend = xend, yend = yend)) +
+    scale_x_reverse(expand = c(0, 0.5)) +
+    scale_y_continuous(breaks = gene_pos_table$y_center,
+      labels = gene_pos_table$gene,
       limits = gene_axis_limits,
-      expand = c(0, 0)) + 
+      expand = c(0, 0)) +
     facet_wrap(~Facet) +
     labs(x = "Distance", y = "", colour = "", size = "") +
-    theme_bw() + 
+    theme_bw() +
     theme(panel.grid.minor = element_blank()) +
     theme(strip.background = element_blank())
-  
+
   # Heatmap plot
-  geneGroupDF <- data.frame(GENE = row.names(exM), GROUP = "")
-  ggL <- lapply(c(0:17), function(cluster){
+  geneGroupDF <- data.frame(GENE = gene_pos_table$gene, GROUP = "")
+  ggL <- lapply(clusterOrder, function(cluster){
     tryCatch(
       Heatmap_By_Cluster(
         geneGroupDF = geneGroupDF
@@ -265,7 +265,7 @@ Seurat_Heatmap_By_Cluster_Hclust_Genes <- function(genes) {
         , clusters = cluster
         , lowerLimit = -1.5
         , upperLimit = 1.5
-        , geneOrder = gene_pos_table$gene
+        , geneOrder = TRUE
       )
       , error = function(e) NULL)
   })
@@ -290,14 +290,16 @@ Seurat_Heatmap_By_Cluster_Hclust_Genes <- function(genes) {
       , plot.margin = unit(c(1, 0.05, 1, 0.05), "cm")
     )
   })
-  
+
   # Combine individual heatmaps and dendrogram
-  rel_widths <- as.vector(log((table(centSO@ident) + 1), 10)) + 1
+  rel_widths <- data.frame(log((table(centSO@ident) + 1), 5))
+  rel_widths <- rel_widths[match(clusterOrder, rel_widths$Var1), ]
+  rel_widths <- as.vector(rel_widths$Freq) + 1
   rel_widths <- c(20, rel_widths, 1)
   # Combine
-  pg <- plot_grid(plotlist = append(list(plt_dendr), ggL), ncol = 19
+  pg <- plot_grid(plotlist = append(list(plt_dendr), ggL), ncol = length(rel_widths)
     , rel_widths = rel_widths, align = 'h', axis = 't')
-  
+
   return(pg)
 }
 ################################################################################
@@ -501,7 +503,7 @@ ggsave(paste0(
 
 ### ASD TADA
 
-# ASD combined de novo proband LOF iossifov + de Rubeis
+# ASD TADA genes
 genes <- tada
 
 # Genes DE >0.4 in cluster 4 or cluster 14
@@ -592,8 +594,9 @@ ggsave(paste0(
   outGraph, "DE_TADA_HeatmapDend_NormalizedCenteredScaled.png")
   , width = 12, height = 12, limitsize = FALSE)
 
-# Heatmap + hclust of ASD combined de novo proband LOF iossifov + de Rubeis genes
-pg <- Seurat_Heatmap_By_Cluster_Hclust_Genes(genes)
+# Heatmap + hclust of ASD TADA genes
+pg <- Seurat_Heatmap_By_Cluster_Hclust_Genes(genes = genes
+  , clusterOrder = c(9,7,8,10,2,0,1,12,4,3,14,5,6,11,13,15,16))
 # Title
 title = paste0(graphCodeTitle
   , "\n\nExpression of ASD TADA genes"
