@@ -107,7 +107,7 @@ Venn_Diagram_3_Wrapper <- function(
 }
 
 ## Correlation to bulk as pool size increases
-ggplot(pool_corr_DF, aes(
+gg <- ggplot(pool_corr_DF, aes(
   x = Number_of_cells, y = Spearman, color = Dataset_label)) +
   facet_wrap(~Dataset_label, ncol = 2, scales = "free") +
   geom_line() +
@@ -121,6 +121,8 @@ ggplot(pool_corr_DF, aes(
     , "\n"
   ))
 ggsave(paste0(outGraph, "Pool_Size_Spearman.pdf"))
+gg + ggplot_set_theme_publication
+ggsave(paste0(outGraph, "Pool_Size_Spearman_paper.pdf"))
 
 ## Number of genes detected as pool size increases
 ggDF <- melt(number_gene_detected_DF
@@ -165,10 +167,12 @@ ggDF$Bulk <- log(ggDF$Bulk + 1, 2)
 labelsDatasetSpr <- c(paste0(unique(ggDF$variable), "\nSpearman: ", sprL))
 names(labelsDatasetSpr) <- unique(ggDF$variable)
 # ggplot
-ggplot(ggDF, aes(x = value, y = Bulk, color = variable)) +
+gg <- ggplot(ggDF, aes(x = value, y = Bulk, color = variable)) +
   facet_wrap("variable", ncol = 2
-    , labeller = labeller(variable = labelsDatasetSpr)) +
+    , labeller = labeller(variable = labelsDatasetSpr), scales = "free") +
   geom_point(alpha = 0.15, shape = 1, size = 0.25) +
+  xlim(c(0, 15)) +
+  ylim(c(0, 15)) +
   stat_smooth(col = "black") +
   ylab("Bulk: log2(mean CPM + 1)") +
   xlab("Pooled: log2(mean CPM + 1)") +
@@ -177,7 +181,9 @@ ggplot(ggDF, aes(x = value, y = Bulk, color = variable)) +
     , "\nPooled scRNA-seq vs Bulk RNA-seq"
     , "\n"
     , "\nMean of CPM across samples and pools"))
-ggsave(paste0(outGraph, "Scatter.png"), dpi = 150, width = 6.5, height = 12)
+ggsave(paste0(outGraph, "Scatter.png"), width = 6.5, height = 9)
+gg + ggplot_set_theme_publication
+ggsave(paste0(outGraph, "Scatter_paper.png"), width = 6.5, height = 9)
 
 ## Table of number of genes biased toward bulk or single-cell
 dfl1 <- lapply(names(bias_flag_DF), function(name){
@@ -212,11 +218,13 @@ ggDF <- rbind(do.call("rbind", ldf1)
   , do.call("rbind", ldf2)
 )
 # scatter
-ggplot(ggDF, aes(x = Mean_Pooled, y = Mean_Bulk)) +
-  facet_wrap("Dataset", ncol = 2) +
+gg <- ggplot(ggDF, aes(x = Mean_Pooled, y = Mean_Bulk)) +
+  facet_wrap("Dataset", ncol = 2, scales = "free") +
   geom_point(alpha = 0.15, shape = 16, size = 0.25, aes(color = Subset)) +
   scale_colour_manual(values = c("#e31a1c", "#bdbdbd", "#1f78b4")) +
   guides(colour = guide_legend(override.aes = list(size = 3))) +
+  xlim(c(0, 15)) +
+  ylim(c(0, 15)) +
   ylab("Bulk: log2(Mean CPM + 1)") +
   xlab("Pooled: log2(Mean CPM + 1)") +
   ggtitle(paste0(graphCodeTitle
@@ -226,7 +234,9 @@ ggplot(ggDF, aes(x = Mean_Pooled, y = Mean_Bulk)) +
     , "\nHuman fetal brain GZ and CP"
     , "\nMean of CPM across samples and pools"
     , "\nSubset 2 SD from mean ratio of pooled vs bulk"))
-ggsave(paste0(outGraph, "ScatterSubset.png"), dpi = 150, width = 6, height = 9)
+ggsave(paste0(outGraph, "ScatterSubset.png"), width = 6, height = 9)
+gg + ggplot_set_theme_publication
+ggsave(paste0(outGraph, "ScatterSubset_paper.png"), width = 6, height = 9)
 # density plot
 ggDF <- melt(ggDF)
 ggplot(ggDF, aes(x = value)) +
@@ -329,11 +339,22 @@ pval_DF <- Ttest_Table(
   , value_col = "cds_length"
 )
 ggt <- tableGrob(pval_DF)
-gg <- ggplot(ggDF, aes(x = variable, y = cds_length, fill = value)) +
+gg <- ggplot(ggDF, aes(x = value, y = cds_length, fill = value)) +
+  facet_wrap(~variable, scales = "free") +
   geom_boxplot(outlier.shape = NA) +
   scale_fill_manual(name = "Gene subset"
     , values = c("#e31a1c", "#bdbdbd", "#1f78b4")) +
-  coord_cartesian(ylim = c(0, 7000)) +
+  # T test for plot
+  stat_compare_means(cds_length ~ value, data = ggDF, group.by = "variable"
+    , comparisons = list(
+      c("Bulk high", "All other genes")
+      , c("Bulk high", "Pool high")
+      , c("All other genes", "Pool high")
+    )
+    , method = "t.test", p.adjust.method = "none"
+    , label.y = c(8500, 9500, 7500), tip.length = 0.003) +
+  coord_cartesian(ylim = c(0, 10000)) +
+  ggplot_set_theme_publication +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
   xlab("Dataset") +
   ylab("CDS length") +
@@ -343,8 +364,8 @@ gg <- ggplot(ggDF, aes(x = variable, y = cds_length, fill = value)) +
     , "\n")
   )
 # Combine plot and table of p-values
-plot_grid(gg, ggt, ncol = 1, rel_widths = c(1,0.5))
-ggsave(paste0(outGraph, "Length_Boxplot_paper.pdf"), width = 5, height = 8)
+plot_grid(gg, ggt, ncol = 1, rel_heights = c(1,0.5))
+ggsave(paste0(outGraph, "Length_Boxplot_paper.pdf"), width = 6, height = 8)
 
 # CDS length for each dataset
 Plot_CDS_Length_Histogram <- function(exM, title, geneIdType){
@@ -421,6 +442,7 @@ gg <- ggplot(ggDF, aes(x = variable, y = percentage_gc_content, fill = value)) +
   coord_cartesian(ylim = c(0, 100)) +
   # theme(text = element_text(size = 12)) +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  ggplot_set_theme_publication +
   xlab("Dataset") +
   ylab("Percent GC") +
   ggtitle(paste0(graphCodeTitle
@@ -527,7 +549,7 @@ ggDF$Brain_expressed[ggDF$ensembl_gene_id %in% brain_exp_DF$V1] <- 1
 ggDF <- dcast(ggDF, variable + value ~ Brain_expressed)
 ggDF$Percent_brain_expressed <- (ggDF[ ,4] / (ggDF[,3] + ggDF[,4])) * 100
 # ggplot
-ggplot(ggDF, aes(x = value, y = Percent_brain_expressed, fill = value)) +
+gg <- ggplot(ggDF, aes(x = value, y = Percent_brain_expressed, fill = value)) +
   facet_wrap(~variable, scale = "free") +
   geom_bar(stat = "identity") +
   scale_fill_manual(name = "Subset"
@@ -541,6 +563,8 @@ ggplot(ggDF, aes(x = value, y = Percent_brain_expressed, fill = value)) +
     , "\nPercentage of brain expressed genes in genes biased towards"
     , "\nsingle-cell or bulk RNA-seq"
     , "\n"))
+ggsave(paste0(outGraph, "BrainExpressed_Percent.pdf"), width = 7, height = 9)
+gg + ggplot_set_theme_publication
 ggsave(paste0(outGraph, "BrainExpressed_Percent.pdf"), width = 7, height = 9)
 
 ## HGNC in Drop-seq 0
