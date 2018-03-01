@@ -24,6 +24,7 @@ require(viridis)
 require(monocle)
 require(WGCNA)
 require(gridExtra)
+require(ggpubr)
 source("Function_Library.R")
 
 options(stringsAsFactors = FALSE)
@@ -695,339 +696,404 @@ df$Cell_Subset[rownames(df) %in% row.names(df1)[df1$RG > 0.5 & df1$IP > 0.5 & df
 
 table(df)
 ################################################################################
-
-### DE RG(cluster 7,9) vs IP(2); RG(7,9) vs Neuron(0); IP(2) vs Neuron(0)
-
-DE_Clusters_Vs_Clusters <- function(clusters1, clusters2) {
-  ids <- names(centSO@ident)[centSO@ident %in% c(clusters1, clusters2)]
-  exM <- as.matrix(centSO@data)
-  exM <- exM[ ,colnames(exM) %in% ids]
-  # DE Linear model
-  termsDF <- centSO@meta.data[
-    row.names(centSO@meta.data) %in% ids
-    , c("nUMI", "librarylab", "individual", "res.0.6")]
-  # Add term TRUE/FALSE cell is in cluster
-  termsDF$clusters <- "clusters1"
-  termsDF$clusters[termsDF$res.0.6 %in% clusters2] <- "clusters2"
-  deLM <- DE_Linear_Model(
-    exDatDF = exM
-    , termsDF = termsDF
-    , mod = "y ~ clusters+nUMI+librarylab+individual")
-  # Format LM DE
-  deDF <- data.frame(Log_FC_C2vC1 = deLM$coefmat[ ,"clustersclusters2"]
-    , Pvalue = deLM$pvalmat[ ,"clustersclusters2"])
-  deDF <- deDF[order(deDF$Log_FC), ]
-  deDF$Pvalue[deDF$Pvalue == "NaN"] <- 1
-  # FDR correct
-  deDF$FDR <- p.adjust(deDF$Pvalue, method="BH")
-  # Check
-  table(deDF$Pvalue < 0.05)
-  table(deDF$FDR < 0.05)
-  print(head(deDF))
-  return(deDF)
-}
-
-DE_By_CellIDs <- function(cell_IDs_1, cell_IDs_2) {
-  ids <- c(cell_IDs_1, cell_IDs_2)
-  exM <- as.matrix(centSO@data)
-  exM <- exM[ ,colnames(exM) %in% ids]
-  # DE Linear model
-  termsDF <- centSO@meta.data[
-    row.names(centSO@meta.data) %in% ids
-    , c("nUMI", "librarylab", "individual", "CELL")]
-  # Add term TRUE/FALSE cell is in cluster
-  termsDF$groups <- "cell_IDs_1"
-  termsDF$groups[termsDF$CELL %in% cell_IDs_2] <- "cell_IDs_2"
-  deLM <- DE_Linear_Model(
-    exDatDF = exM
-    , termsDF = termsDF
-    , mod = "y ~ groups+nUMI+librarylab+individual")
-  # Format LM DE
-  deDF <- data.frame(
-    Log2_FC_Group1_vs_Group2 = deLM$coefmat[ ,"groupscell_IDs_2"]
-    , Pvalue = deLM$pvalmat[ ,"groupscell_IDs_2"]
-  )
-  deDF$Gene = row.names(deDF)
-  # Make DE cell_IDs_1 positive fold change
-  deDF$Log2_FC_Group1_vs_Group2 <- deDF$Log2_FC_Group1_vs_Group2 * -1
-  # Order by fold change
-  deDF <- deDF[order(deDF$Log2_FC_Group1_vs_Group2), ]
-  deDF$Pvalue[deDF$Pvalue == "NaN"] <- 1
-  # FDR correct
-  deDF$FDR <- p.adjust(deDF$Pvalue, method="BH")
-  # Check
-  table(deDF$Pvalue < 0.05)
-  table(deDF$FDR < 0.05)
-  print(head(deDF))
-  return(deDF)
-}
-
-# DE cell types
-# RG vs IP clusters
-de_RG_v_IP_DF <- DE_Clusters_Vs_Clusters(clusters1 = 2, clusters2 = c(7,9))
-# RG vs Migrating Neuron clusters
-de_RG_v_Ne_DF <- DE_Clusters_Vs_Clusters(clusters1 = 0, clusters2 = c(7,9))
-# IP vs Migrating Neuron clusters
-de_IP_v_Ne_DF <- DE_Clusters_Vs_Clusters(clusters1 = 0, clusters2 = c(2))
-
-# Format and save
-de_RG_v_IP_DF$Comparison <- "RG_vs_IP"
-de_RG_v_Ne_DF$Comparison <- "RG_vs_Neuron"
-de_IP_v_Ne_DF$Comparison <- "IP_vs_Neuron"
-deDF <- rbind(de_RG_v_IP_DF, de_RG_v_Ne_DF, de_IP_v_Ne_DF)
-# Save as csv
-write.csv(deDF, file = paste0(outTable, "DE_CellTypes.csv")
-  , quote = FALSE)
-
-
-Format_Cell_IDs_1_2 <- function(cellIDs1, cellIDs2, comparison_label){
-  de_to_run_DF <- data.frame(
-    Cell_IDs = c(cellIDs1, cellIDs2)
-    , Group = c(rep("cell_IDs_1", length(cellIDs1))
-      , rep("cell_IDs_2", length(cellIDs2)))
-    , Comparison = comparison_label
-  )
-  return(de_to_run_DF)
-}
-
-# RG+ vs RG+IP+
-# S phase
-Subset_Cell_IDs_RG_RGIP_Sphase <- function(){
-  mk_exp_DF <- Average_MarkersExp_Per_Cell(
-    exM = noCentExM, seuratO = centSO)
-  # Cell IDs 1
-  cellIDs1 <- row.names(mk_exp_DF)[
-    mk_exp_DF$RG > 0.5 &
-    mk_exp_DF$IP < 0.25 &
-    mk_exp_DF$Neuron < 0.25
-    ]
-  cellIDs1 <- intersect(cellIDs1, names(centSO@ident)[centSO@ident == 8])
-  # Cell IDs 2
-  cellIDs2 <- row.names(mk_exp_DF)[
-    mk_exp_DF$RG > 0.5 &
-    mk_exp_DF$IP > 0.5 &
-    mk_exp_DF$Neuron < 0.25
-    ]
-  cellIDs2 <- intersect(cellIDs2, names(centSO@ident)[centSO@ident == 8])
-  #
-  de_to_run_DF <- Format_Cell_IDs_1_2(cellIDs1, cellIDs2, "RG_vs_RGIP_Sphase")
-  return(de_to_run_DF)
-}
-# G2/M phase
-Subset_Cell_IDs_RG_RGIP_G2Mphase <- function(){
-  mk_exp_DF <- Average_MarkersExp_Per_Cell(
-    exM = noCentExM, seuratO = centSO)
-  # Cell IDs 1
-  cellIDs1 <- row.names(mk_exp_DF)[
-    mk_exp_DF$RG > 0.5 &
-    mk_exp_DF$IP < 0.25 &
-    mk_exp_DF$Neuron < 0.25
-    ]
-  cellIDs1 <- intersect(cellIDs1, names(centSO@ident)[centSO@ident == 10])
-  # Cell IDs 2
-  cellIDs2 <- row.names(mk_exp_DF)[
-    mk_exp_DF$RG > 0.5 &
-    mk_exp_DF$IP > 0.5 &
-    mk_exp_DF$Neuron < 0.25
-    ]
-  cellIDs2 <- intersect(cellIDs2, names(centSO@ident)[centSO@ident == 10])
-  #
-  de_to_run_DF <- Format_Cell_IDs_1_2(cellIDs1, cellIDs2, "RG_vs_RGIP_G2Mphase")
-  return(de_to_run_DF)
-}
-
-# RG+ vs RG+Neuron+
-# S phase
-Subset_Cell_IDs_RG_RGNeuron_Sphase <- function(){
-  mk_exp_DF <- Average_MarkersExp_Per_Cell(
-    exM = noCentExM, seuratO = centSO)
-  # Cell IDs 1
-  cellIDs1 <- row.names(mk_exp_DF)[
-    mk_exp_DF$RG > 0.5 &
-    mk_exp_DF$IP < 0.25 &
-    mk_exp_DF$Neuron < 0.25
-    ]
-  cellIDs1 <- intersect(cellIDs1, names(centSO@ident)[centSO@ident == 8])
-  # Cell IDs 2
-  cellIDs2 <- row.names(mk_exp_DF)[
-    mk_exp_DF$RG > 0.5 &
-    mk_exp_DF$IP < 0.25 &
-    mk_exp_DF$Neuron > 0.5
-    ]
-  cellIDs2 <- intersect(cellIDs2, names(centSO@ident)[centSO@ident == 8])
-  #
-  de_to_run_DF <- Format_Cell_IDs_1_2(cellIDs1, cellIDs2
-    , "RG_vs_RGNeuron_Sphase")
-  return(de_to_run_DF)
-}
-# G2/M phase
-Subset_Cell_IDs_RG_RGNeuron_G2Mphase <- function(){
-  mk_exp_DF <- Average_MarkersExp_Per_Cell(
-    exM = noCentExM, seuratO = centSO)
-  # Cell IDs 1
-  cellIDs1 <- row.names(mk_exp_DF)[
-    mk_exp_DF$RG > 0.5 &
-    mk_exp_DF$IP < 0.25 &
-    mk_exp_DF$Neuron < 0.25
-    ]
-  cellIDs1 <- intersect(cellIDs1, names(centSO@ident)[centSO@ident == 10])
-  # Cell IDs 2
-  cellIDs2 <- row.names(mk_exp_DF)[
-    mk_exp_DF$RG > 0.5 &
-    mk_exp_DF$IP > 0.5 &
-    mk_exp_DF$Neuron < 0.25
-    ]
-  cellIDs2 <- intersect(cellIDs2, names(centSO@ident)[centSO@ident == 10])
-  #
-  de_to_run_DF <- Format_Cell_IDs_1_2(cellIDs1, cellIDs2
-    , "RG_vs_RGNeuron_G2Mphase")
-  return(de_to_run_DF)
-}
-
-# IP+ vs IP+Neuron+
-# S phase
-Subset_Cell_IDs_IP_IPNeuron_Sphase <- function(){
-  mk_exp_DF <- Average_MarkersExp_Per_Cell(
-    exM = noCentExM, seuratO = centSO)
-  # Cell IDs 1
-  cellIDs1 <- row.names(mk_exp_DF)[
-    mk_exp_DF$RG < 0.25 &
-    mk_exp_DF$IP > 0.5 &
-    mk_exp_DF$Neuron < 0.25
-    ]
-  cellIDs1 <- intersect(cellIDs1, names(centSO@ident)[centSO@ident == 8])
-  # Cell IDs 2
-  cellIDs2 <- row.names(mk_exp_DF)[
-    mk_exp_DF$RG < 0.25 &
-    mk_exp_DF$IP > 0.5 &
-    mk_exp_DF$Neuron > 0.5
-    ]
-  cellIDs2 <- intersect(cellIDs2, names(centSO@ident)[centSO@ident == 8])
-  #
-  de_to_run_DF <- Format_Cell_IDs_1_2(cellIDs1, cellIDs2
-    , "IP_vs_IPNeuron_Sphase")
-  return(de_to_run_DF)
-}
-# G2/M phase
-Subset_Cell_IDs_IP_IPNeuron_G2Mphase <- function(){
-  mk_exp_DF <- Average_MarkersExp_Per_Cell(
-    exM = noCentExM, seuratO = centSO)
-  # Cell IDs 1
-  cellIDs1 <- row.names(mk_exp_DF)[
-    mk_exp_DF$RG < 0.25 &
-    mk_exp_DF$IP > 0.5 &
-    mk_exp_DF$Neuron < 0.25
-    ]
-  cellIDs1 <- intersect(cellIDs1, names(centSO@ident)[centSO@ident == 10])
-  # Cell IDs 2
-  cellIDs2 <- row.names(mk_exp_DF)[
-    mk_exp_DF$RG < 0.25 &
-    mk_exp_DF$IP > 0.5 &
-    mk_exp_DF$Neuron > 0.5
-    ]
-  cellIDs2 <- intersect(cellIDs2, names(centSO@ident)[centSO@ident == 10])
-  #
-  de_to_run_DF <- Format_Cell_IDs_1_2(cellIDs1, cellIDs2
-    , "IP_vs_IPNeuron_G2Mphase")
-  return(de_to_run_DF)
-}
-
-# Run DE for transition states
-de_to_run_DF <- rbind(
-  Subset_Cell_IDs_RG_RGIP_Sphase()
-  , Subset_Cell_IDs_RG_RGIP_G2Mphase()
-  , Subset_Cell_IDs_RG_RGNeuron_Sphase()
-  , Subset_Cell_IDs_RG_RGNeuron_G2Mphase()
-  , Subset_Cell_IDs_IP_IPNeuron_Sphase()
-  , Subset_Cell_IDs_IP_IPNeuron_G2Mphase()
-)
-# Format DE into table
-transition_state_DE_DF <- do.call("rbind"
-  , lapply(unique(de_to_run_DF$Comparison)
-    , function(comparison){
-    cellIDs1 <- de_to_run_DF$Cell_IDs[
-      de_to_run_DF$Group == "cell_IDs_1"
-        & de_to_run_DF$Comparison == comparison]
-    cellIDs2 <- de_to_run_DF$Cell_IDs[
-      de_to_run_DF$Group == "cell_IDs_2"
-        & de_to_run_DF$Comparison == comparison]
-    deDF <- DE_By_CellIDs(cell_IDs_1 = cellIDs1, cell_IDs_2 = cellIDs2)
-    deDF$Comparison <- comparison
-    return(deDF)
-  })
-)
-# Save as csv
-write.csv(transition_state_DE_DF, file = paste0(outTable, "DE_CellTransitionStates.csv")
-  , quote = FALSE)
-
-
-
-# DE RG intersection DE RG from RG+ vs IP+
-# versus DE RG+G1 vs RG+Sphase
-# DE RG+IP+ intersection DE IP from RG+ vs IP+
-
-Percent_Signature_DE_Genes <- function(Comparison_1, Comparison_2){
-  genes1 <- row.names(deDF)[
-    deDF$Log_FC_C2vC1 > 0.25 &
-      deDF$FDR < 0.05 &
-      deDF$Comparison == Comparison_1]
-  genes2 <- row.names(transition_state_DE_DF)[
-    transition_state_DE_DF$Log2_FC_Group1_vs_Group2 > 0.25 &
-      # transition_state_DE_DF$FDR < 0.05 &
-      transition_state_DE_DF$Comparison == Comparison_2]
-  percent_signature <- length(intersect(genes1, genes2))/length(genes1) * 100
-  return(percent_signature)
-}
-
-Percent_Signature_DE_Genes(
-  Comparison_1 = "RG_vs_IP"
-  , Comparison_2 = "RG_vs_RGIP_Sphase"
-)
-Percent_Signature_DE_Genes(
-  Comparison_1 = "RG_vs_IP"
-  , Comparison_2 = "RG_vs_RGIP_G2Mphase"
-)
-
-Percent_Signature_DE_Genes(
-  Comparison_1 = "RG_vs_Neuron"
-  , Comparison_2 = "RG_vs_RGIP_Sphase"
-)
-Percent_Signature_DE_Genes(
-  Comparison_1 = "RG_vs_Neuron"
-  , Comparison_2 = "RG_vs_RGNeuron_G2Mphase"
-)
-
-Percent_Signature_DE_Genes(
-  Comparison_1 = "IP_vs_Neuron"
-  , Comparison_2 = "RG_vs_IPNeuron_Sphase"
-)
-Percent_Signature_DE_Genes(
-  Comparison_1 = "IP_vs_Neuron"
-  , Comparison_2 = "RG_vs_IPNeuron_G2Mphase"
-)
-
-
-
-genes1 <- row.names(deDF)[
-  deDF$Log_FC_C2vC1 > 0.25 &
-    deDF$FDR < 0.05 &
-    deDF$Comparison == "RG_vs_IP"]
-genes2 <- row.names(transition_state_DE_DF)[
-  transition_state_DE_DF$Log2_FC_Group1_vs_Group2 > 0.25 &
-    # transition_state_DE_DF$FDR < 0.05 &
-    transition_state_DE_DF$Comparison == "RG_vs_RGIP_Sphase"]
-length(intersect(genes1, genes2))/length(genes1)
-
-genes1 <- row.names(deDF)[
-  deDF$Log_FC_C2vC1 < -0.25 &
-    deDF$FDR < 0.05 &
-    deDF$Comparison == "RG_vs_IP"]
-genes2 <- row.names(transition_state_DE_DF)[
-  transition_state_DE_DF$Log2_FC_Group1_vs_Group2 < -0.25 &
-    # transition_state_DE_DF$FDR < 0.05 &
-    transition_state_DE_DF$Comparison == "RG_vs_RGIP_Sphase"]
-length(intersect(genes1, genes2))/length(genes1)
-
+#
+# ### DE RG(cluster 7,9) vs IP(2); RG(7,9) vs Neuron(0); IP(2) vs Neuron(0)
+#
+# DE_Clusters_Vs_Clusters <- function(clusters1, clusters2) {
+#   ids <- names(centSO@ident)[centSO@ident %in% c(clusters1, clusters2)]
+#   exM <- as.matrix(centSO@data)
+#   exM <- exM[ ,colnames(exM) %in% ids]
+#   # DE Linear model
+#   termsDF <- centSO@meta.data[
+#     row.names(centSO@meta.data) %in% ids
+#     , c("nUMI", "librarylab", "individual", "res.0.6")]
+#   # Add term TRUE/FALSE cell is in cluster
+#   termsDF$clusters <- "clusters1"
+#   termsDF$clusters[termsDF$res.0.6 %in% clusters2] <- "clusters2"
+#   deLM <- DE_Linear_Model(
+#     exDatDF = exM
+#     , termsDF = termsDF
+#     , mod = "y ~ clusters+nUMI+librarylab+individual")
+#   # Format LM DE
+#   deDF <- data.frame(Log_FC_C2vC1 = deLM$coefmat[ ,"clustersclusters2"]
+#     , Pvalue = deLM$pvalmat[ ,"clustersclusters2"])
+#   deDF <- deDF[order(deDF$Log_FC), ]
+#   deDF$Pvalue[deDF$Pvalue == "NaN"] <- 1
+#   # FDR correct
+#   deDF$FDR <- p.adjust(deDF$Pvalue, method="BH")
+#   # Check
+#   table(deDF$Pvalue < 0.05)
+#   table(deDF$FDR < 0.05)
+#   print(head(deDF))
+#   return(deDF)
+# }
+#
+# DE_By_CellIDs <- function(
+#   cell_IDs_1, cell_IDs_2, positive_DE_label = NA, negative_DE_label = NA) {
+#   ids <- c(cell_IDs_1, cell_IDs_2)
+#   exM <- as.matrix(centSO@data)
+#   exM <- exM[ ,colnames(exM) %in% ids]
+#   # DE Linear model
+#   termsDF <- centSO@meta.data[
+#     row.names(centSO@meta.data) %in% ids
+#     , c("nUMI", "librarylab", "individual", "CELL")]
+#   # Add term TRUE/FALSE cell is in cluster
+#   termsDF$groups <- "cell_IDs_1"
+#   termsDF$groups[termsDF$CELL %in% cell_IDs_2] <- "cell_IDs_2"
+#   deLM <- DE_Linear_Model(
+#     exDatDF = exM
+#     , termsDF = termsDF
+#     , mod = "y ~ groups+nUMI+librarylab+individual")
+#   # Format LM DE
+#   deDF <- data.frame(
+#     Log2_FC_Group1_vs_Group2 = deLM$coefmat[ ,"groupscell_IDs_2"]
+#     , Pvalue = deLM$pvalmat[ ,"groupscell_IDs_2"]
+#   )
+#   deDF$Gene = row.names(deDF)
+#   # Make DE cell_IDs_1 positive fold change
+#   deDF$Log2_FC_Group1_vs_Group2 <- deDF$Log2_FC_Group1_vs_Group2 * -1
+#   # Label DE group
+#   deDF$DE_Group <- NA
+#   deDF$DE_Group[deDF$Log2_FC_Group1_vs_Group2 > 0] <- positive_DE_label
+#   deDF$DE_Group[deDF$Log2_FC_Group1_vs_Group2 < 0] <- negative_DE_label
+#   # Order by fold change
+#   deDF <- deDF[order(deDF$Log2_FC_Group1_vs_Group2), ]
+#   deDF$Pvalue[deDF$Pvalue == "NaN"] <- 1
+#   # FDR correct
+#   deDF$FDR <- p.adjust(deDF$Pvalue, method="BH")
+#   # Check
+#   table(deDF$Pvalue < 0.05)
+#   table(deDF$FDR < 0.05)
+#   print(head(deDF))
+#   return(deDF)
+# }
+#
+# # DE cell types
+# # RG vs IP clusters
+# de_RG_v_IP_DF <- DE_Clusters_Vs_Clusters(clusters1 = 2, clusters2 = c(7,9))
+# # RG vs Migrating Neuron clusters
+# de_RG_v_Ne_DF <- DE_Clusters_Vs_Clusters(clusters1 = 0, clusters2 = c(7,9))
+# # IP vs Migrating Neuron clusters
+# de_IP_v_Ne_DF <- DE_Clusters_Vs_Clusters(clusters1 = 0, clusters2 = c(2))
+#
+# # Format and save
+# de_RG_v_IP_DF$Comparison <- "RG_vs_IP"
+# de_RG_v_Ne_DF$Comparison <- "RG_vs_Neuron"
+# de_IP_v_Ne_DF$Comparison <- "IP_vs_Neuron"
+# deDF <- rbind(de_RG_v_IP_DF, de_RG_v_Ne_DF, de_IP_v_Ne_DF)
+# # Save as csv
+# write.csv(deDF, file = paste0(outTable, "DE_CellTypes.csv")
+#   , quote = FALSE)
+deDF <- read.csv(paste0(outTable, "DE_CellTypes.csv"))
+deDF$Gene <- deDF$X
+#
+#
+# Format_Cell_IDs_1_2 <- function(
+#   cellIDs1, cellIDs2, comparison_label, positive_DE_label, negative_DE_label){
+#   de_to_run_DF <- data.frame(
+#     Cell_IDs = c(cellIDs1, cellIDs2)
+#     , Group = c(rep("cell_IDs_1", length(cellIDs1))
+#       , rep("cell_IDs_2", length(cellIDs2)))
+#     , Comparison = comparison_label
+#     , Positive_DE_Label = positive_DE_label
+#     , Negative_DE_Label = negative_DE_label
+#   )
+#   return(de_to_run_DF)
+# }
+#
+# # RG+ vs RG+IP+
+# # S phase
+# Subset_Cell_IDs_RG_RGIP_Sphase <- function(){
+#   mk_exp_DF <- Average_MarkersExp_Per_Cell(
+#     exM = noCentExM, seuratO = centSO)
+#   # Cell IDs 1
+#   cellIDs1 <- row.names(mk_exp_DF)[
+#     mk_exp_DF$RG > 0.5 &
+#     mk_exp_DF$IP < 0.25 &
+#     mk_exp_DF$Neuron < 0.25
+#     ]
+#   cellIDs1 <- intersect(cellIDs1, names(centSO@ident)[centSO@ident == 8])
+#   # Cell IDs 2
+#   cellIDs2 <- row.names(mk_exp_DF)[
+#     mk_exp_DF$RG > 0.5 &
+#     mk_exp_DF$IP > 0.5 &
+#     mk_exp_DF$Neuron < 0.25
+#     ]
+#   cellIDs2 <- intersect(cellIDs2, names(centSO@ident)[centSO@ident == 8])
+#   #
+#   de_to_run_DF <- Format_Cell_IDs_1_2(
+#     cellIDs1 = cellIDs1
+#     , cellIDs2 = cellIDs2
+#     , comparison_label = "RG_vs_RGIP_Sphase"
+#     , positive_DE_label = "RG"
+#     , negative_DE_label = "RGIP"
+#   )
+#   return(de_to_run_DF)
+# }
+# # G2/M phase
+# Subset_Cell_IDs_RG_RGIP_G2Mphase <- function(){
+#   mk_exp_DF <- Average_MarkersExp_Per_Cell(
+#     exM = noCentExM, seuratO = centSO)
+#   # Cell IDs 1
+#   cellIDs1 <- row.names(mk_exp_DF)[
+#     mk_exp_DF$RG > 0.5 &
+#     mk_exp_DF$IP < 0.25 &
+#     mk_exp_DF$Neuron < 0.25
+#     ]
+#   cellIDs1 <- intersect(cellIDs1, names(centSO@ident)[centSO@ident == 10])
+#   # Cell IDs 2
+#   cellIDs2 <- row.names(mk_exp_DF)[
+#     mk_exp_DF$RG > 0.5 &
+#     mk_exp_DF$IP > 0.5 &
+#     mk_exp_DF$Neuron < 0.25
+#     ]
+#   cellIDs2 <- intersect(cellIDs2, names(centSO@ident)[centSO@ident == 10])
+#   de_to_run_DF <- Format_Cell_IDs_1_2(
+#     cellIDs1 = cellIDs1
+#     , cellIDs2 = cellIDs2
+#     , comparison_label = "RG_vs_RGIP_G2Mphase"
+#     , positive_DE_label = "RG"
+#     , negative_DE_label = "RGIP"
+#   )
+#   return(de_to_run_DF)
+# }
+#
+# # RG+ vs RG+Neuron+
+# # S phase
+# Subset_Cell_IDs_RG_RGNeuron_Sphase <- function(){
+#   mk_exp_DF <- Average_MarkersExp_Per_Cell(
+#     exM = noCentExM, seuratO = centSO)
+#   # Cell IDs 1
+#   cellIDs1 <- row.names(mk_exp_DF)[
+#     mk_exp_DF$RG > 0.5 &
+#     mk_exp_DF$IP < 0.25 &
+#     mk_exp_DF$Neuron < 0.25
+#     ]
+#   cellIDs1 <- intersect(cellIDs1, names(centSO@ident)[centSO@ident == 8])
+#   # Cell IDs 2
+#   cellIDs2 <- row.names(mk_exp_DF)[
+#     mk_exp_DF$RG > 0.5 &
+#     mk_exp_DF$IP < 0.25 &
+#     mk_exp_DF$Neuron > 0.5
+#     ]
+#   cellIDs2 <- intersect(cellIDs2, names(centSO@ident)[centSO@ident == 8])
+#   #
+#   de_to_run_DF <- Format_Cell_IDs_1_2(
+#     cellIDs1 = cellIDs1
+#     , cellIDs2 = cellIDs2
+#     , comparison_label = "RG_vs_RGNeuron_Sphase"
+#     , positive_DE_label = "RG"
+#     , negative_DE_label = "RGNeuron"
+#   )
+#   return(de_to_run_DF)
+# }
+# # G2/M phase
+# Subset_Cell_IDs_RG_RGNeuron_G2Mphase <- function(){
+#   mk_exp_DF <- Average_MarkersExp_Per_Cell(
+#     exM = noCentExM, seuratO = centSO)
+#   # Cell IDs 1
+#   cellIDs1 <- row.names(mk_exp_DF)[
+#     mk_exp_DF$RG > 0.5 &
+#     mk_exp_DF$IP < 0.25 &
+#     mk_exp_DF$Neuron < 0.25
+#     ]
+#   cellIDs1 <- intersect(cellIDs1, names(centSO@ident)[centSO@ident == 10])
+#   # Cell IDs 2
+#   cellIDs2 <- row.names(mk_exp_DF)[
+#     mk_exp_DF$RG > 0.5 &
+#     mk_exp_DF$IP > 0.5 &
+#     mk_exp_DF$Neuron < 0.25
+#     ]
+#   cellIDs2 <- intersect(cellIDs2, names(centSO@ident)[centSO@ident == 10])
+#   #
+#   de_to_run_DF <- Format_Cell_IDs_1_2(
+#     cellIDs1 = cellIDs1
+#     , cellIDs2 = cellIDs2
+#     , comparison_label = "RG_vs_RGNeuron_G2Mphase"
+#     , positive_DE_label = "RG"
+#     , negative_DE_label = "RGNeuron"
+#   )
+#   return(de_to_run_DF)
+# }
+#
+# # IP+ vs IP+Neuron+
+# # S phase
+# Subset_Cell_IDs_IP_IPNeuron_Sphase <- function(){
+#   mk_exp_DF <- Average_MarkersExp_Per_Cell(
+#     exM = noCentExM, seuratO = centSO)
+#   # Cell IDs 1
+#   cellIDs1 <- row.names(mk_exp_DF)[
+#     mk_exp_DF$RG < 0.25 &
+#     mk_exp_DF$IP > 0.5 &
+#     mk_exp_DF$Neuron < 0.25
+#     ]
+#   cellIDs1 <- intersect(cellIDs1, names(centSO@ident)[centSO@ident == 8])
+#   # Cell IDs 2
+#   cellIDs2 <- row.names(mk_exp_DF)[
+#     mk_exp_DF$RG < 0.25 &
+#     mk_exp_DF$IP > 0.5 &
+#     mk_exp_DF$Neuron > 0.5
+#     ]
+#   cellIDs2 <- intersect(cellIDs2, names(centSO@ident)[centSO@ident == 8])
+#   #
+#   de_to_run_DF <- Format_Cell_IDs_1_2(
+#     cellIDs1 = cellIDs1
+#     , cellIDs2 = cellIDs2
+#     , comparison_label = "IP_vs_IPNeuron_Sphase"
+#     , positive_DE_label = "IP"
+#     , negative_DE_label = "IPNeuron"
+#   )
+#   return(de_to_run_DF)
+# }
+# # G2/M phase
+# Subset_Cell_IDs_IP_IPNeuron_G2Mphase <- function(){
+#   mk_exp_DF <- Average_MarkersExp_Per_Cell(
+#     exM = noCentExM, seuratO = centSO)
+#   # Cell IDs 1
+#   cellIDs1 <- row.names(mk_exp_DF)[
+#     mk_exp_DF$RG < 0.25 &
+#     mk_exp_DF$IP > 0.5 &
+#     mk_exp_DF$Neuron < 0.25
+#     ]
+#   cellIDs1 <- intersect(cellIDs1, names(centSO@ident)[centSO@ident == 10])
+#   # Cell IDs 2
+#   cellIDs2 <- row.names(mk_exp_DF)[
+#     mk_exp_DF$RG < 0.25 &
+#     mk_exp_DF$IP > 0.5 &
+#     mk_exp_DF$Neuron > 0.5
+#     ]
+#   cellIDs2 <- intersect(cellIDs2, names(centSO@ident)[centSO@ident == 10])
+#   #
+#   de_to_run_DF <- Format_Cell_IDs_1_2(
+#     cellIDs1 = cellIDs1
+#     , cellIDs2 = cellIDs2
+#     , comparison_label = "IP_vs_IPNeuron_G2Mphase"
+#     , positive_DE_label = "IP"
+#     , negative_DE_label = "IPNeuron"
+#   )
+#   return(de_to_run_DF)
+# }
+#
+# # Run DE for transition states
+# de_to_run_DF <- rbind(
+#   Subset_Cell_IDs_RG_RGIP_Sphase()
+#   , Subset_Cell_IDs_RG_RGIP_G2Mphase()
+#   , Subset_Cell_IDs_RG_RGNeuron_Sphase()
+#   , Subset_Cell_IDs_RG_RGNeuron_G2Mphase()
+#   , Subset_Cell_IDs_IP_IPNeuron_Sphase()
+#   , Subset_Cell_IDs_IP_IPNeuron_G2Mphase()
+# )
+# transition_state_DE_DF <- do.call("rbind"
+#   , lapply(unique(de_to_run_DF$Comparison)
+#     , function(comparison){
+#
+#     cellIDs1 <- de_to_run_DF$Cell_IDs[
+#       de_to_run_DF$Group == "cell_IDs_1"
+#         & de_to_run_DF$Comparison == comparison]
+#     cellIDs2 <- de_to_run_DF$Cell_IDs[
+#       de_to_run_DF$Group == "cell_IDs_2"
+#         & de_to_run_DF$Comparison == comparison]
+#
+#     deDF <- DE_By_CellIDs(
+#       cell_IDs_1 = cellIDs1
+#       , cell_IDs_2 = cellIDs2
+#       , positive_DE_label = de_to_run_DF$Positive_DE_Label[1]
+#       , negative_DE_label = de_to_run_DF$Negative_DE_Label[1]
+#     )
+#     deDF$Comparison <- comparison
+#
+#     return(deDF)
+#   })
+# )
+# # Save as csv
+# write.csv(transition_state_DE_DF, file = paste0(outTable, "DE_CellTransitionStates.csv")
+#   , quote = FALSE)
+#
+#
+#
+# # DE RG intersection DE RG from RG+ vs IP+
+# # versus DE RG+G1 vs RG+Sphase
+# # DE RG+IP+ intersection DE IP from RG+ vs IP+
+#
+# Percent_Signature_DE_Genes <- function(Comparison_1, Comparison_2){
+#   genes1 <- deDF$Gene[
+#     deDF$Log_FC_C2vC1 > 0.25 &
+#       deDF$FDR < 0.05 &
+#       deDF$Comparison == Comparison_1]
+#   genes2 <- transition_state_DE_DF$Gene[
+#     transition_state_DE_DF$Log2_FC_Group1_vs_Group2 > 0.25 &
+#       # transition_state_DE_DF$FDR < 0.05 &
+#       transition_state_DE_DF$Comparison == Comparison_2]
+#   genes3 <- deDF$Gene[
+#     deDF$Log_FC_C2vC1 < -0.25 &
+#       deDF$FDR < 0.05 &
+#       deDF$Comparison == Comparison_1]
+#   genes4 <- transition_state_DE_DF$Gene[
+#     transition_state_DE_DF$Log2_FC_Group1_vs_Group2 < -0.25 &
+#       # transition_state_DE_DF$FDR < 0.05 &
+#       transition_state_DE_DF$Comparison == Comparison_2]
+#   percent_signature_DF <- data.frame(
+#     Percent = c(length(intersect(genes1, genes2))/length(genes1) * 100
+#       , length(intersect(genes3, genes4))/length(genes1) * 100)
+#     Group = c(
+#       transition_state_DE_DF$DE_Group[transition_state_DE_DF$Log2_FC_Group1_vs_Group2 > 0][1]
+#       , transition_state_DE_DF$DE_Group[transition_state_DE_DF$Log2_FC_Group1_vs_Group2 < 0][1]
+#   )
+#
+#   )
+#   return(percent_signature)
+# }
+#
+# Percent_Signature_DE_Genes(
+#   Comparison_1 = "RG_vs_IP"
+#   , Comparison_2 = "RG_vs_RGIP_Sphase"
+# )
+# Percent_Signature_DE_Genes(
+#   Comparison_1 = "RG_vs_IP"
+#   , Comparison_2 = "RG_vs_RGIP_G2Mphase"
+# )
+# ggplot()
+#
+# Percent_Signature_DE_Genes(
+#   Comparison_1 = "RG_vs_Neuron"
+#   , Comparison_2 = "RG_vs_RGNeuron_Sphase"
+# )
+# Percent_Signature_DE_Genes(
+#   Comparison_1 = "RG_vs_Neuron"
+#   , Comparison_2 = "RG_vs_RGNeuron_G2Mphase"
+# )
+#
+# Percent_Signature_DE_Genes(
+#   Comparison_1 = "IP_vs_Neuron"
+#   , Comparison_2 = "RG_vs_IPNeuron_Sphase"
+# )
+# Percent_Signature_DE_Genes(
+#   Comparison_1 = "IP_vs_Neuron"
+#   , Comparison_2 = "RG_vs_IPNeuron_G2Mphase"
+# )
+#
+#
+#
+# genes1 <- row.names(deDF)[
+#   deDF$Log_FC_C2vC1 > 0.25 &
+#     deDF$FDR < 0.05 &
+#     deDF$Comparison == "RG_vs_IP"]
+# genes2 <- row.names(transition_state_DE_DF)[
+#   transition_state_DE_DF$Log2_FC_Group1_vs_Group2 > 0.25 &
+#     # transition_state_DE_DF$FDR < 0.05 &
+#     transition_state_DE_DF$Comparison == "RG_vs_RGIP_Sphase"]
+# length(intersect(genes1, genes2))/length(genes1)
+#
+# genes1 <- row.names(deDF)[
+#   deDF$Log_FC_C2vC1 < -0.25 &
+#     deDF$FDR < 0.05 &
+#     deDF$Comparison == "RG_vs_IP"]
+# genes2 <- row.names(transition_state_DE_DF)[
+#   transition_state_DE_DF$Log2_FC_Group1_vs_Group2 < -0.25 &
+#     # transition_state_DE_DF$FDR < 0.05 &
+#     transition_state_DE_DF$Comparison == "RG_vs_RGIP_Sphase"]
+# length(intersect(genes1, genes2))/length(genes1)
+#
 
 # de_RG_v_IP_DF <- read.csv(paste0(outTable, "DE_RGvsIP.csv")
 #   , header = TRUE, row.names = 1)
@@ -1039,53 +1105,107 @@ length(intersect(genes1, genes2))/length(genes1)
 
 ### ME of DE genes in RG+ IP+ Neuron+
 
-ME_CellType_Genes <- function(
-  cellIDs, deDF, mk_exp_DF, foldChange, Class1_label, Class2_label) {
+## Functions
 
-  df2 <- noCentExM[ ,colnames(noCentExM) %in% cellIDs]
+Make_Gene_List_for_moduleEigengenes <- function(
+  foldChange, exM, class1_label, class2_label){
 
   names(foldChange) <- foldChange
   genesDFL <- lapply(foldChange, function(foldChange){
 
-    genesDF <- data.frame(Genes = row.names(df2)
-      , Class = rep("Neither", length(row.names(df2))))
-    genesDF$Class[genesDF$Genes %in% row.names(deDF)[
-      deDF$Log_FC_C2vC1 > foldChange & deDF$FDR < 0.05]] <- Class2_label
-    genesDF$Class[genesDF$Genes %in% row.names(deDF)[
-      deDF$Log_FC_C2vC1 < -(foldChange) & deDF$FDR < 0.05]] <- Class1_label
+    genesDF <- data.frame(Genes = row.names(exM)
+      , Class = rep("Neither", length(row.names(exM))))
+    genesDF$Class[genesDF$Genes %in% deDF$Gene[
+      deDF$Log_FC_C2vC1 > foldChange & deDF$FDR < 0.05]] <- class2_label
+    genesDF$Class[genesDF$Genes %in% deDF$Gene[
+      deDF$Log_FC_C2vC1 < -(foldChange) & deDF$FDR < 0.05]] <- class1_label
 
     return(genesDF)
   })
+  return(genesDFL)
+}
 
-  ggL <- lapply(names(genesDFL), function(name){
+Calculate_Module_Eigengene <- function(genesDF, exM){
+  print("Calculate_Module_Eigengene")
+  subset_exM <- exM[genesDF$Class != "Neither", ]
+  genesDF <- genesDF[genesDF$Class != "Neither", ]
+  meM <- moduleEigengenes(t(subset_exM), genesDF$Class)$eigengenes
+  return(meM)
+}
+
+Format_moduleEigengenes_Output <- function(meM, exM, genesDF, mk_exp_DF){
+  print("Format_moduleEigengenes_Output")
+  meM$CellID <- colnames(exM[genesDF$Class != "Neither", ])
+  me_markerFlag_DF <- Marker_Expression_Flag(meM, mk_exp_DF)
+  me_markerFlag_DF <- me_markerFlag_DF[ ,c(1:6)]
+  me_markerFlag_DF <- melt(me_markerFlag_DF)
+  me_markerFlag_DF$Number_DE_Genes <- sum(genesDF$Class != "Neither")
+  return(me_markerFlag_DF)
+}
+
+T_test_eigengene <- function(me_markerFlag_DF){
+  print("T_test_eigengene")
+  pvals_DF <- sapply(split(me_markerFlag_DF, me_markerFlag_DF$variable), function(df1) {
+    combinations <- combn(unique(df1$Cell_Subset), 2)
+    pvals <- apply(combinations, 2, function(y){
+      results <- t.test(df1$value[df1$Cell_Subset == y[1]]
+        , df1$value[df1$Cell_Subset == y[2]])
+      return(results$p.value)
+    })
+    names(pvals) <- paste(combinations[1, ], "vs", combinations[2, ], "\npvalue")
+    pvals <- signif(pvals, 2)
+    return(pvals)
+  })
+  pvals_DF <- as.data.frame(pvals_DF)
+  return(pvals_DF)
+}
+
+
+Calculate_ME_For_CellType_Genes <- function(
+  cellIDs, deDF, mk_exp_DF, foldChange, class1_label, class2_label) {
+
+  exM <- noCentExM[ ,colnames(noCentExM) %in% cellIDs]
+
+  genesDFL <- Make_Gene_List_for_moduleEigengenes(
+    foldChange = foldChange, exM = exM
+    , class1_label = class1_label, class2_label = class2_label)
+
+  me_markerFlag_DF <- lapply(names(genesDFL), function(name){
+
+    print(name)
 
     genesDF <- genesDFL[[name]]
+    meM <- Calculate_Module_Eigengene(
+      genesDF = genesDF
+      , exM = exM
+    )
+    me_markerFlag_DF <- Format_moduleEigengenes_Output(
+      meM = meM
+      , exM = exM
+      , genesDF = genesDF
+      , mk_exp_DF
+    )
+    me_markerFlag_DF$Fold_Change_Cutoff <- name
+    # Format ME; eg MERG to RG eigengene
+    me_markerFlag_DF$variable <- paste(gsub("ME", "", me_markerFlag_DF$variable)
+      , "eigengene")
+    return(me_markerFlag_DF)
+  })
+  me_markerFlag_DF <- do.call("rbind", me_markerFlag_DF)
 
-    print(str(genesDF))
+  return(me_markerFlag_DF)
+}
 
-    print("ME calculation...")
-    df3 <- df2[genesDF$Class != "Neither", ]
-    genesDF <- genesDF[genesDF$Class != "Neither", ]
-    meM <- moduleEigengenes(t(df3), genesDF$Class)$eigengenes
 
-    print("Formatting...")
-    meM$CellID <- colnames(df3)
-    df4 <- Marker_Expression_Flag(meM, mk_exp_DF)
-    df4 <- df4[ ,c(1:6)]
-    df4 <- melt(df4)
+Plot_ME_CellType_Genes <- function(
+  me_markerFlag_DF, color_1 = NA, color_2 = NA){
 
-    print("T-test...")
-    pvals_DF <- sapply(split(df4, df4$variable), function(df1) {
-      combinations <- combn(unique(df1$Cell_Subset), 2)
-      pvals <- apply(combinations, 2, function(y){
-        results <- t.test(df1$value[df1$Cell_Subset == y[1]]
-          , df1$value[df1$Cell_Subset == y[2]])
-        return(results$p.value)
-      })
-      names(pvals) <- paste(combinations[1, ], "vs", combinations[2, ], "\npvalue")
-      return(round(pvals, 3))
-    })
-    pvals_DF <- as.data.frame(pvals_DF)
+  ggL <- lapply(unique(me_markerFlag_DF$Fold_Change_Cutoff), function(name){
+
+    me_markerFlag_DF <- me_markerFlag_DF[
+      me_markerFlag_DF$Fold_Change_Cutoff == name, ]
+
+    pvals_DF <- T_test_eigengene(me_markerFlag_DF = me_markerFlag_DF)
 
     print("Plotting p-value table...")
     # Plot p-value table
@@ -1094,114 +1214,214 @@ ME_CellType_Genes <- function(
     ggt <- tableGrob(pvals_DF, theme = tt)
 
     # Format for ggplot
-    df4$Cell_Subset <- factor(df4$Cell_Subset
+    me_markerFlag_DF$Cell_Subset <- factor(me_markerFlag_DF$Cell_Subset
       , levels = c("RG", "RG IP", "IP", "RG Neuron", "IP Neuron", "Neuron"))
+    me_markerFlag_DF$variable <- factor(me_markerFlag_DF$variable
+      , levels = c("RG eigengene", "IP eigengene", "Neuron eigengene"))
 
     print("Plotting ME boxplot...")
-    gg <- ggplot(df4, aes(x = Cell_Subset, y = value, fill = variable)) +
-      geom_boxplot() +
-      ylab("ME value") +
+    gg <- ggplot(me_markerFlag_DF
+        , aes(x = Cell_Subset, y = value)) +
+      geom_boxplot(aes(fill = variable)) +
+      scale_fill_manual(values = c(color_1, color_2)) +
+      facet_wrap(~variable, scales = "free") +
+      stat_compare_means(value ~ Cell_Subset, data = me_markerFlag_DF
+        , group.by = c("variable")
+        , comparisons = list(c(1,2), c(1,3), c(2,3))
+        , method = "t.test", p.adjust.method = "none"
+        # , label.y = c(0.75, 0.9, 0.6)
+      ) +
+      # ylim(c(-0.5, 1)) +
+      ggplot_set_theme_publication +
+      theme(legend.position = "none") +
+      theme(text = element_text(size = 12, colour = "black")) +
+      ylab("Eigengene value") +
       xlab("Cell subset") +
       ggtitle(paste0("DE log2 fold change cutoff: ", name
-        , "\nNumber of DE genes: ", nrow(df3)))
+        , "\nNumber of DE genes: ", me_markerFlag_DF$Number_DE_Genes))
 
-    gg <- plot_grid(gg, ggt, ncol = 2, rel_widths = c(1,0.5))
-    return(gg)
+      gg <- plot_grid(gg, ggt, ncol = 1, rel_heights = c(1,0.5))
+      return(gg)
   })
-
   return(ggL)
 }
 
-mk_exp_DF <- Average_MarkersExp_Per_Cell(
-  exM = noCentExM, seuratO = centSO)
-cellIDs <- row.names(mk_exp_DF)[
-  mk_exp_DF$RG > 0.5 & mk_exp_DF$Neuron < 0.25 | mk_exp_DF$IP > 0.5 & mk_exp_DF$Neuron < 0.25]
-cellIDs <- intersect(cellIDs, names(centSO@ident)[centSO@ident == 8])
-ggL <- ME_CellType_Genes(
-  cellIDs = cellIDs, deDF = de_RG_v_IP_DF, mk_exp_DF = mk_exp_DF
-  , Class1_label = "IP", Class2_label = "RG", foldChange = c(0, 0.25, 0.5)
-)
-Plot_Grid(ggL, ncol = 1, rel_height = 0.2
-  , title = paste0(graphCodeTitle
-    , "\n\nME of DE RG vs IP genes in cluster 8 RG+, IP+, RG+IP+, Neuron-")
-)
-ggsave(paste0(outGraph, "DE_ME_boxplot_RGpIPpNn_Cluster8.pdf"), height = 9)
 
-mk_exp_DF <- Average_MarkersExp_Per_Cell(
-  exM = noCentExM, seuratO = centSO)
-cellIDs <- row.names(mk_exp_DF)[
-  mk_exp_DF$RG > 0.5 & mk_exp_DF$Neuron < 0.25 | mk_exp_DF$IP > 0.5 & mk_exp_DF$Neuron < 0.25]
-cellIDs <- intersect(cellIDs, names(centSO@ident)[centSO@ident == 10])
-ggL <- ME_CellType_Genes(
-  cellIDs = cellIDs, deDF = de_RG_v_IP_DF, mk_exp_DF = mk_exp_DF
-  , Class1_label = "IP", Class2_label = "RG", foldChange = c(0, 0.25, 0.5)
-)
-Plot_Grid(ggL, ncol = 1, rel_height = 0.2
-  , title = paste0(graphCodeTitle
-    , "\n\nME of DE RG vs IP genes in cluster 10 RG+, IP+, RG+IP+, Neuron-")
-)
-ggsave(paste0(outGraph, "DE_ME_boxplot_RGpIPpNn_Cluster10.pdf"), height = 9)
+## Functions to run
 
-mk_exp_DF <- Average_MarkersExp_Per_Cell(
-  exM = noCentExM, seuratO = centSO)
-cellIDs <- row.names(mk_exp_DF)[
-  mk_exp_DF$RG > 0.5 & mk_exp_DF$IP < 0.25 | mk_exp_DF$Neuron > 0.5 & mk_exp_DF$IP < 0.25]
-cellIDs <- intersect(cellIDs, names(centSO@ident)[centSO@ident == c(0,8)])
-ggL <- ME_CellType_Genes(
-  cellIDs = cellIDs, deDF = de_RG_v_Ne_DF, mk_exp_DF = mk_exp_DF
-  , Class1_label = "Neuron", Class2_label = "RG", foldChange = c(0, 0.25, 0.5)
-)
-Plot_Grid(ggL, ncol = 1, rel_height = 0.2
-  , title = paste0(graphCodeTitle
-    , "\n\nME of DE RG vs Neuron genes in cluster 0,8 RG+, Neuron+, RG+Neuron+, IP-")
-)
-ggsave(paste0(outGraph, "DE_ME_boxplot_RGpIPnNp_Cluster08.pdf"), height = 9)
+ME_CellType_RG_to_IP_8 <- function(){
+  mk_exp_DF <- Average_MarkersExp_Per_Cell(
+    exM = noCentExM, seuratO = centSO)
+  cellIDs <- row.names(mk_exp_DF)[
+    mk_exp_DF$RG > 0.5 & mk_exp_DF$Neuron < 0.25 | mk_exp_DF$IP > 0.5 & mk_exp_DF$Neuron < 0.25]
+  cellIDs <- intersect(cellIDs, names(centSO@ident)[centSO@ident == 8])
+  me_markerFlag_DF <- Calculate_ME_For_CellType_Genes(
+    cellIDs = cellIDs, deDF = deDF[deDF$Comparison == "RG_vs_IP", ]
+    , mk_exp_DF = mk_exp_DF, class1_label = "IP", class2_label = "RG"
+    , foldChange = c(0, 0.25, 0.5)
+  )
+  return(me_markerFlag_DF)
+}
 
-mk_exp_DF <- Average_MarkersExp_Per_Cell(
-  exM = noCentExM, seuratO = centSO)
-cellIDs <- row.names(mk_exp_DF)[
-  mk_exp_DF$RG > 0.5 & mk_exp_DF$IP < 0.25 | mk_exp_DF$Neuron > 0.5 & mk_exp_DF$IP < 0.25]
-cellIDs <- intersect(cellIDs, names(centSO@ident)[centSO@ident == c(0,10)])
-ggL <- ME_CellType_Genes(
-  cellIDs = cellIDs, deDF = de_RG_v_Ne_DF, mk_exp_DF = mk_exp_DF
-  , Class1_label = "Neuron", Class2_label = "RG", foldChange = c(0, 0.25, 0.5)
-)
-Plot_Grid(ggL, ncol = 1, rel_height = 0.2
-  , title = paste0(graphCodeTitle
-    , "\n\nME of DE RG vs Neuron genes in cluster 0,10 RG+, Neuron+, RG+Neuron+, IP-")
-)
-ggsave(paste0(outGraph, "DE_ME_boxplot_RGpIPnNp_Cluster010.pdf"), height = 9)
+ME_CellType_RG_to_IP_10 <- function(){
+  mk_exp_DF <- Average_MarkersExp_Per_Cell(
+    exM = noCentExM, seuratO = centSO)
+  cellIDs <- row.names(mk_exp_DF)[
+    mk_exp_DF$RG > 0.5 & mk_exp_DF$Neuron < 0.25 | mk_exp_DF$IP > 0.5 & mk_exp_DF$Neuron < 0.25]
+  cellIDs <- intersect(cellIDs, names(centSO@ident)[centSO@ident == 10])
+  me_markerFlag_DF <- Calculate_ME_For_CellType_Genes(
+    cellIDs = cellIDs, deDF = deDF[deDF$Comparison == "RG_vs_IP", ]
+    , mk_exp_DF = mk_exp_DF, class1_label = "IP", class2_label = "RG"
+    , foldChange = c(0, 0.25, 0.5)
+  )
+  return(me_markerFlag_DF)
+}
 
-mk_exp_DF <- Average_MarkersExp_Per_Cell(
-  exM = noCentExM, seuratO = centSO)
-cellIDs <- row.names(mk_exp_DF)[
-  mk_exp_DF$IP > 0.5 & mk_exp_DF$RG < 0.25 | mk_exp_DF$Neuron > 0.5 & mk_exp_DF$RG < 0.25]
-cellIDs <- intersect(cellIDs, names(centSO@ident)[centSO@ident == c(0,8)])
-ggL <- ME_CellType_Genes(
-  cellIDs = cellIDs, deDF = de_IP_v_Ne_DF, mk_exp_DF = mk_exp_DF
-  , Class1_label = "Neuron", Class2_label = "IP", foldChange = c(0, 0.25, 0.5)
-)
-Plot_Grid(ggL, ncol = 1, rel_height = 0.2
-  , title = paste0(graphCodeTitle
-    , "\n\nME of DE IP vs Neuron genes in cluster 0,8 IP+, Neuron+, IP+Neuron+, RG-")
-)
-ggsave(paste0(outGraph, "DE_ME_boxplot_RGnIPpNp_Cluster08.pdf"), height = 9)
+ME_CellType_RG_to_Neuron_08 <- function(){
+  mk_exp_DF <- Average_MarkersExp_Per_Cell(
+    exM = noCentExM, seuratO = centSO)
+  cellIDs <- row.names(mk_exp_DF)[
+    mk_exp_DF$RG > 0.5 & mk_exp_DF$IP < 0.25 | mk_exp_DF$Neuron > 0.5 & mk_exp_DF$IP < 0.25]
+  cellIDs <- intersect(cellIDs, names(centSO@ident)[centSO@ident == c(0,8)])
+  me_markerFlag_DF <- Calculate_ME_For_CellType_Genes(
+    cellIDs = cellIDs, deDF = deDF[deDF$Comparison == "RG_vs_Neuron", ]
+    , mk_exp_DF = mk_exp_DF
+    , class1_label = "Neuron", class2_label = "RG", foldChange = c(0, 0.25, 0.5)
+  )
+  return(me_markerFlag_DF)
+}
 
-mk_exp_DF <- Average_MarkersExp_Per_Cell(
-  exM = noCentExM, seuratO = centSO)
-cellIDs <- row.names(mk_exp_DF)[
-  mk_exp_DF$IP > 0.5 & mk_exp_DF$RG < 0.25 | mk_exp_DF$Neuron > 0.5 & mk_exp_DF$RG < 0.25]
-cellIDs <- intersect(cellIDs, names(centSO@ident)[centSO@ident == c(0,10)])
-ggL <- ME_CellType_Genes(
-  cellIDs = cellIDs, deDF = de_IP_v_Ne_DF, mk_exp_DF = mk_exp_DF
-  , Class1_label = "Neuron", Class2_label = "IP", foldChange = c(0, 0.25, 0.5)
-)
-Plot_Grid(ggL, ncol = 1, rel_height = 0.2
-  , title = paste0(graphCodeTitle
-    , "\n\nME of DE IP vs Neuron genes in cluster 0,10 IP+, Neuron+, IP+Neuron+, RG-")
-)
-ggsave(paste0(outGraph, "DE_ME_boxplot_RGnIPpNp_Cluster010.pdf"), height = 9)
+ME_CellType_RG_to_Neuron_010 <- function(){
+  mk_exp_DF <- Average_MarkersExp_Per_Cell(
+    exM = noCentExM, seuratO = centSO)
+  cellIDs <- row.names(mk_exp_DF)[
+    mk_exp_DF$RG > 0.5 & mk_exp_DF$IP < 0.25 | mk_exp_DF$Neuron > 0.5 & mk_exp_DF$IP < 0.25]
+  cellIDs <- intersect(cellIDs, names(centSO@ident)[centSO@ident == c(0,10)])
+  me_markerFlag_DF <- Calculate_ME_For_CellType_Genes(
+    cellIDs = cellIDs, deDF = deDF[deDF$Comparison == "RG_vs_Neuron", ]
+    , mk_exp_DF = mk_exp_DF
+    , class1_label = "Neuron", class2_label = "RG", foldChange = c(0, 0.25, 0.5)
+  )
+  return(me_markerFlag_DF)
+}
 
+
+ME_CellType_IP_to_Neuron_08 <- function(){
+  mk_exp_DF <- Average_MarkersExp_Per_Cell(
+    exM = noCentExM, seuratO = centSO)
+  cellIDs <- row.names(mk_exp_DF)[
+    mk_exp_DF$IP > 0.5 & mk_exp_DF$RG < 0.25 | mk_exp_DF$Neuron > 0.5 & mk_exp_DF$RG < 0.25]
+  cellIDs <- intersect(cellIDs, names(centSO@ident)[centSO@ident == c(0,8)])
+  me_markerFlag_DF <- Calculate_ME_For_CellType_Genes(
+    cellIDs = cellIDs, deDF = deDF[deDF$Comparison == "IP_vs_Neuron", ]
+    , mk_exp_DF = mk_exp_DF
+    , class1_label = "Neuron", class2_label = "IP", foldChange = c(0, 0.25, 0.5)
+  )
+  return(me_markerFlag_DF)
+}
+
+ME_CellType_IP_to_Neuron_010 <- function(){
+  mk_exp_DF <- Average_MarkersExp_Per_Cell(
+    exM = noCentExM, seuratO = centSO)
+  cellIDs <- row.names(mk_exp_DF)[
+    mk_exp_DF$IP > 0.5 & mk_exp_DF$RG < 0.25 | mk_exp_DF$Neuron > 0.5 & mk_exp_DF$RG < 0.25]
+  cellIDs <- intersect(cellIDs, names(centSO@ident)[centSO@ident == c(0,10)])
+  me_markerFlag_DF <- Calculate_ME_For_CellType_Genes(
+    cellIDs = cellIDs, deDF = deDF[deDF$Comparison == "IP_vs_Neuron", ]
+    , mk_exp_DF = mk_exp_DF
+    , class1_label = "Neuron", class2_label = "IP", foldChange = c(0, 0.25, 0.5)
+  )
+  return(me_markerFlag_DF)
+}
+
+
+## Run
+
+ME_CellType_L <- list(
+  RG_to_IP_8 = ME_CellType_RG_to_IP_8()
+  , RG_to_IP_10 = ME_CellType_RG_to_IP_10()
+  , RG_to_Neuron_08 = ME_CellType_RG_to_Neuron_08()
+  , RG_to_Neuron_010 = ME_CellType_RG_to_Neuron_010()
+  , IP_to_Neuron_08 = ME_CellType_IP_to_Neuron_08()
+  , IP_to_Neuron_010 = ME_CellType_IP_to_Neuron_010()
+)
+
+save(ME_CellType_L, file = paste0(outData, "ME_CellType.rdata"))
+
+
+## Plot
+
+ggL <- Plot_ME_CellType_Genes(
+  me_markerFlag_DF = ME_CellType_L[["RG_to_IP_8"]]
+  , color_1 = "#8dd3c7", color_2 = "#bebada"
+)
+Plot_Grid(ggL, ncol = 1, rel_height = 0.1
+  , title = paste0(graphCodeTitle
+    , "\n\nME of DE RG vs IP genes in"
+    , "\ncluster 8 RG+, IP+, RG+IP+, Neuron-")
+)
+ggsave(paste0(outGraph, "DE_ME_boxplot_RGpIPpNn_Cluster8.pdf")
+  , height = 18, width = 6)
+
+ggL <- Plot_ME_CellType_Genes(
+  me_markerFlag_DF = ME_CellType_L[["RG_to_IP_10"]]
+  , color_1 = "#8dd3c7", color_2 = "#bebada"
+)
+Plot_Grid(ggL, ncol = 1, rel_height = 0.1
+  , title = paste0(graphCodeTitle
+    , "\n\nME of DE RG vs IP genes in"
+    , "\ncluster 10 RG+, IP+, RG+IP+, Neuron-")
+)
+ggsave(paste0(outGraph, "DE_ME_boxplot_RGpIPpNn_Cluster10.pdf")
+  , height = 18, width = 6)
+
+ggL <- Plot_ME_CellType_Genes(
+  me_markerFlag_DF = ME_CellType_L[["RG_to_Neuron_08"]]
+  , color_1 = "#8dd3c7", color_2 = "#fb8072"
+)
+Plot_Grid(ggL, ncol = 1, rel_height = 0.1
+  , title = paste0(graphCodeTitle
+    , "\n\nME of DE RG vs Neuron genes in"
+    , "\ncluster 0,8 RG+, Neuron+, RG+Neuron+, IP-")
+)
+ggsave(paste0(outGraph, "DE_ME_boxplot_RGpIPnNp_Cluster08.pdf")
+  , height = 18, width = 6)
+
+ggL <- Plot_ME_CellType_Genes(
+  me_markerFlag_DF = ME_CellType_L[["RG_to_Neuron_010"]]
+  , color_1 = "#8dd3c7", color_2 = "#fb8072"
+)
+Plot_Grid(ggL, ncol = 1, rel_height = 0.1
+  , title = paste0(graphCodeTitle
+    , "\n\nME of DE RG vs Neuron genes in"
+    , "\ncluster 0,10 RG+, Neuron+, RG+Neuron+, IP-")
+)
+ggsave(paste0(outGraph, "DE_ME_boxplot_RGpIPnNp_Cluster010.pdf")
+  , height = 18, width = 6)
+
+ggL <- Plot_ME_CellType_Genes(
+  me_markerFlag_DF = ME_CellType_L[["IP_to_Neuron_08"]]
+  , color_1 = "#bebada", color_2 = "#fb8072"
+)
+Plot_Grid(ggL, ncol = 1, rel_height = 0.1
+  , title = paste0(graphCodeTitle
+    , "\n\nME of DE IP vs Neuron genes in"
+    , "\ncluster 0,8 IP+, Neuron+, IP+Neuron+, RG-")
+)
+ggsave(paste0(outGraph, "DE_ME_boxplot_RGnIPpNp_Cluster08.pdf")
+  , height = 18, width = 6)
+
+ggL <- Plot_ME_CellType_Genes(
+  me_markerFlag_DF = ME_CellType_L[["IP_to_Neuron_010"]]
+  , color_1 = "#bebada", color_2 = "#fb8072"
+)
+Plot_Grid(ggL, ncol = 1, rel_height = 0.1
+  , title = paste0(graphCodeTitle
+    , "\n\nME of DE IP vs Neuron genes in"
+    , "\ncluster 0,10 IP+, Neuron+, IP+Neuron+, RG-")
+)
+ggsave(paste0(outGraph, "DE_ME_boxplot_RGnIPpNp_Cluster010.pdf")
+  , height = 18, width = 6)
 
 ## Average Expression
 # df1 <- Average_MarkersExp_Per_Cell(
