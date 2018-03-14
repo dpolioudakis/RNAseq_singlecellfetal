@@ -902,33 +902,45 @@ ggsave(paste0(outGraph, "tSNE_PCsTest.png")
   , width = 12, height = 18)
 
 ## Resolution
-centSO <- RunTSNE(centSO, dims.use = 1:40, do.fast = TRUE)
-ggL <- lapply(
-  c(0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.2, 1.5, 2.0),
-  function(res) {
-    so <- FindClusters(centSO, dims.use = 1:40, resolution = res
-      , print.output = 0, save.SNN = TRUE)
-    gg <- TSNEPlot(so, pt.size = 0.01, do.return = TRUE, do.label = TRUE)
-    gg <- gg + ggtitle(paste0("Resolution: ", res))
-    return(gg)
-  })
-# plot_grid combine tSNE graphs
-pg <- plot_grid(plotlist = ggL, ncol = 2, align = 'v', axis = 'r')
-# now add the title
-title <- ggdraw() + draw_label(paste0(graphCodeTitle
-  , "\n\nSeurat cluster and tSNE with different Seurat cluster resolutions"
-  , "\n"
-  , "\nRemove genes > 0 counts in < 3 cells"
-  , "\nRemove cells < 200 genes detected"
-  , "\nRemove cells > 3192 (3 SD) genes detected"
-  , "\nRemove genes detected in < 3 cells"
-  , "\nNormalize expression"
-  , "\nRegress out covariates"
-  , "\n"))
-# rel_heights values control title margins
-plot_grid(title, pg, ncol = 1, rel_heights = c(0.15, 1))
+Seurat_Resolution_Test <- function(seuratO, resolutions){
+  # centSO <- RunTSNE(centSO, dims.use = 1:40, do.fast = TRUE)
+  ggL <- lapply(resolutions, function(resolution) {
+      so <- FindClusters(seuratO, dims.use = 1:40, resolution = resolution
+        , print.output = 0, save.SNN = TRUE)
+      gg <- TSNEPlot(so, pt.size = 0.01, do.return = TRUE, do.label = TRUE)
+      gg <- gg + ggtitle(paste0("Resolution: ", resolution))
+      return(gg)
+    })
+  # plot_grid combine tSNE graphs
+  pg <- plot_grid(plotlist = ggL, ncol = 2, align = 'v', axis = 'r')
+  # now add the title
+  title <- ggdraw() + draw_label(paste0(graphCodeTitle
+    , "\n\nSeurat cluster and tSNE with different Seurat cluster resolutions"
+    , "\n"
+    , "\nRemove genes > 0 counts in < 3 cells"
+    , "\nRemove cells < 200 genes detected"
+    , "\nRemove cells > 3192 (3 SD) genes detected"
+    , "\nRemove genes detected in < 3 cells"
+    , "\nNormalize expression"
+    , "\nRegress out covariates"
+    , "\n"))
+  # rel_heights values control title margins
+  pg <- plot_grid(title, pg, ncol = 1, rel_heights = c(0.15, 1))
+  return(pg)
+}
+Seurat_Resolution_Test(
+  seuratO = centSO
+  , resolutions = c(
+      0.2, 0.3, 0.4, 0.5, 0.54, 0.6, 0.7, 0.8, 0.9, 1.0, 1.2, 1.5, 2.0)
+)
 ggsave(paste0(outGraph, "tSNE_ResolutionTest.png")
-  , width = 12, height = 36)
+  , width = 12, height = 40)
+Seurat_Resolution_Test(
+  seuratO = centSO
+  , resolutions = c(0.5, 0.51, 0.52, 0.53, 0.54, 0.55, 0.6)
+)
+ggsave(paste0(outGraph, "tSNE_ResolutionTest0506.png")
+  , width = 12, height = 22)
 
 ## Clustering parameters to save
 centSO <- RunTSNE(centSO, dims.use = 1:40, do.fast = TRUE)
@@ -1121,6 +1133,17 @@ ssNoCentExM <- noCentExM[ ,colnames(noCentExM) %in% cellIDs]
 
 save(ssCentSO, ssNoCentExM, metDF, high.thresholds
   , file = paste0(outData, "TEST_seuratO.Robj"))
+
+# Sample cell IDs
+cellIDs <- sample(colnames(centSO@scale.data), 5000)
+# Subset
+ssCentSO <- SubsetData(centSO, cells.use = cellIDs)
+ssCentSO@raw.data <- ssCentSO@raw.data[
+  ,colnames(ssCentSO@raw.data) %in% cellIDs]
+ssNoCentExM <- noCentExM[ ,colnames(noCentExM) %in% cellIDs]
+
+save(ssCentSO, ssNoCentExM, metDF, high.thresholds
+  , file = paste0(outData, "TEST5000_seuratO.Robj"))
 
 # Sample cell IDs
 cellIDs <- names(centSO@ident)[centSO@ident %in% c(7,8,9,10)]
@@ -1410,6 +1433,48 @@ ggplot(df1, aes(x = Cluster2, y = GZCP_Log2_Ratio, fill = Class)) +
     , panel.grid.minor = element_blank()
   )
 ggsave(paste0(outGraph, "PC1-40_Cluster_Metrics_GZCP_Ratio_paper.pdf")
+  , height = 2.5, width = 6)
+
+# Fraction of cells from each donor per cluster
+ggDF <- centSO@meta.data
+ggDF$Cluster <- ggDF$"res.0.6"
+ggDF <- ggDF[ggDF$Cluster != 17, ]
+# Reorder clusters
+cluster_key_DF <- data.frame(
+  Original = c(0:16)
+  , Reorder = c(7,9,8,10,2,0,1,3,4,12,14,5,6,11,13,15,16)
+)
+idx <- match(as.numeric(ggDF$Cluster), cluster_key_DF$Original)
+ggDF$Cluster2 <- cluster_key_DF$Reorder[idx]
+# Calculate percent
+ggDF <- table(ggDF$Cluster2, ggDF$individual)
+ggDF <- (ggDF / rowSums(ggDF)) * 100
+# Format
+ggDF <- melt(ggDF)
+colnames(ggDF) <- c("Cluster", "Donor", "Percent_of_cells")
+# Plot
+ggplot(ggDF, aes(x = Cluster, y = Percent_of_cells, fill = Donor)) +
+  geom_bar(stat = "identity") +
+  scale_fill_brewer(type = "qual", palette = "Set2", direction = 1) +
+  theme(
+    legend.position = "none"
+    , panel.grid.major = element_blank()
+    , panel.grid.minor = element_blank()
+  ) +
+  ylab("Percent of cells") +
+  ggtitle(paste0(graphCodeTitle
+    , "\nFraction of cells from each donor per cluster"))
+ggsave(paste0(outGraph, "PC1-40_Cluster_Metrics_Donor_Percent.png")
+  , height = 2.5, width = 6)
+# For paper
+ggplot(ggDF, aes(x = Cluster, y = Percent_of_cells, fill = Donor)) +
+  geom_bar(stat = "identity") +
+  scale_fill_brewer(type = "qual", palette = "Set2", direction = 1) +
+  ggplot_set_theme_publication +
+  ylab("Percent of cells") +
+  ggtitle(paste0(graphCodeTitle
+    , "\nFraction of cells from each donor per cluster"))
+ggsave(paste0(outGraph, "PC1-40_Cluster_Metrics_Donor_Percent_paper.pdf")
   , height = 2.5, width = 6)
 
 # Number of cells per cluster versus mean genes detected per cluster
