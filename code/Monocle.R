@@ -10,16 +10,17 @@ require(Seurat)
 require(cowplot)
 require(ggplot2)
 require(viridis)
+require(scales)
 source("Function_Library.R")
 
-# load("../analysis/Monocle/Monocle_monocleO.Robj")
-# load("../analysis/Monocle/Monocle_PC1-40_RG_IPC_Neuron_monocleO.Robj")
+# load("../analysis/analyzed_data/Monocle/Monocle_monocleO.Robj")
+# load("../analysis/analyzed_data/Monocle/Monocle_PC1-40_RG_IPC_Neuron_monocleO.Robj")
 
 ## Inputs
 
 # Seurat object
-load("../analysis/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_seuratO.Robj")
-# load("../analysis/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_TEST_seuratO.Robj")
+load("../analysis/analyzed_data/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_seuratO.Robj")
+# load("../analysis/analyzed_data/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_TEST_seuratO.Robj")
 # centSO <- ssCentSO
 # noCentExM <- ssNoCentExM
 
@@ -34,7 +35,7 @@ mmDF <- read.csv("../source/Molyneaux_LayerMarkers_Format.csv", header = TRUE)
 graphCodeTitle <- "Monocle.R"
 outGraph <- "../analysis/graphs/Monocle/Monocle_PC1-40_RG_IPC_Neuron_"
 outTable <- "../analysis/tables/Monocle/Monocle_PC1-40_RG_IPC_Neuron_"
-outRdat <- "../analysis/Monocle/Monocle_PC1-40_RG_IPC_Neuron_"
+outRdat <- "../analysis/analyzed_data/Monocle/Monocle_PC1-40_RG_IPC_Neuron_"
 
 ## Output Directories
 dir.create(dirname(outGraph), recursive = TRUE)
@@ -60,7 +61,7 @@ theme_update(axis.line = element_line(colour = "black")
 # each gene, the geometric mean of all samples.
 
 # Subset Seurat object to specifc columns
-ids <- c(0, 1, 2, 3, 4, 7, 8, 9, 10, 12, 14)
+ids <- c(0, 1, 2, 3, 4, 7, 8, 9, 10, 13)
 cellIDs <- names(centSO@ident)[centSO@ident %in% ids]
 centSO <- FilterCells(object = centSO, subset.names = NULL, cells.use = cellIDs)
 
@@ -90,14 +91,14 @@ feature_data = data.frame(gene_short_name = rownames(exDF))
 rownames(feature_data) = feature_data$gene_short_name
 
 pd <- new("AnnotatedDataFrame", data = metDF)
-fd <- new("AnnotatedDataFrame", data = feature_data) 
+fd <- new("AnnotatedDataFrame", data = feature_data)
 
-mo <- newCellDataSet(cellData = as(as.matrix(exDF), "sparseMatrix"), 
-  phenoData = pd, featureData = fd, lowerDetectionLimit = 0.5, 
+mo <- newCellDataSet(cellData = as(as.matrix(exDF), "sparseMatrix"),
+  phenoData = pd, featureData = fd, lowerDetectionLimit = 0.5,
   expressionFamily = negbinomial.size())
 
 # Filter genes and cells
-# retains all 
+# retains all
 mo <- detectGenes(mo, min_expr = 0.1)
 print(head(fData(mo)))
 # genes expressed in at least 10 cells
@@ -110,32 +111,24 @@ pData(mo)$Total_mRNAs <- Matrix::colSums(exprs(mo))
 
 mo <- mo[,pData(mo)$Total_mRNAs < 1e6]
 
-pdf(paste0(outGraph, "nUMI_density.pdf"))
-qplot(Total_mRNAs, data = pData(mo), color = as.factor(BRAIN), geom = "density")
-qplot(Total_mRNAs, data = pData(mo), color = REGION, geom = "density")
-dev.off()
-
 print("Size factors and dispersion")
 # Size factors and dispersion
-mo <- estimateSizeFactors(mo) 
+mo <- estimateSizeFactors(mo)
 mo <- estimateDispersions(mo)
 
 print("Dispersed genes to use for pseudotime ordering")
 # Dispersed genes to use for pseudotime ordering
-disp_table <- dispersionTable(mo) 
+disp_table <- dispersionTable(mo)
 ordering_genes <- subset(disp_table
   , mean_expression >= 0.01 & dispersion_empirical >= 0.25 * dispersion_fit)$gene_id
-mo_filtered <- setOrderingFilter(mo, ordering_genes) 
-# Plot
-png(paste0(outGraph, "OrderingGenesDispersion.png"))
-plot_ordering_genes(mo_filtered)
-dev.off()
+mo_filtered <- setOrderingFilter(mo, ordering_genes)
+
 
 # print("Variance explained by each PC")
 # # Variance explained by each PC
 # png(paste0(outGraph, "PCA_VarianceExplained.png"))
 # plot_pc_variance_explained(mo_filtered, verbose = TRUE, max_components = 20
-#   , use_existing_pc_variance = TRUE, return_all = FALSE) 
+#   , use_existing_pc_variance = TRUE, return_all = FALSE)
 # dev.off()
 
 print("Reduce data dimensionality")
@@ -160,22 +153,113 @@ diff_test_res <- differentialGeneTest(mo_filtered
   , reducedModelFormulaStr = "~individual + librarylab + Total_mRNAs")
 
 save(mo, mo_filtered, diff_test_res, file = paste0(outRdat, "monocleO.Robj"))
+################################################################################
 
-# # Order by qval
-# diff_test_res <- diff_test_res[order(diff_test_res$qval), ]
-# 
-# sig_gene_names <- row.names(diff_test_res)[
-#   diff_test_res$use_for_ordering == TRUE][1:100]
-# png(paste0(outGraph, "Pseudotime_Heatmap_Top100.png")
-#   , width = 12, height = 16, units = "in", res = 300)
-# plot_pseudotime_heatmap(mo_filtered[sig_gene_names,],
-#   num_clusters = 3,
-#   cores = 1,
-#   show_rownames = T)
-# dev.off()
+### Plots paper
+
+## Trajectory colored by Monocle state
+plot_cell_trajectory(mo_filtered, 1, 2, color_by = "State"
+  , cell_size = 0.01, show_branch_points = FALSE) +
+  ggplot_set_theme_publication_nolabels +
+  theme(legend.position = "right") +
+  # Change legend size
+  guides(colour = guide_legend(override.aes = list(size = 5))) +
+  ggtitle(paste0(graphCodeTitle
+  , "\n\nMonocle trajectory colored by state and covariates"
+  , "\nCells from progenitor, IPC, and excitatory neuron Seurat clusters"
+  , "\nColored by state"
+  , "\n")
+  )
+ggsave(paste0(outGraph, "Trajectory_State_paper.png")
+  , width = 5, height = 5)
+
+## Trajectory colored by pseudotime
+plot_cell_trajectory(mo_filtered, 1, 2, color_by = "Pseudotime"
+  , cell_size = 0.01, show_branch_points = FALSE) +
+  scale_color_viridis() +
+  ggplot_set_theme_publication_nolabels +
+  theme(legend.position = "right") +
+  ggtitle(paste0(graphCodeTitle
+  , "\n\nMonocle trajectory colored by state and covariates"
+  , "\nCells from progenitor, IPC, and excitatory neuron Seurat clusters"
+  , "\nColored by pseudotime"
+  , "\n")
+  )
+ggsave(paste0(outGraph, "Trajectory_Pseudotime_paper.png")
+  , width = 5.5, height = 5)
+
+## Plot Seurat clusters faceted by cluster
+Plot_Trajectory_Faceted_By_Seurat_Clusters <- function(){
+  # browser()
+  print("Plot_Trajectory_Faceted_By_Seurat_Clusters")
+
+  # Key of reordered cluster and Seurat ggplot colors
+  gg_color_pal <- hue_pal()(16)
+  names(gg_color_pal) <- c(0:15)
+  cluster_reorder <- c(9,7,8,10,2,0,1,4,3,13,5,6,11,12,14,15)
+  cluster_colors_DF <- data.frame(
+    Cluster = cluster_reorder
+    , Color = gg_color_pal[as.character(cluster_reorder)]
+  )
+  # Add reordered clusters and seurat ggplot colors to monocle metatdata
+  idx <- match(pData(mo_filtered)$cluster, cluster_colors_DF$Cluster)
+  pData(mo_filtered)$Seurat_Cluster_Color <- cluster_colors_DF$Color[idx]
+  pData(mo_filtered)$Cluster_Reorder <- factor(pData(mo)$cluster
+    , levels = cluster_reorder)
+
+  # Subset to RG, IPC, excitatory Seurat clusters
+  mo_filtered <- mo_filtered[ ,
+    pData(mo_filtered)$cluster %in% c(0, 1, 2, 3, 4, 7, 8, 9, 10, 13)]
+
+  # Loop through Seurat clusters and plot monocle trajectory for each
+  ggL <- lapply(levels(pData(mo_filtered)$Cluster_Reorder)
+    , function(cluster) {
+
+      # TRUE FALSE column indicating membership of cell in Seurat cluster
+      pData(mo_filtered)$clusterX <- FALSE
+      idx <- pData(mo_filtered)$cluster %in% cluster
+      pData(mo_filtered)$clusterX[idx] <- TRUE
+
+      # Extract Seurat cluster color
+      seurat_cluster_color <- pData(mo_filtered)$Seurat_Cluster_Color[
+        pData(mo_filtered)$cluster %in% cluster][1]
+      seurat_cluster_color <- as.character(seurat_cluster_color)
+
+      print(head(pData(mo_filtered)))
+      print(seurat_cluster_color)
+
+      # Plot Seurat clusters on trajectory
+      gg <- plot_cell_trajectory(mo_filtered, 1, 2, color_by = "clusterX"
+        , cell_size = 0.001, show_branch_points = FALSE) +
+        scale_colour_manual(values = c("grey", seurat_cluster_color)) +
+        ggtitle(paste0("Cluster: ", cluster)) +
+        theme(legend.position = "none"
+          , axis.title = element_blank()
+          , axis.text = element_blank()
+          , axis.ticks = element_blank()
+        )
+      return(gg)
+  })
+  return(ggL)
+}
+ggL <- Plot_Trajectory_Faceted_By_Seurat_Clusters()
+Plot_Grid(ggL, ncol = 4, title = "Test")
+ggsave(paste0(outGraph, "Trajectory_SeuratCluster_Facet_paper.png")
+  , width = 13, height = 8)
 ################################################################################
 
 ### Plots
+
+# nUMI density plot
+pdf(paste0(outGraph, "nUMI_density.pdf"))
+qplot(Total_mRNAs, data = pData(mo), color = as.factor(BRAIN), geom = "density")
+qplot(Total_mRNAs, data = pData(mo), color = REGION, geom = "density")
+dev.off()
+
+# Dispersed genes to use for pseudotime ordering
+png(paste0(outGraph, "OrderingGenesDispersion.png"))
+plot_ordering_genes(mo_filtered)
+dev.off()
 
 ## Trajectory colored by state or covariates
 
@@ -260,7 +344,7 @@ ggL <- list(
 # gg <- ggplot(gg$data, aes(x = data_dim_1, y = data_dim_2
 #   , shape = cluster, color = cluster)) +
 #   scale_shape_manual(values = 1:nlevels(gg$data$cluster)) +
-#   geom_point() + 
+#   geom_point() +
 #   theme(legend.position = "right")
 # gg$layer[[2]] <- l[[1]]$layer[[1]]
 
@@ -284,17 +368,19 @@ title <- paste0(graphCodeTitle
   , "\n")
 title <- ggdraw() + draw_label(title)
 # rel_heights values control title margins
-pg <- plot_grid(title, pg, ncol = 1, rel_heights = c(0.2, 1))
+pg <- plot_grid(title, pg, ncol = 1, rel_heights = c(0.1, 1))
 # Save
-ggsave(paste0(outGraph, "Trajectory_SeuratCluster.png"), width = 13, height = 20)
+ggsave(paste0(outGraph, "Trajectory_SeuratCluster.png")
+  , width = 13, height = 20)
+
 
 # Plot Seurat clusters on trajectory split as grid component 1 vs 2
 ggL <- lapply(sort(as.numeric(as.character(unique(mo_filtered@phenoData$cluster))))
   , function(cluster) {
-    
+
     mo_filtered@phenoData$clusterX <- FALSE
     mo_filtered@phenoData$clusterX[mo_filtered@phenoData$cluster %in% cluster] <- TRUE
-    
+
     # Plot Seurat clusters on trajectory
     gg <- plot_cell_trajectory(mo_filtered, 1, 2, color_by = "clusterX", cell_size = 0.001) +
       scale_colour_manual(name = "Cluster:"
@@ -321,18 +407,84 @@ title <- ggdraw() + draw_label(paste0(graphCodeTitle
   , "\n\nMonocle trajectory colored by Seurat clusters"
   , "\nCells from progenitor, IPC, and excitatory neuron Seurat clusters"))
 # rel_heights values control title margins
-pg <- plot_grid(title, pg, ncol = 1, rel_heights = c(0.15, 1))
+pg <- plot_grid(title, pg, ncol = 1, rel_heights = c(0.1, 1))
 # Save
 ggsave(paste0(outGraph, "Trajectory_SeuratClusterGrid_Comp12.png"), width = 19
-  , height = 14)
+  , height = 13)
+
+# Plot Seurat clusters on trajectory split as grid component 1 vs 2
+# Order RG -> IPC -> Neuron
+ggL <- lapply(c(0, 1, 2, 3, 4, 7, 8, 9, 10, 13)
+  , function(cluster) {
+
+    mo_filtered@phenoData$clusterX <- FALSE
+    mo_filtered@phenoData$clusterX[mo_filtered@phenoData$cluster %in% cluster] <- TRUE
+
+    # Plot Seurat clusters on trajectory
+    gg <- plot_cell_trajectory(mo_filtered, 1, 2, color_by = "clusterX"
+      , cell_size = 0.001, show_branch_points = FALSE) +
+      scale_colour_manual(name = "Cluster:"
+        , values = c("#a6cee3", "red")) +
+      ggtitle(paste0("Cluster: ", cluster)) +
+      theme(legend.position = "right")
+    return(gg)
+})
+# Change legend size
+ggL <- lapply(ggL, function(gg) {
+  gg + guides(colour = guide_legend(override.aes = list(size = 7)))
+})
+# extract the legend from one of the plots
+legend <- get_legend(ggL[[1]])
+# Remove legends from plots
+ggL <- lapply(ggL, function(gg) {gg + theme(legend.position = "none")})
+# plot_grid combine tSNE graphs
+pg <- plot_grid(plotlist = ggL, ncol = 4, align = 'h', axis = 't')
+# add the legend to the row we made earlier. Give it one-third of the width
+# of one plot (via rel_widths).
+pg <- plot_grid(pg, legend, rel_widths = c(1, 0.2))
+# now add the title
+title <- ggdraw() + draw_label(paste0(graphCodeTitle
+  , "\n\nMonocle trajectory colored by Seurat clusters"
+  , "\nCells from progenitor, IPC, and excitatory neuron Seurat clusters"))
+# rel_heights values control title margins
+pg <- plot_grid(title, pg, ncol = 1, rel_heights = c(0.1, 1))
+# Save
+ggsave(paste0(outGraph, "Trajectory_SeuratClusterGrid_OrderRgIpcNeuron_Comp12.png"), width = 19
+  , height = 13)
+# Plot for paper
+# plot_grid combine tSNE graphs
+ggL <- lapply(ggL, function(gg) {
+  gg + theme(
+    axis.text = element_blank()
+    , axis.title = element_blank()
+    , axis.ticks = element_blank()
+    )
+})
+names(ggL) <- c(0, 1, 2, 3, 4, 7, 8, 9, 10, 13)
+pg <- plot_grid(plotlist = ggL[
+    c("9", "7", "8", "10", "2", "0", "1", "4", "3", "13")]
+  , ncol = 5, align = 'h', axis = 't')
+# add the legend to the row we made earlier. Give it one-third of the width
+# of one plot (via rel_widths).
+pg <- plot_grid(pg, legend, rel_widths = c(1, 0.1))
+# now add the title
+title <- ggdraw() + draw_label(paste0(graphCodeTitle
+  , "\n\nMonocle trajectory colored by Seurat clusters"
+  , "\nCells from progenitor, IPC, and excitatory neuron Seurat clusters"))
+# rel_heights values control title margins
+pg <- plot_grid(title, pg, ncol = 1, rel_heights = c(0.2, 1))
+ggsave(paste0(outGraph
+  , "Trajectory_SeuratClusterGrid_OrderRgIpcNeuron_Comp12_paper.png")
+  , width = 16, height = 7)
+
 
 # Plot Seurat clusters on trajectory split as grid component 1 vs 3
 ggL <- lapply(sort(as.numeric(as.character(unique(mo_filtered@phenoData$cluster))))
   , function(cluster) {
-    
+
     mo_filtered@phenoData$clusterX <- FALSE
     mo_filtered@phenoData$clusterX[mo_filtered@phenoData$cluster %in% cluster] <- TRUE
-    
+
     # Plot Seurat clusters on trajectory
     gg <- plot_cell_trajectory(mo_filtered, 1, 3, color_by = "clusterX", cell_size = 0.001) +
       scale_colour_manual(name = "Cluster:"
@@ -362,7 +514,7 @@ title <- ggdraw() + draw_label(paste0(graphCodeTitle
 pg <- plot_grid(title, pg, ncol = 1, rel_heights = c(0.15, 1))
 # Save
 ggsave(paste0(outGraph, "Trajectory_SeuratClusterGrid_Comp13.png"), width = 19
-  , height = 14)
+  , height = 13)
 
 # ## Trajectory colored by pseudotime
 # ggL <- list(
@@ -403,7 +555,7 @@ ggL <- lapply(c(2:7), function(component) {
     theme(legend.position = "right")
 })
 # plot grid
-Plot_Grid(ggL, ncol = 2, rel_height = 0.1, align = "v", axis = "l", 
+Plot_Grid(ggL, ncol = 2, rel_height = 0.1, align = "v", axis = "l",
   title = paste0(graphCodeTitle
     , "\n\nMonocle trajectory colored by pseudotime"
     , "\n")
@@ -431,13 +583,26 @@ gg1 <- ggplot(df1, aes(x = tSNE_1, y = tSNE_2, col = Pseudotime)) +
 ggTsne <- TSNE_Plot(centSO) + theme(legend.position = "none")
 
 # plot grid
-Plot_Grid(list(ggTsne, gg1), ncol = 2, rel_height = 0.3, align = "v", axis = "r", 
+Plot_Grid(list(ggTsne, gg1), ncol = 2, rel_height = 0.3, align = "v", axis = "r",
   title = paste0(graphCodeTitle
     , "\n\ntSNE colored by Seurat clusters or Monocle pseudotime"
     , "\nCells from progenitor, IPC, and excitatory neuron Seurat clusters")
 )
 ggsave(paste0(outGraph, "tSNE_Pseudotime.png"), width = 13
   , height = 7)
+
+# Pseudotime heatmap
+# Order by qval
+diff_test_res <- diff_test_res[order(diff_test_res$qval), ]
+sig_gene_names <- row.names(diff_test_res)[
+  diff_test_res$use_for_ordering == TRUE][1:100]
+png(paste0(outGraph, "Pseudotime_Heatmap_Top100.png")
+  , width = 12, height = 16, units = "in", res = 300)
+plot_pseudotime_heatmap(mo_filtered[sig_gene_names,],
+  num_clusters = 3,
+  cores = 1,
+  show_rownames = T)
+dev.off()
 ################################################################################
 
 ## Luis markers
