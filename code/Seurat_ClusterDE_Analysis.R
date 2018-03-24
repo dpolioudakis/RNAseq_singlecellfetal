@@ -26,8 +26,8 @@ source("Function_Library.R")
 ## Inputs
 
 # Seurat
-load("../analysis/analyzed_dataSeurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_seuratO.Robj")
-# load("../analysis/analyzed_data/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_TEST_seuratO.Robj")
+load("../analysis/analyzed_data/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_seuratO.Robj")
+# load("../analysis/analyzed_data/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_TEST5000_seuratO.Robj")
 # centSO <- ssCentSO
 # noCentExM <- ssNoCentExM
 
@@ -53,23 +53,28 @@ millerZonesDF = read.csv("../neurogenesis/orig.data/LCMDE/LCM_Zones_CPio.csv")
 millerAnnotRawDF = read.csv("../neurogenesis/orig.data/LCMDE/annot.csv", row.names = 1)
 
 # DE of clusters
-inTables <- list.files("../analysis/tables/Seurat_ClusterDE_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/"
+inTables <- list.files("../analysis/tables/Seurat_ClusterDE_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/res054"
   , full.names = TRUE)
 inTables <- inTables[grep("Cluster\\d", inTables, perl = TRUE)]
 
 ## Variables
 graphCodeTitle <- "Seurat_ClusterDE_Analysis.R"
-outGraph <- "../analysis/graphs/Seurat_ClusterDE_Analysis_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_ClusterDE_DS2-11_"
-outTable <- "../analysis/tables/Seurat_ClusterDE_Analysis_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_ClusterDE_DS2-11_"
-outData <- "../analysis/Seurat_ClusterDE_Analysis_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_ClusterDE_DS2-11_"
+# Output paths
+# Sub path
+out_sub_path <- paste0(
+  "Seurat_ClusterDE_Analysis_DS2-11/"
+  ,"FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/"
+  , "res054/"
+  , "Seurat_ClusterDE_Analysis_DS2-11_"
+)
+outGraph <- paste0("../analysis/graphs/", out_sub_path)
+outTable <- paste0("../analysis/tables/", out_sub_path)
+outData <- paste0("../analysis/processed_data/", out_sub_path)
 
 ## Output Directories
-outDir <- dirname(outGraph)
-dir.create(outDir, recursive = TRUE)
-outTableDir <- dirname(outTable)
-dir.create(outTableDir, recursive = TRUE)
-outRdatDir <- dirname(outData)
-dir.create(outRdatDir, recursive = TRUE)
+dir.create(dirname(outGraph), recursive = TRUE)
+dir.create(dirname(outTable), recursive = TRUE)
+dir.create(dirname(outData), recursive = TRUE)
 
 ## Set ggplot2 theme
 theme_set(theme_bw())
@@ -83,6 +88,41 @@ theme_update(axis.line = element_line(colour = "black")
 
 ### Functions
 
+# Heatmap of mean expression per cluster
+DE_Mean_Heatmap <- function(
+  clusterDeDF, exDF, clusterIDs, ggtitle, upLim, lowLim) {
+
+  # Subset to DE genes
+  ggDF <- exDF[match(clusterDeDF$GENE, row.names(exDF)), ]
+
+  # Change column names from Cell IDs to Cluster ID
+  colnames(ggDF) <- clusterIDs
+  # Melt
+  ggDF <- melt(ggDF)
+  # Mean expression per cluster
+  ggDF <- aggregate(value~Var2+Var1, mean, data = ggDF)
+  # Order genes by fold change
+  ggDF$Var1 <- factor(ggDF$Var1, rev(levels(ggDF$Var1)))
+  # Set expression limits
+  ggDF$value[ggDF$value > upLim] <- upLim
+  ggDF$value[ggDF$value < lowLim] <- lowLim
+  # ggplot
+  ggplot(ggDF, aes(x = Var2, y = Var1, fill = value)) +
+    geom_tile() +
+    # scale_y_discrete(labels = gsub(".*_", "", ggDF$Var1)) +
+    scale_fill_distiller(name = "Normalized\nexpression", type = "div"
+      , palette = 5, direction = -1, limits = c(lowLim, upLim)) +
+    scale_x_continuous(breaks = unique(ggDF$Var2), labels = unique(ggDF$Var2)) +
+    theme_bw() +
+    # theme(axis.text.x = element_blank()) +
+    theme(axis.ticks = element_blank()) +
+    theme(text = element_text(size = 12)) +
+    # theme(axis.text.y = element_blank()) +
+    theme(plot.title = element_text(hjust = 0.5)) +
+    ylab("Genes") +
+    xlab("Cells") +
+    ggtitle(ggtitle)
+}
 ################################################################################
 
 ### Format and compile
@@ -92,18 +132,18 @@ theme_update(axis.line = element_line(colour = "black")
 # Loop through DE text files and compile into one table
 ldf <- lapply(inTables, function(inDE) {
   df <- read.table(inDE, header = TRUE)
-  df <- df[order(-df$LOG_FC), ]
+  df <- df[order(-df$Log2_Fold_Change), ]
 })
 clusterDeDF <- do.call("rbind", ldf)
 head(clusterDeDF)
 # Add ensembl IDs
-clusterDeDF$ENSEMBL <- bmDF$ensembl_gene_id[
+clusterDeDF$Ensembl <- bmDF$ensembl_gene_id[
   match(clusterDeDF$GENE, bmDF$hgnc_symbol)]
 # Fill in IDs from GENE column that were kept as ensembl ID b/c no gene sym
-clusterDeDF$ENSEMBL[is.na(clusterDeDF$ENSEMBL)] <-
-  clusterDeDF$GENE[is.na(clusterDeDF$ENSEMBL)]
+clusterDeDF$Ensembl[is.na(clusterDeDF$Ensembl)] <-
+  clusterDeDF$GENE[is.na(clusterDeDF$Ensembl)]
 # Check
-length(grep("ENSG", clusterDeDF$ENSEMBL))
+length(grep("ENSG", clusterDeDF$Ensembl))
 nrow(clusterDeDF)
 # # Filter FDR < 0.05
 # deDF <- deDF[deDF$FDR < 0.05, ]
@@ -187,11 +227,93 @@ millerMtDF$Zone <- gsub("SZori", "SZi", millerMtDF$Zone)
 # millerExDF <- millerExDF[ ,grep("^f.*", millerMtDF$structure_acronym)]
 ################################################################################
 
+## Plot pvalues
+Plot_DE_Pval_Hist <- function(){
+  print("Plot_DE_Pval_Hist")
+  deDFL <- split(clusterDeDF, clusterDeDF$Cluster)
+  pgL <- lapply(names(deDFL), function(name){
+    deDF <- deDFL[[name]]
+    # ggplot histogram p-values
+    p1 <- ggplot(deDF, aes(x = Pvalue)) +
+      geom_histogram() +
+      xlab("P-value") +
+      ylab("Count") +
+      ggtitle("P-value") +
+      theme(plot.title = element_text(hjust = 0.5))
+    # ggplot histogram FDR
+    p2 <- ggplot(deDF, aes(x = FDR)) +
+      geom_histogram() +
+      xlab("FDR corrected p-value") +
+      ylab("Count") +
+      ggtitle("Benjamini Hochberg corrected p-value") +
+      theme(plot.title = element_text(hjust = 0.5))
+    # plot_grid
+    pg <- plot_grid(p1, p2, ncol = 2)
+    # now add the title
+    title <- ggdraw() + draw_label(paste0("\nCluster: ", name))
+    # rel_heights values control title margins
+    plot_grid(title, pg, ncol = 1, rel_heights = c(0.2, 1))
+  })
+  Plot_Grid(pgL, rel_height = 0.01, ncol = 1
+    , title = paste0(graphCodeTitle
+      , "\n\nHistograms of p-values before and after Benjamini Hochberg correction")
+  )
+}
+Plot_DE_Pval_Hist()
+ggsave(paste0(outGraph, "Pvalue_Histogram_Cluster", clusterID, ".pdf")
+  , width = 9, height = 40)
+
+
+# ## Expression heatmaps of DE genes
+#
+# # Centered scaled
+# geneGroupDF <- data.frame(GENE = deDF$Gene, GROUP = "")
+# # Heatmaps
+# ggL <- Heatmaps_By_Cluster_Combined(geneGroupDF, exprM = centSO@scale.data
+#   , seuratO = centSO, lowerLimit = -1.5, upperLimit = 1.5
+#   , clusters1 = c(0:16), geneOrder = geneGroupDF$GENE
+# )
+# # Remove y-axis labels
+# ggL <- lapply(ggL, function(gg) {gg + theme(axis.text.y = element_blank())})
+# # plot_grid combine
+# pg <- plot_grid(plotlist = ggL, ncol = 3, align = 'h', axis = 'b')
+# # now add the title
+# title <- ggdraw() + draw_label(paste0(graphCodeTitle
+#   , "\n\nSignificant (FDR < 0.05) DE genes for cluster ", clusterID
+#   , "\nMean centered, variance scaled, normalized expression"
+#   , "\nCells sorted by cluster (columns)"))
+# # rel_heights values control title margins
+# plot_grid(title, pg, ncol = 1, rel_heights = c(0.2, 1))
+# ggsave(paste0(outGraph, "ExprHeatmap_NormCentScale_Cluster", clusterID, ".png")
+#   , width = 12, height = 8)
+#
+# # Not centered scaled
+# geneGroupDF <- data.frame(GENE = deDF$GENE, GROUP = "")
+# # Heatmaps
+# ggL <- Heatmaps_By_Cluster_Combined(geneGroupDF, exprM = noCentExM
+#   , seuratO = centSO, lowerLimit = 0, upperLimit = 3
+#   , clusters1 = c(0:1), clusters2 = c(2:10), clusters3 = c(11:17)
+# )
+# # Remove y-axis labels
+# ggL <- lapply(ggL, function(gg) {gg + theme(axis.text.y = element_blank())})
+# # plot_grid combine
+# pg <- plot_grid(plotlist = ggL, ncol = 3, align = 'h', axis = 'b')
+# # now add the title
+# title <- ggdraw() + draw_label(paste0(graphCodeTitle
+#   , "\n\nSignificant (FDR < 0.05) DE genes for cluster ", clusterID
+#   , "\nNormalized expression"
+#   , "\nCells sorted by cluster (columns)"))
+# # rel_heights values control title margins
+# plot_grid(title, pg, ncol = 1, rel_heights = c(0.2, 1))
+# ggsave(paste0(outGraph, "ExprHeatmap_Norm_Cluster", clusterID, ".png")
+#   , width = 12, height = 8)
+################################################################################
+
 ### DE Heatmaps, top 20 DE table, and save seurat object
 
 # Top 20 DE genes
 clusterDe20DF <- data.frame(
-  clusterDeDF %>% group_by(CLUSTER) %>% top_n(20, LOG_FC))
+  clusterDeDF %>% group_by(Cluster) %>% top_n(20, Log2_Fold_Change))
 # Write out as tab delimited
 write.table(x = clusterDe20DF
   , file = paste0(outTable, "ClusterX_Vs_All_Clusters_Top20.txt")
@@ -202,9 +324,9 @@ write.table(x = clusterDe20DF
 
 # Violin plots of fold changes by cluster
 ggDF <- clusterDeDF
-ggDF$CLUSTER <- as.factor(ggDF$CLUSTER)
-ggplot(ggDF, aes(x = CLUSTER, y = LOG_FC)) +
-  geom_violin(aes(fill = CLUSTER)) +
+ggDF$Cluster <- as.factor(ggDF$Cluster)
+ggplot(ggDF, aes(x = Cluster, y = Log2_Fold_Change)) +
+  geom_violin(aes(fill = Cluster)) +
   geom_jitter(size = 0.05) +
   ylab("Log fold change") +
   xlab("Cluster") +
@@ -215,10 +337,10 @@ ggsave(paste0(outGraph, "DE_Violin.png"), width = 12, height = 8)
 
 # Histograms of fold changes by cluster
 ggDF <- clusterDeDF
-ggDF$CLUSTER <- as.factor(ggDF$CLUSTER)
-ggplot(ggDF, aes(x = LOG_FC)) +
+ggDF$Cluster <- as.factor(ggDF$Cluster)
+ggplot(ggDF, aes(x = Log2_Fold_Change)) +
   geom_histogram() +
-  facet_wrap(~CLUSTER) +
+  facet_wrap(~Cluster) +
   ylab("Counts") +
   xlab("Log fold change") +
   ggtitle(paste0(graphCodeTitle
@@ -227,7 +349,7 @@ ggplot(ggDF, aes(x = LOG_FC)) +
 ggsave(paste0(outGraph, "DE_Histogram.png"), width = 12, height = 8)
 
 # MA plots for each cluster
-ggL <- lapply(unique(clusterDeDF$CLUSTER), function(clusterID) {
+ggL <- lapply(unique(clusterDeDF$Cluster), function(clusterID) {
   print(clusterID)
   # Subset expression matrix to cluster
   cdf <- noCentExM[ ,centSO@ident == clusterID, drop = FALSE]
@@ -240,7 +362,12 @@ ggL <- lapply(unique(clusterDeDF$CLUSTER), function(clusterID) {
   # Combine in DF for ggplot
   ggDF <- data.frame(LOG_FOLD_CHANGE = lfc, MEAN_EXPRESSION = mn
     , GENE = names(lfc))
-  ggDF$DE_GENE <- row.names(ggDF) %in% clusterDeDF$GENE[clusterDeDF$CLUSTER == clusterID]
+  ggDF$DE_GENE <- row.names(ggDF) %in% clusterDeDF$Gene[
+    clusterDeDF$Cluster == clusterID &
+    clusterDeDF$FDR < 0.05 &
+    clusterDeDF$Log2_Fold_Change > 0.2
+    ]
+  print(head(ggDF))
   # ggplot
   gg <- ggplot(ggDF, aes(x = MEAN_EXPRESSION, y = LOG_FOLD_CHANGE)) +
     geom_point(size = 0.1, alpha = 0.25, aes(color = DE_GENE)) +
@@ -256,112 +383,162 @@ pg <- plot_grid(plotlist = ggL, ncol = 3, align = 'v', axis = 'r')
 # now add the title
 title <- ggdraw() + draw_label(paste0(graphCodeTitle
   , "\n\nMA plots: Cells in cluster Vs all other cells"
-  , "\nColor indicates > 0.2 log fold change and FDR > 0.05"))
+  , "\nColor indicates > 0.2 log fold change and FDR < 0.05"))
 # rel_heights values control title margins
 plot_grid(title, pg, ncol = 1, rel_heights = c(0.3, 1))
 ggsave(paste0(outGraph, "MAplot.png"), width = 12, height = 4+length(ggL))
 
 # Number of DE genes per cluster barplots
-ggDF1 <- data.frame(table(clusterDeDF$CLUSTER))
-ggDF2 <- data.frame(table(clusterDeDF$CLUSTER[clusterDeDF$LOG_FC > 0.4]))
-ggDF3 <- data.frame(table(clusterDeDF$CLUSTER[clusterDeDF$LOG_FC > 0.7]))
+ggDF1 <- data.frame(table(clusterDeDF$Cluster[
+  clusterDeDF$FDR < 0.05]))
+ggDF2 <- data.frame(table(clusterDeDF$Cluster[
+  clusterDeDF$Log2_Fold_Change > 0.2 &
+  clusterDeDF$FDR < 0.05]))
+ggDF3 <- data.frame(table(clusterDeDF$Cluster[
+  clusterDeDF$Log2_Fold_Change > 0.4 &
+  clusterDeDF$FDR < 0.05]))
+ggDF4 <- data.frame(table(clusterDeDF$Cluster[
+  clusterDeDF$Log2_Fold_Change > 0.7 &
+  clusterDeDF$FDR < 0.05]))
 p1 <- ggplot(ggDF1, aes(x = Var1, y = Freq)) +
   geom_col() +
   ylab("Number of DE genes") +
   xlab("Clusters") +
-  ggtitle("DE > 0.2 log fold change")
+  ggtitle("FDR < 0.05")
 p2 <- ggplot(ggDF2, aes(x = Var1, y = Freq)) +
   geom_col() +
   ylab("Number of DE genes") +
   xlab("Clusters") +
-  ggtitle("DE > 0.4 log fold change")
+  ggtitle("DE > 0.2 log fold change; FDR < 0.05")
 p3 <- ggplot(ggDF3, aes(x = Var1, y = Freq)) +
   geom_col() +
   ylab("Number of DE genes") +
   xlab("Clusters") +
-  ggtitle("DE > 0.7 log fold change")
+  ggtitle("DE > 0.4 log fold change; FDR < 0.05")
+p4 <- ggplot(ggDF4, aes(x = Var1, y = Freq)) +
+  geom_col() +
+  ylab("Number of DE genes") +
+  xlab("Clusters") +
+  ggtitle("DE > 0.7 log fold change; FDR < 0.05")
 # plot_grid combine cluster heatmaps
-pg <- plot_grid(p1, p2, p3, ncol = 3, align = 'v', axis = 'r')
+pg <- plot_grid(p1, p2, p3, p4, ncol = 4, align = 'v', axis = 'r')
 # now add the title
 title <- ggdraw() + draw_label(paste0(graphCodeTitle
   , "\n\nDE genes per cluster"))
 # rel_heights values control title margins
 plot_grid(title, pg, ncol = 1, rel_heights = c(0.3, 1))
-ggsave(paste0(outGraph, "DE_Number_Barplot.pdf"), width = 13, height = 6)
+ggsave(paste0(outGraph, "DE_Number_Barplot.pdf"), width = 17, height = 6)
 
 # Number of DE genes per cluster versus cluster size
-ggDF1 <- data.frame(table(clusterDeDF$CLUSTER)
+ggDF1 <- data.frame(
+  table(clusterDeDF$Cluster[
+    clusterDeDF$FDR < 0.05])
   , NUMBER_CELLS = as.vector(table(centSO@ident)))
-ggDF2 <- data.frame(table(clusterDeDF$CLUSTER[clusterDeDF$LOG_FC > 0.4])
+ggDF2 <- data.frame(
+  table(clusterDeDF$Cluster[
+    clusterDeDF$Log2_Fold_Change > 0.2 &
+    clusterDeDF$FDR < 0.05])
   , NUMBER_CELLS = as.vector(table(centSO@ident)))
-ggDF3 <- data.frame(table(clusterDeDF$CLUSTER[clusterDeDF$LOG_FC > 0.7])
+ggDF3 <- data.frame(
+  table(clusterDeDF$Cluster[
+    clusterDeDF$Log2_Fold_Change > 0.4 &
+    clusterDeDF$FDR < 0.05])
+  , NUMBER_CELLS = as.vector(table(centSO@ident)))
+ggDF4 <- data.frame(
+  table(clusterDeDF$Cluster[
+    clusterDeDF$Log2_Fold_Change > 0.7 &
+    clusterDeDF$FDR < 0.05])
   , NUMBER_CELLS = as.vector(table(centSO@ident)))
 p1 <- ggplot(ggDF1, aes(x = NUMBER_CELLS, y = Freq)) +
   geom_point() +
   xlab("Number of cells in cluster") +
   ylab("Number of DE genes in cluster") +
-  ggtitle("DE > 0.2 log fold change")
-p2 <- ggplot(ggDF2, aes(x = NUMBER_CELLS, y = Freq)) +
+  ggtitle("FDR < 0.05")
+p2 <- ggplot(ggDF1, aes(x = NUMBER_CELLS, y = Freq)) +
   geom_point() +
   xlab("Number of cells in cluster") +
   ylab("Number of DE genes in cluster") +
-  ggtitle("DE > 0.4 log fold change")
-p3 <- ggplot(ggDF3, aes(x = NUMBER_CELLS, y = Freq)) +
+  ggtitle("DE > 0.2 log fold change; FDR < 0.05")
+p3 <- ggplot(ggDF2, aes(x = NUMBER_CELLS, y = Freq)) +
   geom_point() +
   xlab("Number of cells in cluster") +
   ylab("Number of DE genes in cluster") +
-  ggtitle("DE > 0.7 log fold change")
+  ggtitle("DE > 0.4 log fold change; FDR < 0.05")
+p4 <- ggplot(ggDF3, aes(x = NUMBER_CELLS, y = Freq)) +
+  geom_point() +
+  xlab("Number of cells in cluster") +
+  ylab("Number of DE genes in cluster") +
+  ggtitle("DE > 0.7 log fold change; FDR < 0.05")
 # plot_grid combine cluster heatmaps
-pg <- plot_grid(p1, p2, p3, ncol = 3, align = 'v', axis = 'r')
+pg <- plot_grid(p1, p2, p3, p4, ncol = 4, align = 'v', axis = 'r')
 # now add the title
 title <- ggdraw() + draw_label(paste0(graphCodeTitle
   , "\n\nDE genes per cluster versus number of cells per cluster"))
 # rel_heights values control title margins
 plot_grid(title, pg, ncol = 1, rel_heights = c(0.3, 1))
 ggsave(paste0(outGraph, "DE_NumberVsCells_ScatterPlot.pdf")
-  , width = 13, height = 6)
+  , width = 17, height = 6)
 
 # Number of DE genes per cluster versus mean genes detected per cluster
-ggDF1 <- data.frame(table(clusterDeDF$CLUSTER)
+ggDF1 <- data.frame(
+  table(clusterDeDF$Cluster[
+    clusterDeDF$FDR < 0.05])
   , nGene = tapply(centSO@meta.data$nGene, centSO@ident, mean))
-ggDF2 <- data.frame(table(clusterDeDF$CLUSTER[clusterDeDF$LOG_FC > 0.4])
+ggDF2 <- data.frame(
+  table(clusterDeDF$Cluster[
+    clusterDeDF$Log2_Fold_Change > 0.2 &
+    clusterDeDF$FDR < 0.05])
   , nGene = tapply(centSO@meta.data$nGene, centSO@ident, mean))
-ggDF3 <- data.frame(table(clusterDeDF$CLUSTER[clusterDeDF$LOG_FC > 0.7])
+ggDF3 <- data.frame(
+  table(clusterDeDF$Cluster[
+    clusterDeDF$Log2_Fold_Change > 0.2 &
+    clusterDeDF$FDR < 0.05])
+  , nGene = tapply(centSO@meta.data$nGene, centSO@ident, mean))
+ggDF4 <- data.frame(
+  table(clusterDeDF$Cluster[
+    clusterDeDF$Log2_Fold_Change > 0.2 &
+    clusterDeDF$FDR < 0.05])
   , nGene = tapply(centSO@meta.data$nGene, centSO@ident, mean))
 p1 <- ggplot(ggDF1, aes(x = nGene, y = Freq)) +
   geom_point() +
   xlab("Mean genes detected in cluster") +
   ylab("Number of DE genes in cluster") +
-  ggtitle("DE > 0.2 log fold change")
-p2 <- ggplot(ggDF2, aes(x = nGene, y = Freq)) +
+  ggtitle("FDR < 0.05")
+p2 <- ggplot(ggDF1, aes(x = nGene, y = Freq)) +
   geom_point() +
   xlab("Mean genes detected in cluster") +
   ylab("Number of DE genes in cluster") +
-  ggtitle("DE > 0.4 log fold change")
-p3 <- ggplot(ggDF3, aes(x = nGene, y = Freq)) +
+  ggtitle("DE > 0.2 log fold change; FDR < 0.05")
+p3 <- ggplot(ggDF2, aes(x = nGene, y = Freq)) +
   geom_point() +
   xlab("Mean genes detected in cluster") +
   ylab("Number of DE genes in cluster") +
-  ggtitle("DE > 0.7 log fold change")
+  ggtitle("DE > 0.4 log fold change; FDR < 0.05")
+p4 <- ggplot(ggDF3, aes(x = nGene, y = Freq)) +
+  geom_point() +
+  xlab("Mean genes detected in cluster") +
+  ylab("Number of DE genes in cluster") +
+  ggtitle("DE > 0.7 log fold change; FDR < 0.05")
 # plot_grid combine cluster heatmaps
-pg <- plot_grid(p1, p2, p3, ncol = 3, align = 'v', axis = 'r')
+pg <- plot_grid(p1, p2, p3, p4, ncol = 4, align = 'v', axis = 'r')
 # now add the title
 title <- ggdraw() + draw_label(paste0(graphCodeTitle
   , "\n\nDE genes per cluster versus number of cells per cluster"))
 # rel_heights values control title margins
 plot_grid(title, pg, ncol = 1, rel_heights = c(0.3, 1))
 ggsave(paste0(outGraph, "DE_NumberVsnGene_ScatterPlot.pdf")
-  , width = 13, height = 6)
+  , width = 17, height = 6)
 ################################################################################
 
 ### Hierarchical cluster by Seurat cluster mean expression of DE genes
 
 # Top 10 DE genes
 clusterDe10DF <- data.frame(
-  clusterDeDF %>% group_by(CLUSTER) %>% top_n(10, LOG_FC))
+  clusterDeDF %>% group_by(Cluster) %>% top_n(10, Log2_Fold_Change))
 
 # Subset expression matrix
-df <- data.frame(t(centSO@scale.data[row.names(centSO@scale.data) %in% clusterDeDF$GENE, ]))
+df <- data.frame(t(centSO@scale.data[
+  row.names(centSO@scale.data) %in% clusterDeDF$Gene, ]))
 df$ClusterID <- centSO@ident
 df <- aggregate(.~ClusterID, df, mean)
 row.names(df) <- df$ClusterID
@@ -387,7 +564,7 @@ ggsave(paste0(outGraph, "hclust_dend.pdf"))
 # Heatmap plot
 # Use the dendrogram label data to position the labels
 # Order genes by dendro order
-geneGroupDF <- data.frame(GENE = clusterDe10DF$GENE, GROUP = clusterDe10DF$CLUSTER)
+geneGroupDF <- data.frame(GENE = clusterDe10DF$Gene, GROUP = clusterDe10DF$Cluster)
 geneGroupDF$GROUP <- factor(geneGroupDF$GROUP, levels = hclust_order)
 geneGroupDF <- geneGroupDF[order(geneGroupDF$GROUP), ]
 # Plot heatmap
@@ -412,7 +589,7 @@ legend <- get_legend(ggL[[1]])
 ggLabels <- ggL[[1]]
 # Remove axis labels
 ggL[1:length(ggL)] <- lapply(ggL[1:length(ggL)], function(gg) {
-  # gg <- gg + facet_grid(~SEURAT_CLUSTERS, space = "free", scales = "free")
+  # gg <- gg + facet_grid(~SEURAT_ClusterS, space = "free", scales = "free")
   gg + theme(
     strip.text.y = element_blank()
     , axis.text.y = element_blank()
@@ -464,250 +641,30 @@ ggsave(paste0(outGraph, "hclust_heatmap.png"), width = 12, height = 28)
 ### Heatmaps
 
 # Top 10 markers for each cluster
-clusterDeDF %>% group_by(CLUSTER) %>% top_n(10, LOG_FC) -> top10
-geneGroupDF <- data.frame(GENE = as.character(top10$GENE), GROUP = top10$CLUSTER)
+clusterDeDF %>% group_by(Cluster) %>% top_n(10, Log2_Fold_Change) -> top10
+geneGroupDF <- data.frame(GENE = as.character(top10$Gene)
+  , GROUP = top10$Cluster)
 
 Heatmap_By_Cluster(geneGroupDF = geneGroupDF, exprM = centSO@scale.data
   , seuratO = centSO, clusters = c(1:16), lowerLimit = -1.5, upperLimit = 1.5
-  , geneOrder = FALSE
-  # , clusterOrder = c(16,13,15,8,10,11,7,9,3,14,2,5,6,4,1,0,12)
+  # , geneOrder = TRUE
+  , clusterOrder = c(9,7,8,10,2,0,1,4,3,13,5,6,11,12,14,15)
 )
 ggsave(paste0(outGraph, "Top10DE_ExprHeatmap_CentScale.png")
   , width = 13, height = 24)
-#
-# ggL <- Heatmaps_By_Cluster_Combined(geneGroupDF, exprM = centSO@scale.data
-#   , seuratO = centSO, lowerLimit = -1.5, upperLimit = 1.5
-#   , clusters1 = c(0:1), clusters2 = c(2:10), clusters3 = c(11:17)
-# )
-# # ggL <- lapply(ggL, function(gg) {gg + theme(axis.text.y = element_blank())})
-# # plot_grid combine
-# pg <- plot_grid(plotlist = ggL, ncol = 3, align = 'h', axis = 'b')
-
-# Split by cluster
-ldf <- split(top10, top10$CLUSTER)
-
-# Mean centered variance scaled
-# Heatmap for each cluster
-pgL <- lapply(names(ldf), function(cl) {
-  deDF <- ldf[[cl]]
-  # Centered scaled
-  geneGroupDF <- data.frame(GENE = deDF$GENE, GROUP = "")
-  # Heatmaps
-  ggL <- Heatmaps_By_Cluster_Combined(geneGroupDF, exprM = centSO@scale.data
-    , seuratO = centSO, lowerLimit = -1.5, upperLimit = 1.5
-    , clusters1 = c(0:1), clusters2 = c(2:10), clusters3 = c(11:17)
-  )
-  # ggL <- lapply(ggL, function(gg) {gg + theme(axis.text.y = element_blank())})
-  # plot_grid combine
-  pg <- plot_grid(plotlist = ggL, ncol = 3, align = 'h', axis = 'b')
-  # now add the title
-  title <- ggdraw() + draw_label(paste0("Cluster: ", cl))
-  # rel_heights values control title margins
-  pg <- plot_grid(title, pg, ncol = 1, rel_heights = c(0.2, 1))
-  return(pg)
-})
-# plot_grid combine cluster heatmaps
-pg <- plot_grid(plotlist = pgL, ncol = 2, align = 'v', axis = 'r')
-# now add the title
-title <- ggdraw() + draw_label(paste0(graphCodeTitle
-  , "\n\nTop 10 DE genes for each cluster"
-  , "\nMean centered, variance scaled normalized expression"
-  , "\nCells sorted by cluster (columns)"))
-# rel_heights values control title margins
-plot_grid(title, pg, ncol = 1, rel_heights = c(0.05, 1))
-ggsave(paste0(outGraph, "ExprHeatmap_CentScale.png")
-  , width = 18, height = length(pgL)*2.5)
-
-# No mean centered variance scaled
-# Heatmap for each cluster
-pgL <- lapply(names(ldf), function(cl) {
-  deDF <- ldf[[cl]]
-  # Centered scaled
-  geneGroupDF <- data.frame(GENE = deDF$GENE, GROUP = "")
-  # Heatmaps
-  ggL <- Heatmaps_By_Cluster_Combined(geneGroupDF, exprM = centSO@scale.data
-    , seuratO = centSO, lowerLimit = 0, upperLimit = 3
-    , clusters1 = c(0:1), clusters2 = c(2:10), clusters3 = c(11:17)
-  )
-  # ggL <- lapply(ggL, function(gg) {gg + theme(axis.text.y = element_blank())})
-  # plot_grid combine
-  pg <- plot_grid(plotlist = ggL, ncol = 3, align = 'h', axis = 'b')
-  # now add the title
-  title <- ggdraw() + draw_label(paste0("Cluster: ", clusterID))
-  # rel_heights values control title margins
-  pg <- plot_grid(title, pg, ncol = 1, rel_heights = c(0.2, 1))
-  return(pg)
-})
-# plot_grid combine cluster heatmaps
-pg <- plot_grid(plotlist = pgL, ncol = 2, align = 'v', axis = 'l')
-# now add the title
-title <- ggdraw() + draw_label(paste0(graphCodeTitle
-  , "\n\nTop 10 DE genes for each cluster"
-  , "\nNormalized expression"
-  , "\nCells sorted by cluster (columns)"))
-# rel_heights values control title margins
-plot_grid(title, pg, ncol = 1, rel_heights = c(0.05, 1))
-ggsave(paste0(outGraph, "ExprHeatmap_NoCentScale_TEST.png")
-  , width = 18, height = length(pgL)*2.5)
-
-# Heatmaps - mean expression
-# Mean centered variance scaled
-# Top 20 markers for each cluster
-clusterDeDF %>% group_by(CLUSTER) %>% top_n(20, LOG_FC) -> top20
-# Split by cluster
-ldf <- split(top20, top20$CLUSTER)
-# Heatmap for each cluster
-ggL <- lapply(names(ldf), function(cl) {
-  print(cl)
-  deDF <- ldf[[cl]]
-  gg <- DE_Mean_Heatmap(clusterDeDF = deDF
-    , exDF = centSO@scale.data
-    , clusterIDs = centSO@ident
-    , upLim = 1.5
-    , lowLim = -1.5
-    , ggtitle = paste0("Cluster: ", cl)
-  )
-  gg <- gg + theme(axis.text.y = element_text(size = 10)) +
-    return(gg)
-})
-# extract the legend from one of the plots
-legend <- get_legend(ggL[[1]])
-# Remove legends from plots
-ggL <- lapply(ggL, function(gg) {gg + theme(legend.position = "none")})
-# plot_grid combine cluster heatmaps
-pg <- plot_grid(plotlist = ggL, ncol = 3, align = 'v', axis = 'r')
-# add the legend to the row we made earlier. Give it one-third of the width
-# of one plot (via rel_widths).
-pg <- plot_grid(pg, legend, rel_widths = c(3, 0.3))
-# now add the title
-title <- ggdraw() + draw_label(paste0(graphCodeTitle
-  , "\n\nTop 20 DE genes for each cluster"
-  , "\nMean centered, variance scaled normalized expression"
-  , "\nMean expression"))
-# rel_heights values control title margins
-plot_grid(title, pg, ncol = 1, rel_heights = c(0.05, 1))
-ggsave(paste0(outGraph, "ExprMeanHeatmap_CentScale.png")
-  , width = 16, height = length(ggL)*1.5)
-
-
-# # Violin plots of top 10 markers
-# pdf(paste0(outGraph, "ViolinPlot_Top10Markers.pdf"), width = 10)
-# top10L <- split(top10, top10$cluster)
-# lapply(top10L, function(top10cluster) {
-#   VlnPlot(centSO, top10cluster$gene, size.use = 0.5)
-# })
-# dev.off()
-#
-# # Feature plot of top 10 markers
-# pdf(paste0(outGraph, "FeaturePlot_Top10Markers.pdf"), width = 10)
-# top10L <- split(top10, top10$cluster)
-# lapply(top10L, function(top10cluster) {
-#   FeaturePlot(centSO, top10cluster$gene, cols.use = c("grey","blue")
-#     , pt.size = 0.7)
-# })
-# dev.off()
-
-## To redo expression heatmaps individually for each cluster
-
-ldf <- split(clusterDeDF, clusterDeDF$CLUSTER)
-
-lapply(names(ldf)[1], function(clusterID) {
-
-  print(clusterID)
-  deDF <- ldf[[clusterID]]
-
-  # Expression heatmap of DE genes
-  # Centered scaled
-  p1 <- DE_Heatmap(clusterDeDF = deDF
-    , exDF = centSO@scale.data
-    , clusterIDs = centSO@ident
-    , upLim = 1.5
-    , lowLim = -1.5
-    , ggtitle = paste0(
-      "\nMean centered, variance scaled, normalized expression"
-      , "\n")
-  )
-  # Not centered scaled
-  p2 <- DE_Heatmap(clusterDeDF = deDF
-    , exDF = noCentExM
-    , clusterIDs = centSO@ident
-    , upLim = 3
-    , lowLim = 0
-    , ggtitle = paste0(
-      "\nNormalized expression"
-      , "\n")
-  )
-  p1 <- p1 + theme(axis.text.y = element_blank())
-  p2 <- p2 + theme(axis.text.y = element_blank())
-  # plot_grid
-  pg <- plot_grid(p1, p2, ncol = 2)
-  # now add the title
-  title <- ggdraw() + draw_label(paste0(graphCodeTitle
-    , "\n\nSignificant (p-value < 0.05) DE genes for cluster ", clusterID
-    , "\nCells sorted by cluster (columns)"))
-  # rel_heights values control title margins
-  plot_grid(title, pg, ncol = 1, rel_heights = c(0.2, 1))
-  ggsave(paste0(outGraph, "ExprHeatmap_Cluster", clusterID, ".png")
-    , width = 12, height = 8)
-
-})
-
-# Heatmap - mean expression
-lapply(names(ldf), function(clusterID) {
-
-  print(clusterID)
-  deDF <- ldf[[clusterID]]
-
-  deDF <- deDF[1:40, ]
-
-  # Expression heatmap of DE genes
-  # Centered scaled
-  p1 <- DE_Mean_Heatmap(clusterDeDF = deDF
-    , exDF = centSO@scale.data
-    , clusterIDs = centSO@ident
-    , upLim = 1.5
-    , lowLim = -1.5
-    , ggtitle = paste0(
-      "\nMean centered, variance scaled, normalized expression"
-      , "\n")
-  )
-  # Not centered scaled
-  p2 <- DE_Mean_Heatmap(clusterDeDF = deDF
-    , exDF = noCentExM
-    , clusterIDs = centSO@ident
-    , upLim = 3
-    , lowLim = 0
-    , ggtitle = paste0(
-      "\nNormalized expression"
-      , "\n")
-  )
-  # plot_grid
-  pg <- plot_grid(p1, p2, ncol = 2)
-  # now add the title
-  title <- ggdraw() + draw_label(paste0(graphCodeTitle
-    , "\n\nSignificant (p-value < 0.05) DE genes for cluster ", clusterID
-    , "\nTop 40 DE genes"
-    , "\nMean expression"))
-  # rel_heights values control title margins
-  plot_grid(title, pg, ncol = 1, rel_heights = c(0.2, 1))
-  ggsave(paste0(outGraph, "ExprMeanHeatmap_Cluster", clusterID, ".png")
-    , width = 12, height = 8)
-})
-
-
 ################################################################################
 
 ### DE genes expression across Kang et al. cortex stages 1-8
 
 ## Plot DE genes expression across Kang et al. cortex stages 1-8
 
-ggL <- lapply(sort(unique(clusterDeDF$CLUSTER)), function(cluster){
+ggL <- lapply(sort(unique(clusterDeDF$Cluster)), function(cluster){
   # Subset DE data frame to cluster
-  specificClusterDeDF <- clusterDeDF[clusterDeDF$CLUSTER == cluster, ]
+  specificClusterDeDF <- clusterDeDF[clusterDeDF$Cluster == cluster, ]
   # Subset to genes > 0.4 log fold change
-  specificClusterDeDF <- specificClusterDeDF[specificClusterDeDF$LOG_FC > 0.4, ]
+  specificClusterDeDF <- specificClusterDeDF[specificClusterDeDF$Log2_Fold_Change > 0.4, ]
   # Subset Kang expression matrix to DE genes
-  exM <- kangExM[row.names(kangExM) %in% specificClusterDeDF$ENSEMBL, ]
+  exM <- kangExM[row.names(kangExM) %in% specificClusterDeDF$Ensembl, ]
   # Format for ggplot2 and add stage
   df <- melt(exM)
   df$Stage <- kangMtDF$Stage[match(df$Var2, kangMtDF$X)]
@@ -747,7 +704,7 @@ Convert_Mixed_GeneSym_EnsID_To_EnsID <- function(ids){
 }
 
 Cluster_Correlation_To_Kang_Stages <- function (topGenes) {
-  ll <- lapply(sort(unique(clusterDeDF$CLUSTER)), function(cluster){
+  ll <- lapply(sort(unique(clusterDeDF$Cluster)), function(cluster){
     # Subset expression matrix to cells in cluster
     exM <- noCentExM[ ,centSO@ident %in% cluster]
     # Convert hgnc symbols to ensembl and leave ensembl IDs unchanged
@@ -771,7 +728,7 @@ Cluster_Correlation_To_Kang_Stages <- function (topGenes) {
   })
   df <- do.call("cbind", ll)
   df <- df[-9, ]
-  colnames(df) <- sort(unique(clusterDeDF$CLUSTER))
+  colnames(df) <- sort(unique(clusterDeDF$Cluster))
   df <- melt(df)
   return(df)
 }
@@ -810,13 +767,13 @@ ggsave(paste0(outGraph, "KangCorrelation.png"), width = 16, height = 9)
 
 ## Expression across Miller zones
 
-ggL <- lapply(sort(unique(clusterDeDF$CLUSTER)), function(cluster){
+ggL <- lapply(sort(unique(clusterDeDF$Cluster)), function(cluster){
   # Subset DE data frame to cluster
-  specificClusterDeDF <- clusterDeDF[clusterDeDF$CLUSTER == cluster, ]
+  specificClusterDeDF <- clusterDeDF[clusterDeDF$Cluster == cluster, ]
   # Subset to genes > 0.4 log fold change
-  specificClusterDeDF <- specificClusterDeDF[specificClusterDeDF$LOG_FC > 0.4, ]
+  specificClusterDeDF <- specificClusterDeDF[specificClusterDeDF$Log2_Fold_Change > 0.4, ]
   # Subset Kang expression matrix to DE genes
-  exM <- millerExDF[row.names(millerExDF) %in% specificClusterDeDF$ENSEMBL, ]
+  exM <- millerExDF[row.names(millerExDF) %in% specificClusterDeDF$Ensembl, ]
   # Format for ggplot2 and add stage
   df <- melt(exM)
   df$Zone <- millerMtDF$Zone[match(df$variable, millerMtDF$well_id)]
