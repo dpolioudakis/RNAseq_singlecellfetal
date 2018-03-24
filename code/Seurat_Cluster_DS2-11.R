@@ -32,7 +32,7 @@ print(args)
 # Digital gene expression
 
 # DS-002-003-004-005-006-007-008-009-011: exDF and metDF
-load("../analysis/analyzed_data/Expression_Matrix_Compile_dge_FtMm250_DS-2-3-4-5-6-7-8-9-11.Rdata")
+load("../analysis/analyzed_data/Expression_Matrix_Compile/Expression_Matrix_Compile_dge_FtMm250_DS-2-3-4-5-6-7-8-9-11.Rdata")
 # load("../analysis/analyzed_data/Expression_Matrix_Compile_dge_FtMm250_Magic_DS-2-3-4-5-6-7-8-9-11_exon_FtMm250_200-3sdgd.Rdata")
 # exDF <- as.data.frame(exDF)
 # # Subsetting for testing
@@ -944,7 +944,7 @@ ggsave(paste0(outGraph, "tSNE_ResolutionTest0506.png")
 
 ## Clustering parameters to save
 centSO <- RunTSNE(centSO, dims.use = 1:40, do.fast = TRUE)
-centSO <- FindClusters(centSO, dims.use = 1:40, resolution = 0.6
+centSO <- FindClusters(centSO, dims.use = 1:40, resolution = 0.54
   , print.output = 0, save.SNN = TRUE)
 
 PrintFindClustersParams(object = centSO)
@@ -1220,77 +1220,77 @@ ggsave(paste0(outGraph, "PCscore_FeaturePlot.png"), width = 15, height = 15)
 
 ### Heatmap of expression of genes with highest PC loadings sorted by cluster
 
-print("### Heatmap of expression of genes with highest PC loadings sorted by cluster")
-
-# Genes with highest PC loadings
-ldf <- lapply(1:20, function(pc) {
-  data.frame(GENES = names(sort(abs(centSO@dr$pca@gene.loadings[ ,pc])
-    , decreasing = TRUE)[1:10]), PC = paste0("PC", pc))
-})
-genesDF <- do.call("rbind", ldf)
-
+# print("### Heatmap of expression of genes with highest PC loadings sorted by cluster")
+#
 # # Genes with highest PC loadings
-# ldf <- lapply(1:40, function(pc) {
-#   data.frame(GENES = names(sort(abs(centSO@pca.obj[[1]]$rotation[ ,pc])
+# ldf <- lapply(1:20, function(pc) {
+#   data.frame(GENES = names(sort(abs(centSO@dr$pca@gene.loadings[ ,pc])
 #     , decreasing = TRUE)[1:10]), PC = paste0("PC", pc))
 # })
 # genesDF <- do.call("rbind", ldf)
-
-# # Genes with highest PC loadings - if PCAFast is used to calculate PCs
-# m <- centSO@pca.obj[[1]]$v
-# row.names(m) <- centSO@var.genes
-# ldf <- lapply(1:40, function(pc) {
-#   data.frame(GENES = row.names(m[order(-abs(m[,pc])), ])[1:10]
-#     , PC = paste0("PC", pc))
+#
+# # # Genes with highest PC loadings
+# # ldf <- lapply(1:40, function(pc) {
+# #   data.frame(GENES = names(sort(abs(centSO@pca.obj[[1]]$rotation[ ,pc])
+# #     , decreasing = TRUE)[1:10]), PC = paste0("PC", pc))
+# # })
+# # genesDF <- do.call("rbind", ldf)
+#
+# # # Genes with highest PC loadings - if PCAFast is used to calculate PCs
+# # m <- centSO@pca.obj[[1]]$v
+# # row.names(m) <- centSO@var.genes
+# # ldf <- lapply(1:40, function(pc) {
+# #   data.frame(GENES = row.names(m[order(-abs(m[,pc])), ])[1:10]
+# #     , PC = paste0("PC", pc))
+# # })
+# # genesDF <- do.call("rbind", ldf)
+#
+# # Format for heatmap function
+# colnames(genesDF) <- c("GENE", "GROUP")
+# # Heatmap - mean centered scaled
+# ggL <- Heatmaps_By_Cluster_Combined(geneGroupDF = genesDF
+#   , exprM = centSO@scale.data, seuratO = centSO
+#   , lowerLimit = -1.5, upperLimit = 1.5
+#   , clusters1 = c(0:1), clusters2 = c(2:10), clusters3 = c(11:length(unique(centSO@ident))))
+# # Change legend title
+# ggL <- lapply(ggL, function(gg) {
+#   gg + scale_fill_distiller(name = "Normalized\nExpression\nz-score")
+#   return(gg)
 # })
-# genesDF <- do.call("rbind", ldf)
-
-# Format for heatmap function
-colnames(genesDF) <- c("GENE", "GROUP")
-# Heatmap - mean centered scaled
-ggL <- Heatmaps_By_Cluster_Combined(geneGroupDF = genesDF
-  , exprM = centSO@scale.data, seuratO = centSO
-  , lowerLimit = -1.5, upperLimit = 1.5
-  , clusters1 = c(0:1), clusters2 = c(2:10), clusters3 = c(11:length(unique(centSO@ident))))
-# Change legend title
-ggL <- lapply(ggL, function(gg) {
-  gg + scale_fill_distiller(name = "Normalized\nExpression\nz-score")
-  return(gg)
-})
-# plot grid
-pg <- plot_grid(plotlist = ggL, align = "h", axis = "b", ncol = 3)
-# now add the title
-title <- ggdraw() + draw_label(paste0(graphCodeTitle
-  , "\n"
-  , "\nExpression of genes with highest PC loadings"
-  , "\nMean centered, variance scaled, normalized expression"
-  , "\nLimits set to -1.5 and 1.5"
-  , "\n"))
-# rel_heights values control title margins
-plot_grid(title, pg, ncol = 1, rel_heights = c(0.05, 1))
-# save
-ggsave(paste0(outGraph, "PC1-40_DoHeatmap_HighestLoading_CenterScale.png")
-  , width = 12, height = 4 + 0.16*nrow(genesDF))
-
-# Heatmap - not mean centered scaled
-ggL <- Heatmaps_By_Cluster_Combined(geneGroupDF = genesDF
-  , exprM = noCentExM, seuratO = centSO
-  , lowerLimit = -1, upperLimit = 3
-  , clusters1 = c(0:1), clusters2 = c(2:10), clusters3 = c(11:length(unique(centSO@ident))))
-# plot grid
-pg <- plot_grid(plotlist = ggL, align = "h", axis = "b", ncol = 3)
-# now add the title
-title <- ggdraw() + draw_label(paste0(graphCodeTitle
-  , "\n"
-  , "\nExpression of genes with highest PC loadings"
-  , "\nMean centered, variance scaled, normalized expression"
-  , "\nLimits set to -1 and 3"
-  , "\n"))
-# rel_heights values control title margins
-plot_grid(title, pg, ncol = 1, rel_heights = c(0.05, 1))
-# save
-ggsave(paste0(outGraph, "PC1-40_DoHeatmap_HighestLoading_NoCentScale.png")
-  , width = 12, height = 4 + 0.16*nrow(genesDF))
+# # plot grid
+# pg <- plot_grid(plotlist = ggL, align = "h", axis = "b", ncol = 3)
+# # now add the title
+# title <- ggdraw() + draw_label(paste0(graphCodeTitle
+#   , "\n"
+#   , "\nExpression of genes with highest PC loadings"
+#   , "\nMean centered, variance scaled, normalized expression"
+#   , "\nLimits set to -1.5 and 1.5"
+#   , "\n"))
+# # rel_heights values control title margins
+# plot_grid(title, pg, ncol = 1, rel_heights = c(0.05, 1))
+# # save
+# ggsave(paste0(outGraph, "PC1-40_DoHeatmap_HighestLoading_CenterScale.png")
+#   , width = 12, height = 4 + 0.16*nrow(genesDF))
+#
+# # Heatmap - not mean centered scaled
+# ggL <- Heatmaps_By_Cluster_Combined(geneGroupDF = genesDF
+#   , exprM = noCentExM, seuratO = centSO
+#   , lowerLimit = -1, upperLimit = 3
+#   , clusters1 = c(0:1), clusters2 = c(2:10), clusters3 = c(11:length(unique(centSO@ident))))
+# # plot grid
+# pg <- plot_grid(plotlist = ggL, align = "h", axis = "b", ncol = 3)
+# # now add the title
+# title <- ggdraw() + draw_label(paste0(graphCodeTitle
+#   , "\n"
+#   , "\nExpression of genes with highest PC loadings"
+#   , "\nMean centered, variance scaled, normalized expression"
+#   , "\nLimits set to -1 and 3"
+#   , "\n"))
+# # rel_heights values control title margins
+# plot_grid(title, pg, ncol = 1, rel_heights = c(0.05, 1))
+# # save
+# ggsave(paste0(outGraph, "PC1-40_DoHeatmap_HighestLoading_NoCentScale.png")
+#   , width = 12, height = 4 + 0.16*nrow(genesDF))
 ################################################################################
 
 ### Cluster QC and statistics
@@ -1335,11 +1335,11 @@ v1 <- c(
   "Radial glia" = sum(df$NUMBER_CELLS[df$CLUSTER %in% c(7,9)])/sum(df$NUMBER_CELLS) * 100
   , "Cycling progenitor" = sum(df$NUMBER_CELLS[df$CLUSTER %in% c(8,10)])/sum(df$NUMBER_CELLS) * 100
   , "Intermediate progenitor" = sum(df$NUMBER_CELLS[df$CLUSTER %in% c(2)])/sum(df$NUMBER_CELLS) * 100
-  , "Excitatory Neuron" = sum(df$NUMBER_CELLS[df$CLUSTER %in% c(0,1,3,4,12,14)])/sum(df$NUMBER_CELLS) * 100
+  , "Excitatory Neuron" = sum(df$NUMBER_CELLS[df$CLUSTER %in% c(0,1,3,4,13)])/sum(df$NUMBER_CELLS) * 100
   , "Interneuron" = sum(df$NUMBER_CELLS[df$CLUSTER %in% c(5,6)])/sum(df$NUMBER_CELLS) * 100
   , "Oligodendrocyte precursor" = sum(df$NUMBER_CELLS[df$CLUSTER %in% c(11)])/sum(df$NUMBER_CELLS) * 100
-  , "Endothelial" = sum(df$NUMBER_CELLS[df$CLUSTER %in% c(13)])/sum(df$NUMBER_CELLS) * 100
-  , "Pericyte" = sum(df$NUMBER_CELLS[df$CLUSTER %in% c(15)])/sum(df$NUMBER_CELLS) * 100
+  , "Endothelial" = sum(df$NUMBER_CELLS[df$CLUSTER %in% c(12)])/sum(df$NUMBER_CELLS) * 100
+  , "Pericyte" = sum(df$NUMBER_CELLS[df$CLUSTER %in% c(14)])/sum(df$NUMBER_CELLS) * 100
   , "Microglia" = sum(df$NUMBER_CELLS[df$CLUSTER %in% c(16)])/sum(df$NUMBER_CELLS) * 100
 )
 df1 <- data.frame(Class = names(v1), Percent = v1)
@@ -1359,16 +1359,16 @@ ggsave(paste0(outGraph, "PC1-40_Cluster_Metrics_Percent_CellType.png")
   , height = 2.5, width = 4)
 
 # Bar plot of percent of cells in clusters
-df1 <- df[df$CLUSTER != 17, ]
+df1 <- df[df$CLUSTER != 16, ]
 df1$CLUSTER <- factor(df1$CLUSTER
-  , levels = c(7,9,8,10,2,0,1,3,4,12,14,5,6,11,13,15,16))
+  , levels = c(9,7,8,10,2,0,1,4,3,13,5,6,11,12,14,15))
 df1 <- df1[order(df1$CLUSTER), ]
-df1$Cluster2 <- as.factor(c(0:16))
+df1$Cluster2 <- as.factor(c(0:15))
 df1$Class = factor(c(
       rep("Radial glia", 2)
       , rep("Cycling progenitor", 2)
       , "Intermediate progenitor"
-      , rep("Excitatory Neuron", 6)
+      , rep("Excitatory Neuron", 5)
       , rep("Interneuron", 2)
       , "Oligodendrocyte precursor"
     , "Endothelial", "Pericyte", "Microglia"
@@ -1396,15 +1396,16 @@ ggsave(paste0(outGraph, "PC1-40_Cluster_Metrics_Percent_CellType_Barplot.pdf")
 df1 <- data.frame(Cluster = df$CLUSTER
   , GZCP_Log2_Ratio = log(df$NUMBER_CELLS_CP/df$NUMBER_CELLS_GZ, 2)
 )
-df1 <- df1[df1$Cluster != 17, ]
-df1$Cluster <- factor(df1$Cluster, levels = c(7,9,8,10,2,0,1,3,4,12,14,5,6,11,13,15,16))
+df1 <- df1[df1$Cluster != 16, ]
+df1$Cluster <- factor(df1$Cluster
+  , levels = c(c(9,7,8,10,2,0,1,4,3,13,5,6,11,12,14,15)))
 df1 <- df1[order(df1$Cluster), ]
-df1$Cluster2 = as.factor(c(0:16))
+df1$Cluster2 = as.factor(c(0:15))
 df1$Class = factor(c(
       rep("Radial glia", 2)
       , rep("Cycling progenitor", 2)
       , "Intermediate progenitor"
-      , rep("Excitatory Neuron", 6)
+      , rep("Excitatory Neuron", 5)
       , rep("Interneuron", 2)
       , "Oligodendrocyte precursor"
     , "Endothelial", "Pericyte", "Microglia"
@@ -1437,17 +1438,17 @@ ggsave(paste0(outGraph, "PC1-40_Cluster_Metrics_GZCP_Ratio_paper.pdf")
 
 # Fraction of cells from each donor per cluster
 ggDF <- centSO@meta.data
-ggDF$Cluster <- ggDF$"res.0.6"
-ggDF <- ggDF[ggDF$Cluster != 17, ]
+ggDF$Cluster <- ggDF$"res.0.54"
+ggDF <- ggDF[ggDF$Cluster != 16, ]
 # Reorder clusters
 cluster_key_DF <- data.frame(
-  Original = c(0:16)
-  , Reorder = c(7,9,8,10,2,0,1,3,4,12,14,5,6,11,13,15,16)
+  Original = c(0:15)
+  , Reorder = c(9,7,8,10,2,0,1,4,3,13,5,6,11,12,14,15)
 )
 idx <- match(as.numeric(ggDF$Cluster), cluster_key_DF$Original)
 ggDF$Cluster2 <- cluster_key_DF$Reorder[idx]
 # Calculate percent
-ggDF <- table(ggDF$Cluster2, ggDF$individual)
+ggDF <- table(ggDF$Cluster, ggDF$individual)
 ggDF <- (ggDF / rowSums(ggDF)) * 100
 # Format
 ggDF <- melt(ggDF)
@@ -1466,11 +1467,33 @@ ggplot(ggDF, aes(x = Cluster, y = Percent_of_cells, fill = Donor)) +
     , "\nFraction of cells from each donor per cluster"))
 ggsave(paste0(outGraph, "PC1-40_Cluster_Metrics_Donor_Percent.png")
   , height = 2.5, width = 6)
+
 # For paper
+ggDF <- centSO@meta.data
+ggDF$Cluster <- ggDF$"res.0.54"
+ggDF <- ggDF[ggDF$Cluster != 16, ]
+# Reorder clusters
+cluster_key_DF <- data.frame(
+  Original = c(0:15)
+  , Reorder = c(9,7,8,10,2,0,1,4,3,13,5,6,11,12,14,15)
+)
+idx <- match(as.numeric(ggDF$Cluster), cluster_key_DF$Original)
+ggDF$Cluster2 <- cluster_key_DF$Reorder[idx]
+# Calculate percent
+ggDF <- table(ggDF$Cluster2, ggDF$individual)
+ggDF <- (ggDF / rowSums(ggDF)) * 100
+# Format
+ggDF <- melt(ggDF)
+colnames(ggDF) <- c("Cluster", "Donor", "Percent_of_cells")
+# Plot
 ggplot(ggDF, aes(x = Cluster, y = Percent_of_cells, fill = Donor)) +
   geom_bar(stat = "identity") +
   scale_fill_brewer(type = "qual", palette = "Set2", direction = 1) +
-  ggplot_set_theme_publication +
+  theme(
+    legend.position = "none"
+    , panel.grid.major = element_blank()
+    , panel.grid.minor = element_blank()
+  ) +
   ylab("Percent of cells") +
   ggtitle(paste0(graphCodeTitle
     , "\nFraction of cells from each donor per cluster"))
@@ -1511,15 +1534,18 @@ dev.off()
 
 ### Hierarchical cluster by Seurat cluster mean expression
 
-df <- data.frame(t(noCentExM))
-df$ClusterID <- centSO@ident
-df <- aggregate(.~ClusterID, df, mean)
-row.names(df) <- df$ClusterID
-df <- df[ ,colnames(df) != "ClusterID"]
+Hclust_Cluster_Mean_Expression <- function(){
+  df <- data.frame(t(noCentExM))
+  df$ClusterID <- centSO@ident
+  df <- aggregate(.~ClusterID, df, mean)
+  row.names(df) <- df$ClusterID
+  df <- df[ ,colnames(df) != "ClusterID"]
 
-d1 <- dist(df, method = "euclidean") # distance matrix
-fit <- hclust(d1)
-ggdendrogram(fit)
+  d1 <- dist(df, method = "euclidean") # distance matrix
+  fit <- hclust(d1)
+  ggdendrogram(fit)
+}
+Hclust_Cluster_Mean_Expression()
 ggsave(paste0(outGraph, "PC1-40_hclust.pdf"))
 ################################################################################
 
