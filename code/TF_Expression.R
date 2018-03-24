@@ -26,16 +26,15 @@ source("Function_Library.R")
 
 # Log normalized, regressed nUMI and percent mito
 load("../analysis/analyzed_data/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_seuratO.Robj")
-# load("../analysis/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_TEST_seuratO.Robj")
+# load("../analysis/analyzed_data/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_TEST_seuratO.Robj")
 # centSO <- ssCentSO
 # noCentExM <- ssNoCentExM
 
 # BrainSpan developmental transcriptome
 bsDF <- read.csv(
   "../source/BrainSpan_DevTranscriptome/genes_matrix_csv/expression_matrix.csv", header = FALSE)
-rnames <- read.csv(
+bs_rnames <- read.csv(
   "../source/BrainSpan_DevTranscriptome/genes_matrix_csv/rows_metadata.csv")
-row.names(bsDF) <- rnames$gene_symbol
 bsMtDF <- read.csv(
   "../source/BrainSpan_DevTranscriptome/genes_matrix_csv/columns_metadata.csv")
 
@@ -57,7 +56,7 @@ allen_lcm_rows_DF <- read.csv("../allen_brain_data/FISH_genes/Rows.csv")
 #   "../analysis/tables/Cluster_Seurat/Cluster_Seurat_exon_FtMm250_Marker_Genes_Clusters_Vs_All.txt"
 #   , header = TRUE)
 deDF <- read.table(
-  "../analysis/tables/Seurat_ClusterDE_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_ClusterDE_DS2-11_ClusterX_Vs_All_Clusters.txt"
+  "../analysis/tables/Seurat_ClusterDE_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/res054/Seurat_ClusterDE_DS2-11_ClusterX_Vs_All_Clusters.txt"
   , header = TRUE)
 
 # Human TFs
@@ -90,17 +89,17 @@ aheGzDF <- read.table("../source/ATAC-HiC-CombProxDist-VZ.txt", header = TRUE)
 # DE Vijay pipeline TF enrichment
 # JASPAR
 # Results
-tbejDF <- read.csv("../analysis/Seurat_ClusterDE_TFenrichment/JASPAR/Seurat_ClusterDE_TFenrichment_logFC04_TF_Enrichment_Results.csv"
+tbejDF <- read.csv("../analysis/analyzed_data/Seurat_ClusterDE_TFenrichment/JASPAR/Seurat_ClusterDE_TFenrichment_logFC04_TF_Enrichment_Results.csv"
   , header = TRUE)
 # TFs in JASPAR database
-jasparDF <- read.csv("../analysis/Seurat_ClusterDE_TFenrichment/JASPAR/Compiled_TFs_in_JASPAR_Database.csv"
+jasparDF <- read.csv("../analysis/analyzed_data/Seurat_ClusterDE_TFenrichment/JASPAR/Compiled_TFs_in_JASPAR_Database.csv"
   , header = TRUE)
 # TRANSFAC
 # Results
-tbetDF <- read.csv("../analysis/Seurat_ClusterDE_TFenrichment/TRANSFAC/Seurat_ClusterDE_TFenrichment_logFC04_TF_Enrichment_Results.csv"
+tbetDF <- read.csv("../analysis/analyzed_data/Seurat_ClusterDE_TFenrichment/TRANSFAC/Seurat_ClusterDE_TFenrichment_logFC04_TF_Enrichment_Results.csv"
   , header = TRUE)
 # TFs in JASPAR database
-jasparDF <- read.csv("../analysis/Seurat_ClusterDE_TFenrichment/TRANSFAC/Compiled_TFs_in_TRANSFAC_Database.csv"
+jasparDF <- read.csv("../analysis/analyzed_data/Seurat_ClusterDE_TFenrichment/TRANSFAC/Compiled_TFs_in_TRANSFAC_Database.csv"
   , header = TRUE)
 
 ## Variables
@@ -125,7 +124,7 @@ theme_update(axis.line = element_line(colour = "black")
 
 Subset_TFs <- function(deDF, cluster, okayClusters, fcHigh, fcLow) {
   # Clusters gene cannot be DE in
-  clsNo <- c(0:17)[! c(0:17) %in% okayClusters]
+  clsNo <- c(0:15)[! c(0:15) %in% okayClusters]
   # Gene is > X FC in cluster
   genes1 <- deDF$GENE[deDF$LOG_FC > fcHigh & deDF$CLUSTER == cluster]
   # Genes in clusters genes cannot be DE in > 0.3
@@ -152,83 +151,6 @@ Combine_DE_and_Expression <- function(deDF, exDF) {
   # Remove order variable now set
   ggDF <- ggDF[ ,! colnames(ggDF) == "ORDER"]
 }
-
-# # Expression heatmap
-# Heatmap_By_Cluster <- function(
-#   ggDF, seuratO, clusters, lowerLimit, upperLimit, ggTitle, levels) {
-#
-#   colnames(ggDF)[1:2] <- c("GENE", "GROUP")
-#   # Remove blanks
-#   ggDF <- ggDF[! ggDF$GENE == "", ]
-#   # Save order to set levels later
-#   levels <- paste0(ggDF$GENE, "   ", ggDF$GROUP)
-#   ggDF <- melt(ggDF)
-#   # Add seurat clusters
-#   idx <- match(ggDF$variable, names(seuratO@ident))
-#   ggDF$SEURAT_CLUSTERS <- seuratO@ident[idx]
-#   # Subset clusters
-#   ggDF <- ggDF[ggDF$SEURAT_CLUSTERS %in% clusters, ]
-#   ggDF$GENE_GROUP <- paste0(ggDF$GENE, "   ", ggDF$GROUP)
-#   ggDF$GENE_GROUP <- factor(ggDF$GENE_GROUP, levels = levels)
-#   # Set limits
-#   ggDF$value[ggDF$value < lowerLimit] <- lowerLimit
-#   ggDF$value[ggDF$value > upperLimit] <- upperLimit
-#   # ggplot
-#   ggplot(ggDF, aes(x = variable, y = GENE_GROUP, fill = value)) +
-#     geom_tile() +
-#     facet_grid(GROUP~SEURAT_CLUSTERS, space = "free", scales = "free") +
-#     # scale_fill_gradient2(high = "#d7191c", low = "#2c7bb6")
-#     scale_fill_distiller(name = "Normalized\nexpression", type = "div"
-#       , palette = 5, direction = -1, limits = c(lowerLimit, upperLimit)) +
-#     theme_bw() +
-#     theme(strip.text.x = element_text(angle = 90)) +
-#     theme(strip.text.y = element_text(angle = 0)) +
-#     theme(strip.background = element_blank()) +
-#     theme(axis.text.x = element_blank()) +
-#     theme(axis.ticks = element_blank()) +
-#     theme(text = element_text(size = 12)) +
-#     theme(axis.text.y = element_text(size = 10)) +
-#     ylab("Genes") +
-#     xlab("Cells ordered by cluster")
-# }
-#
-# # Use plot_grid to combine 3 heatmaps to deal with cell number scaling
-# Heatmaps_Combined <- function(ggDF, seuratO, clusters1, clusters2, clusters3
-#   , lowerLimit, upperLimit, title) {
-#   p1 <- Heatmap_By_Cluster(ggDF, seuratO = centSO, clusters = clusters1
-#     , lowerLimit = lowerLimit, upperLimit = upperLimit
-#   )
-#   p1 <- p1 + theme(
-#     axis.title.x = element_blank()
-#     , strip.text.y = element_blank()
-#     , legend.position = "none"
-#   )
-#   p2 <- Heatmap_By_Cluster(ggDF, seuratO = centSO, clusters = clusters2
-#     , lowerLimit = lowerLimit, upperLimit = upperLimit
-#   )
-#   p2 <- p2 + theme(
-#     strip.text.y = element_blank()
-#     , legend.position = "none"
-#     , axis.title.y = element_blank()
-#     , axis.text.y = element_blank()
-#     , axis.ticks.y = element_blank()
-#   )
-#   p3 <- Heatmap_By_Cluster(ggDF, seuratO = centSO, clusters = clusters3
-#     , lowerLimit = lowerLimit, upperLimit = upperLimit
-#   )
-#   p3 <- p3 + theme(
-#     axis.title.x = element_blank()
-#     , axis.title.y = element_blank()
-#     , axis.text.y = element_blank()
-#     , axis.ticks.y = element_blank())
-#   # plot_grid combine
-#   pg <- plot_grid(p1, p2, p3, ncol = 3, align = 'h', axis = 'b')
-#   # # now add the title
-#   # title <- ggdraw() + draw_label(title)
-#   # # rel_heights values control title margins
-#   # pg <- plot_grid(title, pg, ncol = 1, rel_heights = c(0.1, 1))
-#   return(pg)
-# }
 
 Intersection_Of_Cells_Expressing_Both <- function(gene1, gene2){
   v1 <- noCentExM[row.names(noCentExM) %in% c(gene1), ] > 0.5
@@ -387,7 +309,45 @@ mapDF <- data.frame(VALUE = current.cluster.ids, MAPVALUE = new.cluster.ids)
 
 ### Figures for paper
 
-# Allen LCM
+## BrainSpan
+# Subset to cortex, remove visual and cerebellar
+subset_BsMt_DF <- bsMtDF[grep("cortex", bsMtDF$structure_name), ]
+subset_BsMt_DF <- subset_BsMt_DF[
+  subset_BsMt_DF$structure_name != "cerebellar cortex" &
+  subset_BsMt_DF$structure_name != "primary visual cortex (striate cortex, area V1/17)", ]
+ssBsDF <- bsDF[ ,subset_BsMt_DF$column_num]
+# Log2 transform
+ssBsDF <- log(ssBsDF, 2)
+# Subset to genes of interest
+idx <- match(c(
+  "ZFHX4", "CARHSP1", "ST18", "CSRP2"
+  , "HOPX", "PAX6", "EOMES", "SATB2", "BCL11B", "STMN2"
+  ), bs_rnames$gene_symbol)
+df1 <- bs_rnames[idx, ]
+ssBsDF <- ssBsDF[df1$row_num, ]
+row.names(ssBsDF) <- df1$gene_symbol
+# Genes as columns
+ssBsDF <- as.data.frame(t(ssBsDF))
+# Remove outliers by stdev
+ssBsDF <- as.data.frame(apply(ssBsDF, 2, function(x) {
+  Remove_Outliers_By_SD(x, nStdev = 2.5)
+  }))
+# Add age
+ssBsDF$Age <- factor(subset_BsMt_DF$age, levels = unique(subset_BsMt_DF$age))
+# Format
+ssBsDF <- melt(ssBsDF)
+# ggplot fit line
+ggplot(ssBsDF, aes(x = Age, y = value, group = 1)) +
+  facet_wrap(~variable, scales = "free", ncol = 3) +
+  geom_jitter(size = 0.1, width = 0.2) +
+  geom_smooth(color = "red") +
+  ggplot_set_theme_publication +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)) +
+  xlab("Age") +
+  ylab("Normalized expression")
+ggsave(paste0(outGraph, "BrainSpan_Fit_paper.pdf"), width = 10, height = 8)
+
+## Allen LCM
 Allen_LCM_Format_For_GGplot <- function(){
   colnames(allen_lcm_DF)[2:ncol(allen_lcm_DF)] <-
     paste(as.character(allen_lcm_cols_DF$structure_name), c(1:nrow(allen_lcm_cols_DF)))
@@ -421,9 +381,11 @@ ggsave(paste0(outGraph, "Miller_Heatmap_paper.png")
   , width = 8, height = 3, dpi = 600)
 
 # Feature plot
-genes <- c("HES1", "ZFHX4", "CARHSP1"
+genes <- c(
+  "HES1", "ZFHX4", "CARHSP1"
   , "NEUROD6", "CSRP2"
-  , "TBR1", "ST18")
+  , "TBR1", "ST18"
+)
 ggL <- FeaturePlot_CentScale(
   genes = genes
   , tsneDF = as.data.frame(centSO@dr$tsne@cell.embeddings)
@@ -436,13 +398,335 @@ ggL <- lapply(ggL, function(gg){
   # gg <- gg + theme(plot.title = element_text(size = 20))
   return(gg)
 })
-
 Plot_Grid(ggPlotsL = ggL, ncol = 3, rel_height = 0.2, align = 'v', axis = 'r'
   , title = paste0(graphCodeTitle
     , "\n\ntSNE colored by normalized centered scaled expression"))
 ggsave(paste0(outGraph, "TFsOfInterest_FeaturePlot_paper.png")
   , width = 8, height = 8)
-################################################################################
+
+## Expression heatmap
+
+Subset_TFs_For_Multiple_Clusters <- function(
+  clusters_of_interest
+  , deDF
+  , clusters_okay
+  , fold_change_high_filter
+  , fold_change_low_filter
+  ) {
+  print("Subset_TFs_For_Multiple_Clusters")
+  unique_TFs_DFL <- lapply(clusters_of_interest, function(cluster) {
+    Subset_TFs(deDF = deDF, cluster = cluster, okayClusters = clusters_okay
+      , fcHigh = fold_change_high_filter, fcLow = fold_change_low_filter)
+  })
+  unique_TFs_DF <- do.call("rbind", unique_TFs_DFL)
+  unique_TFs_DF <- unique_TFs_DF[! duplicated(unique_TFs_DF$GENE), ]
+  return(unique_TFs_DF)
+}
+
+Seurat_Heatmap_Cell_Type_Specific_TFs <- function(
+  seuratO
+  , deDF
+  , clusters_of_interest
+  , clusters_okay
+  , fold_change_high_filter
+  , fold_change_low_filter
+  , cluster_order
+  , title
+  ) {
+
+  print("Seurat_Heatmap_Cell_Type_Specific_TFs")
+
+  unique_TFs_DF <- Subset_TFs_For_Multiple_Clusters(
+    clusters_of_interest = clusters_of_interest
+    , deDF = deDF
+    , clusters_okay = clusters_okay
+    , fold_change_high_filter = fold_change_high_filter
+    , fold_change_low_filter = fold_change_low_filter
+  )
+
+  # Heatmap plot
+  gene_group_DF <- data.frame(GENE = rev(unique_TFs_DF$GENE), GROUP = "")
+  cluster_order = cluster_order
+  ggL <- lapply(cluster_order, function(cluster){
+    tryCatch(
+      Heatmap_By_Cluster(
+        geneGroupDF = gene_group_DF
+        , exprM = as.matrix(centSO@scale.data)
+        , seuratO = centSO
+        , clusters = cluster
+        , lowerLimit = -1.5
+        , upperLimit = 1.5
+        , geneOrder = TRUE
+      )
+      , error = function(err) {
+        print(paste0("tryCatch error cluster: ", cluster))
+        print(err)
+        return(NULL)
+      })
+  })
+  # Remove nulls from ggplot list
+  ggL <- ggL[! sapply(ggL, is.null)]
+  # Extract legend
+  legend <- get_legend(ggL[[1]])
+  # Format - remove axis labels
+  axis_y_labels <- ggL[[1]]
+  ggL[1:length(ggL)] <- lapply(ggL[1:length(ggL)], function(gg) {
+    gg + theme(
+      strip.text.y = element_blank()
+      , legend.position = "none"
+      , axis.title.y = element_blank()
+      , axis.text.y = element_blank()
+      , axis.ticks.y = element_blank()
+      , axis.title.x = element_blank()
+      # margin: top, right, bottom, and left
+      , plot.margin = unit(c(1, 0.05, 1, 0.05), "cm")
+    )
+  })
+
+  # Combine individual heatmaps
+  rel_widths <- data.frame(log((table(centSO@ident) + 1), 2))
+  rel_widths <- rel_widths[match(cluster_order, rel_widths$Var1), ]
+  rel_widths <- as.vector(rel_widths$Freq) + 1
+  rel_widths <- c(30, rel_widths, 1)
+  rel_widths <- rel_widths[! is.na(rel_widths)]
+  # # Combine
+  # pg <- plot_grid(plotlist = append(list(plt_dendr), ggL), ncol = length(rel_widths)
+  #   , rel_widths = rel_widths, align = 'h', axis = 't')
+
+  Plot_Grid(append(list(axis_y_labels), ggL)
+    , ncol = length(rel_widths), rel_widths = rel_widths
+    , align = 'h', axis = 't'
+    , title = title
+  )
+}
+
+# RG
+# Data frame of TFs, co-factors, chromatin remodelers
+tf_cr_cf_DF  <- rbind(tfDF, crDF, cfDF)
+# Intersect DE gene lists and TFs, co-factors, chromatin remodelers list
+subset_DE_DF <- deDF[deDF$ENSEMBL %in% tf_cr_cf_DF$V1, ]
+# Heatmap
+Seurat_Heatmap_Cell_Type_Specific_TFs(
+  seuratO = centSO
+  , deDF = subset_DE_DF
+  , clusters_of_interest = c(7,9)
+  , clusters_okay = c(7,8,9,10)
+  , fold_change_high_filter = 0.4
+  , fold_change_low_filter = 0.25
+  , cluster_order = c(9,7,8,10,2,0,1,4,3,13,5,6,11,12,14,15)
+  , title = paste0(graphCodeTitle
+    , "\n\nExpression of TFs, chromatin remodelers, co-factors differentially expressed in RG clusters"
+    , "\nDE fold change in clusters of cell type of interest > 0.4"
+    , "\nFor all other clusters < 0.25"
+  )
+)
+ggsave(
+  paste0(outGraph
+    , "TFsCRsCFs_DEtypeRG_Heatmap_NormalizedCenteredScaled_paper.png"
+  )
+  , width = 13, height = 12, limitsize = FALSE
+)
+
+# Deep layer neuron
+# Data frame of TFs, co-factors, chromatin remodelers
+tf_cr_cf_DF  <- rbind(tfDF, crDF, cfDF)
+# Intersect DE gene lists and TFs, co-factors, chromatin remodelers list
+subset_DE_DF <- deDF[deDF$ENSEMBL %in% tf_cr_cf_DF$V1, ]
+# Heatmap
+Seurat_Heatmap_Cell_Type_Specific_TFs(
+  seuratO = centSO
+  , deDF = subset_DE_DF
+  , clusters_of_interest = c(3,13)
+  , clusters_okay = c(3,13)
+  , fold_change_high_filter = 0.4
+  , fold_change_low_filter = 0.25
+  , cluster_order = c(9,7,8,10,2,0,1,4,3,13,5,6,11,12,14,15)
+  , title = paste0(graphCodeTitle
+    , "\n\nExpression of TFs, chromatin remodelers, co-factors differentially expressed in deep layer excitatory clusters"
+    , "\nDE fold change in clusters of cell type of interest > 0.4"
+    , "\nFor all other clusters < 0.25"
+  )
+)
+ggsave(
+  paste0(outGraph
+    , "TFsCRsCFs_DEtypeNeuronDeepLayerExc_Heatmap_NormalizedCenteredScaled_paper.png"
+  )
+  , width = 13, height = 12, limitsize = FALSE
+)
+
+# Excitatory neuron
+# Data frame of TFs, co-factors, chromatin remodelers
+tf_cr_cf_DF  <- rbind(tfDF, crDF, cfDF)
+# Intersect DE gene lists and TFs, co-factors, chromatin remodelers list
+subset_DE_DF <- deDF[deDF$ENSEMBL %in% tf_cr_cf_DF$V1, ]
+# Heatmap
+Seurat_Heatmap_Cell_Type_Specific_TFs(
+  seuratO = centSO
+  , deDF = subset_DE_DF
+  , clusters_of_interest = c(0,1,4,3,13)
+  , clusters_okay = c(0,1,4,3,13)
+  , fold_change_high_filter = 0.4
+  , fold_change_low_filter = 0.25
+  , cluster_order = c(9,7,8,10,2,0,1,4,3,13,5,6,11,12,14,15)
+  , title = paste0(graphCodeTitle
+    , "\n\nExpression of TFs, chromatin remodelers, co-factors differentially expressed in deep layer excitatory clusters"
+    , "\nDE fold change in clusters of cell type of interest > 0.4"
+    , "\nFor all other clusters < 0.25"
+  )
+)
+ggsave(
+  paste0(outGraph
+    , "TFsCRsCFs_DEtypeNeuronExc_Heatmap_NormalizedCenteredScaled_paper.png"
+  )
+  , width = 13, height = 12, limitsize = FALSE
+)
+
+## tSNE colored by intersection and heatmap of numbers of intersections
+
+Intersection_tSNE_Plots_Wrapper <- function(genes, subtitle){
+  print("Intersection_tSNE_Plots_Wrapper")
+  # tSNE intersections
+  ggL <- Intersection_tSNE_Plots(genes)
+  # tSNE colored by cluster
+  gg1 <- TSNE_Plot(centSO)
+  ggL <- append(list(gg1), ggL)
+  # Set theme
+  ggL <- lapply(ggL, function(gg){
+    gg <- gg + ggplot_set_theme_publication
+    # Remove legend
+    gg <- gg + theme(legend.position = "none")
+    return(gg)
+  })
+  # Plot
+  Plot_Grid(ggPlotsL = ggL, ncol = 3, rel_height = 0.1, align = 'v', axis = 'r'
+    , title = paste0(paste0(graphCodeTitle
+      , "\n\ntSNE plot colored by intersection of expression of gene A and gene B"
+      , "\n(> 0.5 normalized expression)"
+      , "\n", subtitle))
+  )
+}
+# RG
+genes <- c("CARHSP1", "ZFHX4", "SOX2", "PAX6", "HOPX", "CRYAB")
+Intersection_tSNE_Plots_Wrapper(genes = genes, subtitle = "RG")
+ggsave(paste0(outGraph
+    , "TFsOfInterest_And_Marker_Intersection_tSNE_RG_paper.png")
+  , width = 14, height = 32)
+# Neuron
+genes <- c("ST18", "CSRP2", "SATB2", "BCL11B", "STMN2")
+Intersection_tSNE_Plots_Wrapper(genes = genes, subtitle = "Neuron")
+ggsave(paste0(outGraph
+    , "TFsOfInterest_And_Marker_Intersection_tSNE_Neuron_paper.png")
+  , width = 14, height = 28)
+
+Percent_Expression_Of_Genes_Same_Cell <- function(
+  gene_of_interest
+  , gene_list
+  ){
+  print("Intersection_Of_Cells_Expressing_Both_Percent")
+  percent_intersect_DFL <- lapply(gene_list, function(gene2){
+    # Number cells expressing both
+    cells_intersect <- Intersection_Of_Cells_Expressing_Both(
+      gene1 = gene_of_interest, gene2 = gene2
+    )
+    cells_intersect <- row.names(cells_intersect)[
+      cells_intersect$Intersection == TRUE]
+    # Number cells expressing gene
+    cells_gene_list_gene <- Intersection_Of_Cells_Expressing_Both(
+      gene1 = gene2, gene2 = gene2
+    )
+    cells_gene_list_gene <- row.names(cells_gene_list_gene)[
+      cells_gene_list_gene$Intersection == TRUE]
+    # Cells expressing gene of interest
+    cells_gene_of_interest <- Intersection_Of_Cells_Expressing_Both(
+      gene1 = gene_of_interest, gene2 = gene_of_interest
+    )
+    cells_gene_of_interest <- row.names(cells_gene_of_interest)[
+      cells_gene_of_interest$Intersection == TRUE]
+    # Percent
+    percent_intersect_gene_of_interest <-
+      (length(cells_intersect) / length(cells_gene_of_interest)) * 100
+    percent_intersect_gene_list <-
+      (length(cells_intersect) / length(cells_gene_list_gene)) * 100
+    percent_intersect_DF <- data.frame(
+      Percent_Gene_Of_Interest = percent_intersect_gene_of_interest
+      , Percent_Gene_list = percent_intersect_gene_list
+      , Gene_Of_Interest = gene_of_interest
+      , Genes = gene2
+      )
+    return(percent_intersect_DF)
+  })
+  percent_intersect_DF <- do.call("rbind", percent_intersect_DFL)
+  return(percent_intersect_DF)
+}
+
+Percent_Expression_Of_Genes_Same_Cell_Plot <- function(
+  gene_of_interest
+  , gene_list
+  ){
+    percent_intersect_DF <- Percent_Expression_Of_Genes_Same_Cell(
+      gene_of_interest = gene_of_interest
+      , gene_list = gene_list
+    )
+    gg1 <- ggplot(percent_intersect_DF
+        , aes(x = Genes, y = Percent_Gene_Of_Interest)) +
+      geom_bar(stat = "identity") +
+      xlab("Gene") +
+      ylab("Percent") +
+      ggtitle(paste0(
+        percent_intersect_DF$Gene_Of_Interest[1]
+        , "\nBackground: GOI")) +
+      ggplot_set_theme_publication +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1))
+    gg2 <- ggplot(percent_intersect_DF
+        , aes(x = Genes, y = Percent_Gene_list)) +
+      geom_bar(stat = "identity") +
+      xlab("Gene") +
+      ylab("Percent") +
+      ggtitle(paste0(
+        percent_intersect_DF$Gene_Of_Interest[1]
+        , "\nBackground: Marker")) +
+      ggplot_set_theme_publication +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1))
+    return(list(gg1, gg2))
+}
+
+pgL <- list(
+  plot_grid(
+    plotlist = Percent_Expression_Of_Genes_Same_Cell_Plot(
+      gene_of_interest = "ZFHX4"
+      , gene_list = c("SOX2", "PAX6", "HOPX")
+    )
+    , ncol = 1
+  )
+  , plot_grid(
+    plotlist = Percent_Expression_Of_Genes_Same_Cell_Plot(
+      gene_of_interest = "CARHSP1"
+      , gene_list = c("SOX2", "PAX6", "HOPX")
+    )
+    , ncol = 1
+  )
+  , plot_grid(
+    plotlist = Percent_Expression_Of_Genes_Same_Cell_Plot(
+      gene_of_interest = "ST18"
+      , gene_list = c("SATB2", "BCL11B", "STMN2", "TBR1")
+    )
+    , ncol = 1
+  )
+  , plot_grid(
+    plotlist = Percent_Expression_Of_Genes_Same_Cell_Plot(
+      gene_of_interest = "CSRP2"
+      , gene_list = c("SATB2", "BCL11B", "STMN2", "TBR1")
+    )
+    , ncol = 1
+  )
+)
+Plot_Grid(pgL, ncol = 4, align = 'v', axis = 'r'
+  , title = "Percent of cells expressing marker and gene of interest"
+)
+ggsave(paste0(outGraph
+  , "TFsOfInterest_And_Marker_Intersection_Percent_Barplot.pdf")
+  , width = 7, height = 5)
+###############################################################################
 
 ### TFs, co-factors, chromatin remodelers
 
@@ -492,8 +776,8 @@ ggsave(paste0(
 # Excitatory and deep layer
 # Heatmap
 # Normalized, mean centering scaling
-ldf <- lapply(c(0, 1, 4, 12, 3, 14), function(cluster) {
-  Subset_TFs(deDF = df, cluster = cluster, okayClusters = c(0, 1, 4, 12, 3, 14)
+ldf <- lapply(c(0, 1, 4, 3, 13), function(cluster) {
+  Subset_TFs(deDF = df, cluster = cluster, okayClusters = c(0, 1, 4, 3, 13)
     , fcHigh = 0.4, fcLow = 0.3)
 })
 utdeDF <- do.call("rbind", ldf)
@@ -522,8 +806,8 @@ ggsave(paste0(
 # Excitatory
 # Heatmap
 # Normalized, mean centering scaling
-ldf <- lapply(c(0, 1, 4, 12), function(cluster) {
-  Subset_TFs(deDF = df, cluster = cluster, okayClusters = c(0, 1, 4, 12)
+ldf <- lapply(c(0, 1, 4), function(cluster) {
+  Subset_TFs(deDF = df, cluster = cluster, okayClusters = c(0, 1, 4)
     , fcHigh = 0.4, fcLow = 0.3)
 })
 utdeDF <- do.call("rbind", ldf)
@@ -552,8 +836,8 @@ ggsave(paste0(
 # Deep layer
 # Heatmap
 # Normalized, mean centering scaling
-ldf <- lapply(c(3, 14), function(cluster) {
-  Subset_TFs(deDF = df, cluster = cluster, okayClusters = c(3, 14)
+ldf <- lapply(c(3, 13), function(cluster) {
+  Subset_TFs(deDF = df, cluster = cluster, okayClusters = c(3, 13)
     , fcHigh = 0.4, fcLow = 0.3)
 })
 utdeDF <- do.call("rbind", ldf)
@@ -765,8 +1049,8 @@ idx <- match(c(
   # Excitatory - upper or deep layer
   , "NEUROD6", "MAP2", "YWHAB"
   # Interneuron
-  , "DLX1", "DLX5", "CXCR4", "CALB2", "CITED2"), rnames$gene_symbol)
-df1 <- rnames[idx, ]
+  , "DLX1", "DLX5", "CXCR4", "CALB2", "CITED2"), bs_rnames$gene_symbol)
+df1 <- bs_rnames[idx, ]
 ssBsDF <- ssBsDF[df1$row_num, ]
 row.names(ssBsDF) <- df1$gene_symbol
 # Genes as columns
@@ -1146,7 +1430,7 @@ df[row.names(df) %in% c("CARHSP1", "ZFHX4", "MALAT1"), ]
 
 # Excitatory - not deep layer
 # MALAT1 as check
-v1 <- rowMeans(noCentExM[ ,centSO@ident %in% c(0, 1, 4, 13)])
+v1 <- rowMeans(noCentExM[ ,centSO@ident %in% c(0, 1, 4)])
 df <- data.frame(v1, rank(-v1))
 df[row.names(df) %in% c("CSRP2", "MALAT1"), ]
 # CSRP2  0.9643488       217
@@ -1154,7 +1438,7 @@ df[row.names(df) %in% c("CSRP2", "MALAT1"), ]
 
 # Excitatory - deep layer
 # MALAT1 as check
-v1 <- rowMeans(noCentExM[ ,centSO@ident %in% c(3, 14)])
+v1 <- rowMeans(noCentExM[ ,centSO@ident %in% c(3, 13)])
 df <- data.frame(v1, rank(-v1))
 df[row.names(df) %in% c("ST18", "KAT6B", "MALAT1"), ]
 # ST18   0.6913903       386
@@ -1522,7 +1806,7 @@ df1 <- melt(genesL)
 # Heatmap plot
 # Normalized, mean centered and scaled
 geneGroupDF <- data.frame(GENE = df1$value, GROUP = df1$L1)
-ggL <- lapply(c(9,7,8,10,2,0,1,12,4,3,14,5,6,11,13,15,16), function(cluster){
+ggL <- lapply(c(9,7,8,10,2,0,1,4,3,13,5,6,11,12,14,15), function(cluster){
   # tryCatch(
     Heatmap_By_Cluster(
       geneGroupDF = geneGroupDF
@@ -1566,7 +1850,7 @@ ggL[1:length(ggL)] <- lapply(ggL[1:length(ggL)], function(gg) {
 
 # Combine individual heatmaps and dendrogram
 rel_widths <- data.frame(log((table(centSO@ident) + 1), 5))
-rel_widths <- rel_widths[match(c(9,7,8,10,2,0,1,12,4,3,14,5,6,11,13,15,16)
+rel_widths <- rel_widths[match(c(9,7,8,10,2,0,1,4,3,13,5,6,11,12,14,15)
   , rel_widths$Var1), ]
 rel_widths <- as.vector(rel_widths$Freq) + 1
 
