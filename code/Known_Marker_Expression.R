@@ -96,7 +96,20 @@ Format_Cell_Cycle_Genes_Table <- function(){
 
 ## Subset of marker genes heatmap
 
-Plot_marker_genes_heatmap <- function(){
+# Expression heatmap, cells ordered by cluster
+Plot_Marker_Genes_Heatmap_SetColWidths <- function(
+  geneGroupDF
+  , exprM = centSO@scale.data
+  , seuratO = centSO
+  , clusters = c(0:15)
+  , lowerLimit = -1.5
+  , upperLimit = 1.5
+  , geneOrder = TRUE
+  , clusterOrder = c(9,7,8,10,2,0,1,4,3,13,5,6,11,12,14,15)
+  ) {
+
+  print("Plot_Marker_Genes_Heatmap_SetColWidths")
+
   genesL <- list(
     vRG = c("CRYAB")
     , oRG = c("HOPX")
@@ -116,67 +129,47 @@ Plot_marker_genes_heatmap <- function(){
   # Heatmap plot
   # Normalized, mean centered and scaled
   geneGroupDF <- data.frame(GENE = df1$value, GROUP = df1$L1)
-  ggL <- lapply(c(9,7,8,10,2,0,1,12,4,3,14,5,6,11,13,15,16), function(cluster){
-    # tryCatch(
-      Heatmap_By_Cluster(
-        geneGroupDF = geneGroupDF
-        , exprM = as.matrix(centSO@scale.data)
-        , seuratO = centSO
-        , clusters = cluster
-        , lowerLimit = -1.5
-        , upperLimit = 1.5
-        , geneOrder = TRUE
-      )
-      # , error = function(e) NULL)
-  })
-  # Remove nulls from ggplot list
-  ggL <- ggL[! sapply(ggL, is.null)]
-  # Extract legend
-  legend <- get_legend(ggL[[1]])
-  # Format - remove axis labels
-  # ggL[[1]] <- ggL[[1]] + theme(
-  #   axis.title.x = element_blank()
-  #   , legend.position = "none"
-  #   , strip.text.y = element_blank())
-  labels <- ggL[[1]]
-  # margin: top, right, bottom, and left
-  labels <- ggL[[1]] + theme(
-    plot.margin = unit(c(1, -1, 1, 1), "cm")
-    , legend.position = "none"
-    , axis.title.x = element_blank()
-    , strip.text.y = element_blank())
-  ggL[1:length(ggL)] <- lapply(ggL[1:length(ggL)], function(gg) {
-    gg + theme(
-      strip.text.y = element_blank()
-      , legend.position = "none"
-      , axis.title.y = element_blank()
-      , axis.text.y = element_blank()
-      , axis.ticks.y = element_blank()
-      , axis.title.x = element_blank()
-      # margin: top, right, bottom, and left
-      , plot.margin = unit(c(1, 0.05, 1, 0.05), "cm")
-    )
-  })
 
-  # Combine individual heatmaps and dendrogram
-  rel_widths <- data.frame(log((table(centSO@ident) + 1), 5))
-  rel_widths <- rel_widths[match(c(9,7,8,10,2,0,1,12,4,3,14,5,6,11,13,15,16), rel_widths$Var1), ]
-  rel_widths <- as.vector(rel_widths$Freq) + 1
-
-  rel_widths <- c(30, rel_widths)
-  # Combine
-  pg <- plot_grid(plotlist = append(list(labels), ggL)
-    , ncol = length(rel_widths), rel_widths = rel_widths
-    , align = 'h', axis = 't'
+  ggDF <- Heatmap_By_Cluster_Format_Data(
+    geneGroupDF = geneGroupDF
+    , exprM = exprM
+    , seuratO = seuratO
+    , clusters = clusters
+    , lowerLimit = lowerLimit
+    , upperLimit = upperLimit
+    , geneOrder = geneOrder
+    , clusterOrder = clusterOrder
   )
-  return(pg)
+
+  print("Heatmap_By_Cluster: plotting...")
+  # ggplot
+  gg <- ggplot(ggDF, aes(x = variable, y = GENE_GROUP, fill = value)) +
+    geom_tile() +
+    facet_grid(GROUP~SEURAT_CLUSTERS, space = "free_y", scales = "free"
+      , drop = TRUE) +
+    # scale_fill_gradient2(high = "#d7191c", low = "#2c7bb6")
+    scale_fill_distiller(name = "Normalized\nexpression", type = "div"
+      , palette = 5, direction = -1, limits = c(lowerLimit, upperLimit)) +
+    theme_bw() +
+    theme(strip.text.x = element_text(angle = 90)) +
+    theme(strip.text.y = element_text(angle = 0)) +
+    theme(strip.background = element_blank()) +
+    theme(axis.text.x = element_blank()) +
+    theme(axis.ticks = element_blank()) +
+    theme(text = element_text(size = 12)) +
+    theme(axis.text.y = element_text(size = 10)) +
+    ylab("Genes") +
+    xlab("Cells ordered by cluster")
+  # gg <- gg + ...
+  return(gg)
 }
-Plot_marker_genes_heatmap()
+Plot_Marker_Genes_Heatmap_SetColWidths()
 ggsave(paste0(outGraph
-    , "KnownMarksSubset_Heatmap_NormalizedCenteredScaled_paper.png"
+    , "KnownMarksSubset_HeatmapSetColWidths_NormalizedCenteredScaled_paper.png"
   )
   , width = 10, height = 7
 )
+
 
 ## Subset of marker genes feature plots
 
@@ -253,6 +246,90 @@ ggsave(paste0(outGraph
 ################################################################################
 
 ### Luis marker genes
+
+## Subset of marker genes heatmap
+
+Plot_marker_genes_heatmap <- function(){
+  genesL <- list(
+    vRG = c("CRYAB")
+    , oRG = c("HOPX")
+    , RG = c("VIM", "PAX6", "HES1", "SOX2")
+    , IPC = c("EOMES")
+    , Neuron = c("STMN2", "NEUROD6")
+    , "Excitatory deep layer" = c("BCL11B", "TBR1", "SOX5")
+    , "Excitatory upper layer" = c("SATB2")
+    , Interneuron = c("DLX1", "DLX2", "SST", "CALB2")
+    , OPC = c("OLIG1", "OLIG2")
+    , Endothelial = c("ITM2A", "CLDN5")
+    , Pericyte = c("RGS5")
+    , Microglia = c("AIF1", "CX3CR1")
+  )
+  df1 <- melt(genesL)
+
+  # Heatmap plot
+  # Normalized, mean centered and scaled
+  geneGroupDF <- data.frame(GENE = df1$value, GROUP = df1$L1)
+  ggL <- lapply(c(9,7,8,10,2,0,1,4,3,13,5,6,11,12,14,15), function(cluster){
+    # tryCatch(
+      Heatmap_By_Cluster(
+        geneGroupDF = geneGroupDF
+        , exprM = as.matrix(centSO@scale.data)
+        , seuratO = centSO
+        , clusters = cluster
+        , lowerLimit = -1.5
+        , upperLimit = 1.5
+        , geneOrder = TRUE
+      )
+      # , error = function(e) NULL)
+  })
+  # Remove nulls from ggplot list
+  ggL <- ggL[! sapply(ggL, is.null)]
+  # Extract legend
+  legend <- get_legend(ggL[[1]])
+  # Format - remove axis labels
+  # ggL[[1]] <- ggL[[1]] + theme(
+  #   axis.title.x = element_blank()
+  #   , legend.position = "none"
+  #   , strip.text.y = element_blank())
+  labels <- ggL[[1]]
+  # margin: top, right, bottom, and left
+  labels <- ggL[[1]] + theme(
+    plot.margin = unit(c(1, -1, 1, 1), "cm")
+    , legend.position = "none"
+    , axis.title.x = element_blank()
+    , strip.text.y = element_blank())
+  ggL[1:length(ggL)] <- lapply(ggL[1:length(ggL)], function(gg) {
+    gg + theme(
+      strip.text.y = element_blank()
+      , legend.position = "none"
+      , axis.title.y = element_blank()
+      , axis.text.y = element_blank()
+      , axis.ticks.y = element_blank()
+      , axis.title.x = element_blank()
+      # margin: top, right, bottom, and left
+      , plot.margin = unit(c(1, 0.05, 1, 0.05), "cm")
+    )
+  })
+
+  # Combine individual heatmaps and dendrogram
+  rel_widths <- data.frame(log((table(centSO@ident) + 1), 5))
+  rel_widths <- rel_widths[match(c(9,7,8,10,2,0,1,4,3,13,5,6,11,12,14,15), rel_widths$Var1), ]
+  rel_widths <- as.vector(rel_widths$Freq) + 1
+
+  rel_widths <- c(30, rel_widths)
+  # Combine
+  pg <- plot_grid(plotlist = append(list(labels), ggL)
+    , ncol = length(rel_widths), rel_widths = rel_widths
+    , align = 'h', axis = 't'
+  )
+  return(pg)
+}
+Plot_marker_genes_heatmap()
+ggsave(paste0(outGraph
+    , "KnownMarksSubset_Heatmap_NormalizedCenteredScaled_paper.png"
+  )
+  , width = 10, height = 7
+)
 
 # ## Assign annotated cluster names to clusters
 # current.cluster.ids <- c(0, 1, 2, 3, 4, 5, 6, 7, 8, 9)
