@@ -68,73 +68,14 @@ theme_update(axis.line = element_line(colour = "black")
   , plot.background = element_blank()
   , panel.border = element_blank()
 )
+
+## Load Seurat_Cluster_DS2-11_Cycling_vRGoRG_01 DE analysis
+deDF <- read.csv(paste0(outTable, "DE_CellTypes.csv")
+  , header = TRUE, row.names = 1)
 ################################################################################
 
 ### Functions
 
-################################################################################
-
-### DE RG(cluster 7,9) vs IP(2); RG(7,9) vs Neuron(0); IP(2) vs Neuron(0)
-
-DE_Clusters_Vs_Clusters <- function(clusters1, clusters2) {
-  ids <- names(centSO@ident)[centSO@ident %in% c(clusters1, clusters2)]
-  exM <- as.matrix(centSO@data)
-  exM <- exM[ ,colnames(exM) %in% ids]
-  # DE Linear model
-  termsDF <- centSO@meta.data[
-    row.names(centSO@meta.data) %in% ids
-    , c("nUMI", "librarylab", "individual", "res.0.6")]
-  # Add term TRUE/FALSE cell is in cluster
-  termsDF$clusters <- "clusters1"
-  termsDF$clusters[termsDF$res.0.6 %in% clusters2] <- "clusters2"
-  deLM <- DE_Linear_Model(
-    exDatDF = exM
-    , termsDF = termsDF
-    , mod = "y ~ clusters+nUMI+librarylab+individual")
-  # Format LM DE
-  deDF <- data.frame(Log_FC_C2vC1 = deLM$coefmat[ ,"clustersclusters2"]
-    , Pvalue = deLM$pvalmat[ ,"clustersclusters2"])
-  deDF$Gene <- row.names(deDF)
-  deDF <- deDF[order(deDF$Log_FC), ]
-  deDF$Pvalue[deDF$Pvalue == "NaN"] <- 1
-  # FDR correct
-  deDF$FDR <- p.adjust(deDF$Pvalue, method="BH")
-  # Check
-  table(deDF$Pvalue < 0.05)
-  table(deDF$FDR < 0.05)
-  return(deDF)
-}
-
-# de_RG_v_IP_DF <- DE_Clusters_Vs_Clusters(clusters1 = 2, clusters2 = c(7,9))
-# # Save as csv
-# write.csv(de_RG_v_IP_DF, file = paste0(outTable, "DE_RGvsIP.csv")
-#   , quote = FALSE)
-#
-# de_RG_v_Ne_DF <- DE_Clusters_Vs_Clusters(clusters1 = 0, clusters2 = c(7,9))
-# # Save as csv
-# write.csv(de_RG_v_Ne_DF, file = paste0(outTable, "DE_RGvsNeuron.csv")
-#   , quote = FALSE)
-#
-# de_IP_v_Ne_DF <- DE_Clusters_Vs_Clusters(clusters1 = 0, clusters2 = c(2))
-# # Save as csv
-# write.csv(de_IP_v_Ne_DF, file = paste0(outTable, "DE_IPvsNeuron.csv")
-#   , quote = FALSE)
-
-# Load DE tables
-de_RG_v_IP_DF <- read.csv(paste0(outTable, "DE_RGvsIP.csv")
-  , header = TRUE, row.names = 1)
-de_RG_v_Ne_DF <- read.csv(paste0(outTable, "DE_RGvsNeuron.csv")
-  , header = TRUE, row.names = 1)
-de_IP_v_Ne_DF <- read.csv(paste0(outTable, "DE_IPvsNeuron.csv")
-  , header = TRUE, row.names = 1)
-
-de_RG_v_IP_DF$Gene <- row.names(de_RG_v_IP_DF)
-de_RG_v_Ne_DF$Gene <- row.names(de_RG_v_Ne_DF)
-de_IP_v_Ne_DF$Gene <- row.names(de_IP_v_Ne_DF)
-de_RG_v_IP_DF$Comparison <- "RG_vs_IP"
-de_RG_v_Ne_DF$Comparison <- "RG_vs_Neuron"
-de_IP_v_Ne_DF$Comparison <- "IP_vs_Neuron"
-deDF <- rbind(de_RG_v_IP_DF, de_RG_v_Ne_DF, de_IP_v_Ne_DF)
 ################################################################################
 
 ### Monocle

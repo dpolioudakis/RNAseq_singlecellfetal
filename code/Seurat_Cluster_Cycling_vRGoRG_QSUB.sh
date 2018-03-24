@@ -34,7 +34,7 @@ LD_LIBRARY_PATH=/u/local/compilers/gcc/4.9.3/lib:/u/local/compilers/gcc/4.9.3/li
 LIBRARY_PATH=/u/local/compilers/gcc/4.9.3/lib:/u/local/compilers/gcc/4.9.3/lib64:$LIBRARY_PATH
 
 ## Run Seurat_Cluster_Cycling_vRGoRG.R
-${pathRscript} Seurat_Cluster_Cycling_vRGoRG_02.R
+${pathRscript} Seurat_Cluster_Cycling_vRGoRG_01.R && ${pathRscript} Seurat_Cluster_Cycling_vRGoRG_Plots.R && ${pathRscript} Seurat_Cluster_Cycling_vRGoRG_02.R
 ################################################################################
 
 echo ""

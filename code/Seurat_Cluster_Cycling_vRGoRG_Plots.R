@@ -667,7 +667,7 @@ ggsave(paste0(outGraph, "PercentMixedCluster_Barplot.pdf")
 gg <- Mixed_Marker_By_Cluster_Percent_Barplot(
   exM = noCentExM, seuratO = centSO
   , highThreshold = 0.5, lowThreshold = 0.25
-  , cluster_order = c(9,7,8,10,2,0,1,12,4,3,14,5,6,11,13,15,16)
+  , cluster_order = c(9,7,8,10,2,0,1,4,3,13,5,6,11,12,14,15)
   , title = paste0(graphCodeTitle
     , "\n\nPercent of cells passing combinations of marker expression filters"
     , "\nKeep CC"
