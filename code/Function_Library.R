@@ -119,12 +119,11 @@ DE_Filters_ExpMatrix <- function(
 # 6            VZ   9.1  0.27861748 -0.248868277
 # mod: "y~ExpCondition+RIN.y+Seq.PC1+Seq.PC2"
 DE_Linear_Model <- function (exDatDF, termsDF, mod) {
-
+  print("DE_Linear_Model")
   lmmod <- apply(as.matrix(exDatDF), 1
     , function(y) {
       mod <- as.formula(mod)
       lm(mod, data = termsDF)})
-
   coefmat <- matrix(NA, nrow = nrow(exDatDF)
     , ncol = length(coef(lmmod[[1]])))
   pvalmat <- matrix(NA, nrow = nrow(exDatDF)
@@ -144,25 +143,25 @@ DE_Linear_Model <- function (exDatDF, termsDF, mod) {
 
 # Format output of linear model into data frame
 Format_DE <- function (deLM, so, clusterID) {
+  print("Format_DE")
   # Combine log2 fold changes, p-values
-  deDF <- data.frame(GENE = row.names(deLM$coefmat)
-    , LOG_FC = deLM$coefmat[ ,2]
-    , PVALUE = deLM$pvalmat[ ,2])
-  # Order by pvalue
-  deDF <- deDF[order(deDF$PVALUE), ]
+  deDF <- data.frame(Gene = row.names(deLM$coefmat)
+    , Log2_Fold_Change = deLM$coefmat[ ,2]
+    , Pvalue = deLM$pvalmat[ ,2])
   # Add cluster ID
-  deDF$CLUSTER <- clusterID
+  deDF$Cluster <- clusterID
   # Percent of cells in cluster expressing gene > 0 counts
-  cdf <- as.matrix(so@data)[row.names(so@data) %in% deDF$GENE, so@ident == clusterID]
-  deDF$PERCENT_CLUSTER <- (rowSums(cdf > 0) / ncol(cdf)) * 100
+  cdf <- as.matrix(so@data)[
+    row.names(so@data) %in% deDF$Gene, so@ident == clusterID]
+  deDF$Percent_Cluster <- (rowSums(cdf > 0) / ncol(cdf)) * 100
   # Percent of all cells expressing gene > 0 counts
-  deDF$PERCENT_ALL <- (rowSums(as.matrix(so@data)[row.names(so@data) %in% deDF$GENE, ] > 0)
-    / ncol(so@data[row.names(so@data) %in% deDF$GENE, ])) * 100
+  deDF$Percent_All <- (rowSums(as.matrix(so@data)[
+    row.names(so@data) %in% deDF$Gene, ] > 0)
+    / ncol(so@data[row.names(so@data) %in% deDF$Gene, ])) * 100
   # Order by log fold change
-  deDF <- deDF[order(-deDF$LOG_FC), ]
+  deDF <- deDF[order(-deDF$Log2_Fold_Change), ]
   return(deDF)
 }
-
 ################################################################################
 
 ### Expression heatmaps
@@ -171,6 +170,8 @@ Format_DE <- function (deLM, so, clusterID) {
 Heatmap_By_Cluster_Format_Data <- function(
   geneGroupDF, exprM, seuratO, clusters, lowerLimit, upperLimit
   , geneOrder = FALSE, clusterOrder = NULL) {
+
+  print("Heatmap_By_Cluster_Format_Data")
 
   # Subset expression matrix to genes of interest by merging
   ggDF <- merge(geneGroupDF[c("GENE", "GROUP")], exprM
@@ -191,7 +192,7 @@ Heatmap_By_Cluster_Format_Data <- function(
   # Format for ggplot
   ggDF <- melt(ggDF)
   # Add seurat clusters
-  idx <- match(ggDF$variable, names(seuratO@ident))
+  idx <- match(as.character(ggDF$variable), names(seuratO@ident))
   ggDF$SEURAT_CLUSTERS <- seuratO@ident[idx]
   # Set cluster levels
   if (! is.null(clusterOrder)) {
@@ -203,7 +204,7 @@ Heatmap_By_Cluster_Format_Data <- function(
   ggDF$GENE_GROUP <- paste0(ggDF$GENE, "   ", ggDF$GROUP)
 
   # Order genes by setting levels
-  if (! is.null(geneOrder)) {
+  if (! geneOrder == FALSE) {
     ggDF$GENE_GROUP <- factor(ggDF$GENE_GROUP, levels = levels)
   }
   # Set limits
@@ -218,6 +219,8 @@ Heatmap_By_Cluster <- function(
   geneGroupDF, exprM, seuratO, clusters, lowerLimit, upperLimit
   , geneOrder = FALSE, clusterOrder = NULL) {
 
+  print("Heatmap_By_Cluster")
+
   ggDF <- Heatmap_By_Cluster_Format_Data(
     geneGroupDF = geneGroupDF
     , exprM = exprM
@@ -229,6 +232,7 @@ Heatmap_By_Cluster <- function(
     , clusterOrder = clusterOrder
   )
 
+  print("Heatmap_By_Cluster: plotting...")
   # ggplot
   gg <- ggplot(ggDF, aes(x = variable, y = GENE_GROUP, fill = value)) +
     geom_tile() +
@@ -573,6 +577,19 @@ ggplot_set_theme_publication <-
     , panel.border = element_blank()
     , panel.grid.major = element_blank()
     , panel.grid.minor = element_blank()
+  )
+ggplot_set_theme_publication_nolabels <-
+  theme_bw() +
+  theme(
+    , text = element_text(size = 10, colour = "black")
+    , plot.title = element_text(size = 10)
+    , axis.line = element_line(colour = "black")
+    , panel.border = element_blank()
+    , panel.grid.major = element_blank()
+    , panel.grid.minor = element_blank()
+    , axis.title = element_blank()
+    , axis.text = element_blank()
+    , axis.ticks = element_blank()
   )
 ################################################################################
 
