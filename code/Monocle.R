@@ -66,9 +66,8 @@ cellIDs <- names(centSO@ident)[centSO@ident %in% ids]
 centSO <- FilterCells(object = centSO, subset.names = NULL, cells.use = cellIDs)
 
 # Add clustering to metadata
-v1 <- centSO@meta.data$res.0.6
-names(v1) <- row.names(centSO@meta.data)
-centSO <- AddMetaData(centSO, v1, "cluster")
+v1 <- centSO@ident
+# centSO <- AddMetaData(centSO, v1, "cluster")
 # row.names(metDF) <- metDF$CELL
 # metDF <- metDF[metDF$CELL %in% row.names(centSO@meta.data), ]
 # centSO <- AddMetaData(centSO, metDF)
@@ -190,13 +189,13 @@ ggsave(paste0(outGraph, "Trajectory_Pseudotime_paper.png")
 
 ## Plot Seurat clusters faceted by cluster
 Plot_Trajectory_Faceted_By_Seurat_Clusters <- function(){
-  # browser()
+  browser()
   print("Plot_Trajectory_Faceted_By_Seurat_Clusters")
 
   # Key of reordered cluster and Seurat ggplot colors
-  gg_color_pal <- hue_pal()(16)
-  names(gg_color_pal) <- c(0:15)
-  cluster_reorder <- c(9,7,8,10,2,0,1,4,3,13,5,6,11,12,14,15)
+  gg_color_pal <- hue_pal()(17)
+  names(gg_color_pal) <- c(0:16)
+  cluster_reorder <- c(9,7,8,10,2,0,1,4,3,13,5,6,11,12,14,15,16)
   cluster_colors_DF <- data.frame(
     Cluster = cluster_reorder
     , Color = gg_color_pal[as.character(cluster_reorder)]
@@ -210,10 +209,14 @@ Plot_Trajectory_Faceted_By_Seurat_Clusters <- function(){
   # Subset to RG, IPC, excitatory Seurat clusters
   mo_filtered <- mo_filtered[ ,
     pData(mo_filtered)$cluster %in% c(0, 1, 2, 3, 4, 7, 8, 9, 10, 13)]
+  pData(mo_filtered)$Cluster_Reorder <-
+    droplevels(pData(mo_filtered)$Cluster_Reorder)
 
   # Loop through Seurat clusters and plot monocle trajectory for each
   ggL <- lapply(levels(pData(mo_filtered)$Cluster_Reorder)
     , function(cluster) {
+
+      print(paste0("Cluster: ", cluster))
 
       # TRUE FALSE column indicating membership of cell in Seurat cluster
       pData(mo_filtered)$clusterX <- FALSE
@@ -227,6 +230,7 @@ Plot_Trajectory_Faceted_By_Seurat_Clusters <- function(){
 
       print(head(pData(mo_filtered)))
       print(seurat_cluster_color)
+      print(dim(pData(mo_filtered)))
 
       # Plot Seurat clusters on trajectory
       gg <- plot_cell_trajectory(mo_filtered, 1, 2, color_by = "clusterX"

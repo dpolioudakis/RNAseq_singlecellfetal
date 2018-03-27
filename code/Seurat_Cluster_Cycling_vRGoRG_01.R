@@ -73,23 +73,6 @@ theme_update(axis.line = element_line(colour = "black")
 )
 ################################################################################
 
-### Number of cells positive for RG, IP, or Neuron markers
-
-df <- data.frame(Cell_Subset = rep(NA, nrow(df1)))
-row.names(df) <- row.names(df1)
-
-df$Cell_Subset <- NA
-df$Cell_Subset[rownames(df) %in% row.names(df1)[df1$Neuron > 0.5]] <- "Neuron"
-df$Cell_Subset[rownames(df) %in% row.names(df1)[df1$RG > 0.5]] <- "RG"
-df$Cell_Subset[rownames(df) %in% row.names(df1)[df1$IP > 0.5]] <- "IP"
-df$Cell_Subset[rownames(df) %in% row.names(df1)[df1$RG > 0.5 & df1$Neuron > 0.5]] <- "RG Neuron"
-df$Cell_Subset[rownames(df) %in% row.names(df1)[df1$RG > 0.5 & df1$IP > 0.5]] <- "RG IP"
-df$Cell_Subset[rownames(df) %in% row.names(df1)[df1$IP > 0.5 & df1$Neuron > 0.5]] <- "IP Neuron"
-df$Cell_Subset[rownames(df) %in% row.names(df1)[df1$RG > 0.5 & df1$IP > 0.5 & df1$Neuron > 0.5]] <- "RG IP Neuron"
-
-table(df)
-################################################################################
-
 ### DE RG(cluster 7,9) vs IP(2); RG(7,9) vs Neuron(0); IP(2) vs Neuron(0)
 
 DE_Clusters_Vs_Clusters <- function(
@@ -1642,4 +1625,24 @@ Number_Of_Cells_Intersection_Heatmap(
 )
 ggsave(paste0(outGraph, "RG_IP_Sphase_Marker_Intersection_Heatmap.png")
   , width = 7, height = 7)
+################################################################################
+
+### Number of cells positive for RG, IP, or Neuron markers
+
+df1 <- Average_MarkersExp_Per_Cell(
+  exM = noCentExM, seuratO = centSO)
+
+df <- data.frame(Cell_Subset = rep(NA, nrow(df1)))
+row.names(df) <- row.names(df1)
+
+df$Cell_Subset <- NA
+df$Cell_Subset[rownames(df) %in% row.names(df1)[df1$Neuron > 0.5]] <- "Neuron"
+df$Cell_Subset[rownames(df) %in% row.names(df1)[df1$RG > 0.5]] <- "RG"
+df$Cell_Subset[rownames(df) %in% row.names(df1)[df1$IP > 0.5]] <- "IP"
+df$Cell_Subset[rownames(df) %in% row.names(df1)[df1$RG > 0.5 & df1$Neuron > 0.5]] <- "RG Neuron"
+df$Cell_Subset[rownames(df) %in% row.names(df1)[df1$RG > 0.5 & df1$IP > 0.5]] <- "RG IP"
+df$Cell_Subset[rownames(df) %in% row.names(df1)[df1$IP > 0.5 & df1$Neuron > 0.5]] <- "IP Neuron"
+df$Cell_Subset[rownames(df) %in% row.names(df1)[df1$RG > 0.5 & df1$IP > 0.5 & df1$Neuron > 0.5]] <- "RG IP Neuron"
+
+table(df)
 ################################################################################

@@ -56,7 +56,7 @@ allen_lcm_rows_DF <- read.csv("../allen_brain_data/FISH_genes/Rows.csv")
 #   "../analysis/tables/Cluster_Seurat/Cluster_Seurat_exon_FtMm250_Marker_Genes_Clusters_Vs_All.txt"
 #   , header = TRUE)
 deDF <- read.table(
-  "../analysis/tables/Seurat_ClusterDE_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/res054/Seurat_ClusterDE_DS2-11_ClusterX_Vs_All_Clusters.txt"
+  "../analysis/tables/Seurat_ClusterDE/DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/res054/Seurat_ClusterDE_ClusterX_Vs_All_Clusters.txt"
   , header = TRUE)
 
 # Human TFs
@@ -126,16 +126,16 @@ Subset_TFs <- function(deDF, cluster, okayClusters, fcHigh, fcLow) {
   # Clusters gene cannot be DE in
   clsNo <- c(0:15)[! c(0:15) %in% okayClusters]
   # Gene is > X FC in cluster
-  genes1 <- deDF$GENE[deDF$LOG_FC > fcHigh & deDF$CLUSTER == cluster]
+  genes1 <- deDF$Gene[deDF$Log2_Fold_Change > fcHigh & deDF$Cluster == cluster]
   # Genes in clusters genes cannot be DE in > 0.3
-  genes2 <- deDF$GENE[deDF$LOG_FC > fcLow & deDF$CLUSTER %in% clsNo]
+  genes2 <- deDF$Gene[deDF$Log2_Fold_Change > fcLow & deDF$Cluster %in% clsNo]
   # Check
   table(genes1 %in% genes2)
   # Remove genes in clusters genes cannot be DE in
   genes1 <- genes1[! genes1 %in% genes2]
   # Filter DE DF
-  utdeDF <- deDF[deDF$GENE %in% genes1, ]
-  utdeDF <- utdeDF[utdeDF$CLUSTER == cluster, ]
+  utdeDF <- deDF[deDF$Gene %in% genes1, ]
+  utdeDF <- utdeDF[utdeDF$Cluster == cluster, ]
   return(utdeDF)
 }
 
@@ -419,7 +419,7 @@ Subset_TFs_For_Multiple_Clusters <- function(
       , fcHigh = fold_change_high_filter, fcLow = fold_change_low_filter)
   })
   unique_TFs_DF <- do.call("rbind", unique_TFs_DFL)
-  unique_TFs_DF <- unique_TFs_DF[! duplicated(unique_TFs_DF$GENE), ]
+  unique_TFs_DF <- unique_TFs_DF[! duplicated(unique_TFs_DF$Gene), ]
   return(unique_TFs_DF)
 }
 
@@ -445,7 +445,7 @@ Seurat_Heatmap_Cell_Type_Specific_TFs <- function(
   )
 
   # Heatmap plot
-  gene_group_DF <- data.frame(GENE = rev(unique_TFs_DF$GENE), GROUP = "")
+  gene_group_DF <- data.frame(GENE = rev(unique_TFs_DF$Gene), GROUP = "")
   cluster_order = cluster_order
   ggL <- lapply(cluster_order, function(cluster){
     tryCatch(
@@ -504,7 +504,7 @@ Seurat_Heatmap_Cell_Type_Specific_TFs <- function(
 # Data frame of TFs, co-factors, chromatin remodelers
 tf_cr_cf_DF  <- rbind(tfDF, crDF, cfDF)
 # Intersect DE gene lists and TFs, co-factors, chromatin remodelers list
-subset_DE_DF <- deDF[deDF$ENSEMBL %in% tf_cr_cf_DF$V1, ]
+subset_DE_DF <- deDF[deDF$Ensembl %in% tf_cr_cf_DF$V1, ]
 # Heatmap
 Seurat_Heatmap_Cell_Type_Specific_TFs(
   seuratO = centSO
@@ -531,7 +531,7 @@ ggsave(
 # Data frame of TFs, co-factors, chromatin remodelers
 tf_cr_cf_DF  <- rbind(tfDF, crDF, cfDF)
 # Intersect DE gene lists and TFs, co-factors, chromatin remodelers list
-subset_DE_DF <- deDF[deDF$ENSEMBL %in% tf_cr_cf_DF$V1, ]
+subset_DE_DF <- deDF[deDF$Ensembl %in% tf_cr_cf_DF$V1, ]
 # Heatmap
 Seurat_Heatmap_Cell_Type_Specific_TFs(
   seuratO = centSO
@@ -558,7 +558,7 @@ ggsave(
 # Data frame of TFs, co-factors, chromatin remodelers
 tf_cr_cf_DF  <- rbind(tfDF, crDF, cfDF)
 # Intersect DE gene lists and TFs, co-factors, chromatin remodelers list
-subset_DE_DF <- deDF[deDF$ENSEMBL %in% tf_cr_cf_DF$V1, ]
+subset_DE_DF <- deDF[deDF$Ensembl %in% tf_cr_cf_DF$V1, ]
 # Heatmap
 Seurat_Heatmap_Cell_Type_Specific_TFs(
   seuratO = centSO
@@ -740,8 +740,8 @@ nrow(df)
 # Number of DE genes 7839
 nrow(deDF)
 # Intersect DE gene lists and TFs, co-factors, chromatin remodelers list: 408
-length(intersect(deDF$ENSEMBL, df$V1))
-df <- deDF[deDF$ENSEMBL %in% df$V1, ]
+length(intersect(deDF$Ensembl, df$V1))
+df <- deDF[deDF$Ensembl %in% df$V1, ]
 
 # RG
 # Heatmap
@@ -897,15 +897,15 @@ ggsave(paste0(
 ## Unique DE genes
 
 # Keep only DE genes that are unique to a cluster
-keep <- names(table(deDF$GENE))[table(deDF$GENE) == 1]
-udeDF <- deDF[deDF$GENE %in% keep, ]
+keep <- names(table(deDF$Gene))[table(deDF$Gene) == 1]
+udeDF <- deDF[deDF$Gene %in% keep, ]
 
 df <- rbind(tfDF, crDF, cfDF)
 # 1970
 nrow(df)
 nrow(udeDF)
-length(intersect(udeDF$ENSEMBL, df$V1))
-df <- udeDF[udeDF$ENSEMBL %in% df$V1, ]
+length(intersect(udeDF$Ensembl, df$V1))
+df <- udeDF[udeDF$Ensembl %in% df$V1, ]
 
 # Heatmap
 # Normalized, no mean centering scaling
@@ -958,7 +958,7 @@ nrow(df)
 # Number of DE genes 7839
 nrow(deDF)
 # Number of DE genes > 0.7 log FC: 1431
-df2 <- deDF[deDF$LOG_FC > 0.4, ]
+df2 <- deDF[deDF$Log2_Fold_Change > 0.4, ]
 nrow(df2)
 # Intersect DE gene lists and TFs, co-factors, chromatin remodelers list: 408
 length(intersect(df2$ENSEMBL, df$V1))
@@ -1409,12 +1409,12 @@ tccDF$TYPE <- c(rep("TF", nrow(tfDF))
   , rep("Chromatin remodeler", nrow(crDF))
   , rep("Co-factor", nrow(cfDF)))
 
-ssDeDF <- deDF[deDF$ENSEMBL %in% tccDF$V1, ]
-ssDeDF[ssDeDF$ENSEMBL %in% aheCpDF$Identifier, ]
-ssDeDF[ssDeDF$ENSEMBL %in% aheGzDF$Identifier, ]
+ssDeDF <- deDF[deDF$Ensembl %in% tccDF$V1, ]
+ssDeDF[ssDeDF$Ensembl %in% aheCpDF$Identifier, ]
+ssDeDF[ssDeDF$Ensembl %in% aheGzDF$Identifier, ]
 
-ssDeDF[ssDeDF$GENE %in% hsDF$Gene[hsDF$Set == "Human-specific"], ]
-ssDeDF[ssDeDF$GENE %in% hsDF$Gene[hsDF$Set == "Primate-specific"], ]
+ssDeDF[ssDeDF$Gene %in% hsDF$Gene[hsDF$Set == "Human-specific"], ]
+ssDeDF[ssDeDF$Gene %in% hsDF$Gene[hsDF$Set == "Primate-specific"], ]
 ################################################################################
 
 ### Expression ranking in cell classes of interest
@@ -1510,7 +1510,7 @@ tccDF <- rbind(tfDF, crDF, cfDF)
 # 1970
 nrow(tccDF)
 # Add gene symbol
-tccDF$GENE <- bmDF$hgnc_symbol[match(tccDF$V1, bmDF$ensembl_gene_id)]
+tccDF$Gene <- bmDF$hgnc_symbol[match(tccDF$V1, bmDF$ensembl_gene_id)]
 
 # Luis CP human specific enhancers intersect with TFs, co-factors, chromatin remodelers
 # FALSE  TRUE
@@ -1525,8 +1525,8 @@ table(tccDF$V1 %in% aheGzDF$Identifier)
 # Species specific genes from Bakken et al. Allen Macaque intersect with TFs, co-factors, chromatin remodelers
 # FALSE  TRUE
 # 1890   172
-table(hsDF$Gene %in% tccDF$GENE)
-hsDF[hsDF$Gene %in% tccDF$GENE, ]
+table(hsDF$Gene %in% tccDF$Gene)
+hsDF[hsDF$Gene %in% tccDF$Gene, ]
 ################################################################################
 
 ### Check if genes are TFs, chromatin remodelers, or co-factors

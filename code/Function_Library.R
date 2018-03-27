@@ -533,11 +533,13 @@ FeaturePlot <- function(genes, tsneDF, seuratO, exM, limLow, limHigh
 
 ### General functions
 
-# Converts vector of gene symbols and ensembl IDs to ensembl IDs
-# Need to load:
-# bmDF <- read.csv("../source/BiomaRt_Compile_GeneInfo_GRCh38_Ensembl87.csv"
-# , header = TRUE)
 Convert_Mixed_GeneSym_EnsID_To_EnsID <- function(ids){
+  # Converts vector of gene symbols and ensembl IDs to ensembl IDs
+  # ids must be character format
+  # Need to load:
+  # bmDF <- read.csv("../source/BiomaRt_Compile_GeneInfo_GRCh38_Ensembl87.csv"
+  # , header = TRUE)
+  print("Convert_Mixed_GeneSym_EnsID_To_EnsID")
   idx <- match(ids, bmDF$hgnc_symbol)
   ens <- bmDF$ensembl_gene_id[idx]
   ids[! is.na(ens)] <- as.character(ens[! is.na(ens)])
