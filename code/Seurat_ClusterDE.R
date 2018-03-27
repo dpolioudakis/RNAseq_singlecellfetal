@@ -43,14 +43,14 @@ graphCodeTitle <- "Seurat_ClusterDE.R"
 # Output paths
 # Sub path
 out_sub_path <- paste0(
-  "Seurat_ClusterDE_DS2-11/"
+  "Seurat_ClusterDE/DS2-11/"
   ,"FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/"
   , "res054/"
-  , "Seurat_ClusterDE_DS2-11_"
+  , "Seurat_ClusterDE_"
 )
 outGraph <- paste0("../analysis/graphs/", out_sub_path)
 outTable <- paste0("../analysis/tables/", out_sub_path)
-outData <- paste0("../analysis/processed_data/", out_sub_path)
+outData <- paste0("../analysis/analyzed_data/", out_sub_path)
 
 ## Output Directories
 dir.create(dirname(outGraph), recursive = TRUE)
@@ -68,6 +68,8 @@ theme_update(axis.line = element_line(colour = "black")
 ################################################################################
 
 ### Functions
+
+################################################################################
 
 ### Differentially expressed genes for each cluster versus all other cells
 
@@ -89,6 +91,9 @@ deLM <- DE_Linear_Model(exDatDF = centSO@data, termsDF = termsDF, mod = mod)
 
 # Format LM output into data frame
 deDF <- Format_DE(deLM, centSO, clusterID)
+
+# Add ensembl
+deDF$Ensembl <- Convert_Mixed_GeneSym_EnsID_To_EnsID(as.character(deDF$Gene))
 
 # FDR correct
 # NOTE: p-values are so low that FDR tool is returning FDR of 1 for everything

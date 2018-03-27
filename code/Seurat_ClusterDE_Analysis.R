@@ -53,7 +53,7 @@ millerZonesDF = read.csv("../neurogenesis/orig.data/LCMDE/LCM_Zones_CPio.csv")
 millerAnnotRawDF = read.csv("../neurogenesis/orig.data/LCMDE/annot.csv", row.names = 1)
 
 # DE of clusters
-inTables <- list.files("../analysis/tables/Seurat_ClusterDE_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/res054"
+inTables <- list.files("../analysis/tables/Seurat_ClusterDE/DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/res054"
   , full.names = TRUE)
 inTables <- inTables[grep("Cluster\\d", inTables, perl = TRUE)]
 
@@ -62,14 +62,14 @@ graphCodeTitle <- "Seurat_ClusterDE_Analysis.R"
 # Output paths
 # Sub path
 out_sub_path <- paste0(
-  "Seurat_ClusterDE_Analysis_DS2-11/"
+  "Seurat_ClusterDE/DS2-11/"
   ,"FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/"
   , "res054/"
-  , "Seurat_ClusterDE_Analysis_DS2-11_"
+  , "Seurat_ClusterDE_"
 )
 outGraph <- paste0("../analysis/graphs/", out_sub_path)
 outTable <- paste0("../analysis/tables/", out_sub_path)
-outData <- paste0("../analysis/processed_data/", out_sub_path)
+outData <- paste0("../analysis/analyzed_data/", out_sub_path)
 
 ## Output Directories
 dir.create(dirname(outGraph), recursive = TRUE)
@@ -132,26 +132,23 @@ DE_Mean_Heatmap <- function(
 # Loop through DE text files and compile into one table
 ldf <- lapply(inTables, function(inDE) {
   df <- read.table(inDE, header = TRUE)
+  # Filter FDR < 0.05 and log2 fold change > 0.2
+  df <- df[with(df, FDR < 0.05 & Log2_Fold_Change > 0.2), ]
   df <- df[order(-df$Log2_Fold_Change), ]
+  # Add ensembl IDs
+  df$Ensembl <- Convert_Mixed_GeneSym_EnsID_To_EnsID(as.character(df$Gene))
+  return(df)
 })
 clusterDeDF <- do.call("rbind", ldf)
-head(clusterDeDF)
-# Add ensembl IDs
-clusterDeDF$Ensembl <- bmDF$ensembl_gene_id[
-  match(clusterDeDF$GENE, bmDF$hgnc_symbol)]
-# Fill in IDs from GENE column that were kept as ensembl ID b/c no gene sym
-clusterDeDF$Ensembl[is.na(clusterDeDF$Ensembl)] <-
-  clusterDeDF$GENE[is.na(clusterDeDF$Ensembl)]
 # Check
+head(clusterDeDF)
 length(grep("ENSG", clusterDeDF$Ensembl))
 nrow(clusterDeDF)
-# # Filter FDR < 0.05
-# deDF <- deDF[deDF$FDR < 0.05, ]
-
 # Write out as tab delimited
 write.table(x = clusterDeDF
   , file = paste0(outTable, "ClusterX_Vs_All_Clusters.txt")
-  , sep = "\t", quote = FALSE, row.names = FALSE)
+  , sep = "\t", quote = FALSE, row.names = FALSE
+)
 
 
 ## Kang convert probe ids to ensembl
