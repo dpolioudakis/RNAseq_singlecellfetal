@@ -602,6 +602,110 @@ Plot_Grid(ggL, ncol = 4, title = "DE Mixed")
 ggsave(paste0(outGraph, "DE_Mixed_barplot.png"), width = 11, height = 9)
 ################################################################################
 
+### DE of top expressed genes in cell type
+
+Signature_Top_Expressed_Genes <- function(
+  seurat_clusters, DE_comparison_2, transition_state, phase, fold_change_cutoff, cell_type_label){
+
+  if (fold_change_cutoff > 0) {
+    fold_change_cutoff_idx <- deDF$Log2_FC_Group1_vs_Group2 > fold_change_cutoff
+  } else if (fold_change_cutoff < 0) {
+    fold_change_cutoff_idx <- deDF$Log2_FC_Group1_vs_Group2 < fold_change_cutoff
+  }
+  exM <- noCentExM[, centSO@ident %in% seurat_clusters]
+  mean_expr <- rowMeans(exM)
+  genes1 <- names(head(sort(mean_expr, decreasing = TRUE), 250))
+  subset_transition_state_DE_DF <- transition_state_DE_DF[
+    transition_state_DE_DF$Gene %in% genes1 &
+    transition_state_DE_DF$Comparison == DE_comparison_2,
+    ]
+
+  subset_transition_state_DE_DF <- subset_transition_state_DE_DF[
+    order(subset_transition_state_DE_DF$Log2_FC_Group1_vs_Group2), ]
+  subset_transition_state_DE_DF$Gene <- factor(
+    subset_transition_state_DE_DF$Gene
+    , levels = subset_transition_state_DE_DF$Gene
+  )
+
+  subset_transition_state_DE_DF$DE_Group_2 <- as.factor(cell_type_label)
+  subset_transition_state_DE_DF$Transition_State <- as.factor(transition_state)
+  subset_transition_state_DE_DF$Phase <- as.factor(phase)
+
+  return(subset_transition_state_DE_DF)
+}
+
+ggDFL <- list(
+  Signature_Top_Expressed_Genes(
+      seurat_clusters = c(7,9)
+    , DE_comparison_2 = "RG_vs_RGIP_Sphase"
+    , transition_state = "RG vs RGIP"
+    , phase = "S phase"
+    , fold_change_cutoff = 0.25
+    , cell_type_label = "RG"
+  )
+  , Signature_Top_Expressed_Genes(
+      seurat_clusters = c(2)
+    , DE_comparison_2 = "RG_vs_RGIP_Sphase"
+    , transition_state = "RG vs RGIP"
+    , phase = "S phase"
+    , fold_change_cutoff = 0.25
+    , cell_type_label = "IP"
+  )
+  , Signature_Top_Expressed_Genes(
+      seurat_clusters = c(7,9)
+    , DE_comparison_2 = "RG_vs_RGNeuron_Sphase"
+    , transition_state = "RG vs RGNeuron"
+    , phase = "S phase"
+    , fold_change_cutoff = 0.25
+    , cell_type_label = "RG"
+  )
+  , Signature_Top_Expressed_Genes(
+      seurat_clusters = c(0)
+    , DE_comparison_2 = "RG_vs_RGNeuron_Sphase"
+    , transition_state = "RG vs RGNeuron"
+    , phase = "S phase"
+    , fold_change_cutoff = 0.25
+    , cell_type_label = "Neuron"
+  )
+  , Signature_Top_Expressed_Genes(
+      seurat_clusters = c(2)
+    , DE_comparison_2 = "IP_vs_IPNeuron_Sphase"
+    , transition_state = "IP vs IPNeuron"
+    , phase = "S phase"
+    , fold_change_cutoff = 0.25
+    , cell_type_label = "IP"
+  )
+  , Signature_Top_Expressed_Genes(
+      seurat_clusters = c(0)
+    , DE_comparison_2 = "IP_vs_IPNeuron_Sphase"
+    , transition_state = "IP vs IPNeuron"
+    , phase = "S phase"
+    , fold_change_cutoff = 0.25
+    , cell_type_label = "Neuron"
+  )
+)
+
+ggL <- lapply(ggDFL, function(ggDF){
+  ggplot(ggDF, aes(x = Gene, y = Log2_FC_Group1_vs_Group2)) +
+    geom_bar(stat = "identity") +
+    ylab("Log2 fold change") +
+    xlab("Genes") +
+    coord_cartesian(ylim = c(-1, 1)) +
+    ggplot_set_theme_publication +
+    theme(axis.text.x = element_blank()
+      , axis.ticks.x = element_blank()
+    ) +
+    ggtitle(paste0(
+      "\nTransition state: ", ggDF$Transition_State
+      , "\nCell cycle phase: ", ggDF$Phase
+      , "\nDE Signature: ", ggDF$DE_Group_2
+    ))
+})
+Plot_Grid(ggL, ncol = 4, title = "DE in mixed state cells of top cell type expressed genes")
+ggsave(paste0(outGraph, "TopCellTypeExpressed_Mixed_barplot.png")
+  , width = 11, height = 9)
+################################################################################
+
 ### Percent of cells passing expression filters per cluster
 
 Mixed_Marker_By_Cluster_Percent_Barplot <- function(
