@@ -67,10 +67,10 @@ centSO <- FilterCells(object = centSO, subset.names = NULL, cells.use = cellIDs)
 
 # Add clustering to metadata
 v1 <- centSO@ident
-# centSO <- AddMetaData(centSO, v1, "cluster")
-# row.names(metDF) <- metDF$CELL
-# metDF <- metDF[metDF$CELL %in% row.names(centSO@meta.data), ]
-# centSO <- AddMetaData(centSO, metDF)
+centSO <- AddMetaData(centSO, v1, "cluster")
+row.names(metDF) <- metDF$CELL
+metDF <- metDF[metDF$CELL %in% row.names(centSO@meta.data), ]
+centSO <- AddMetaData(centSO, metDF)
 
 # Subset cells to Seurat filtered cells
 exDF <- centSO@raw.data
@@ -133,7 +133,7 @@ mo_filtered <- setOrderingFilter(mo, ordering_genes)
 print("Reduce data dimensionality")
 # Reduce data dimensionality
 # Use number of genes expressed or total mRNAs?
-mo_filtered <- reduceDimension(mo_filtered, max_components = 20,
+mo_filtered <- reduceDimension(mo_filtered, max_components = 40,
   residualModelFormulaStr = "~individual + librarylab + Total_mRNAs"
   , verbose = TRUE)
 
@@ -164,7 +164,7 @@ plot_cell_trajectory(mo_filtered, 1, 2, color_by = "State"
   # Change legend size
   guides(colour = guide_legend(override.aes = list(size = 5))) +
   ggtitle(paste0(graphCodeTitle
-  , "\n\nMonocle trajectory colored by state and covariates"
+  , "\n\nMonocle trajectory"
   , "\nCells from progenitor, IPC, and excitatory neuron Seurat clusters"
   , "\nColored by state"
   , "\n")
@@ -179,7 +179,7 @@ plot_cell_trajectory(mo_filtered, 1, 2, color_by = "Pseudotime"
   ggplot_set_theme_publication_nolabels +
   theme(legend.position = "right") +
   ggtitle(paste0(graphCodeTitle
-  , "\n\nMonocle trajectory colored by state and covariates"
+  , "\n\nMonocle trajectory"
   , "\nCells from progenitor, IPC, and excitatory neuron Seurat clusters"
   , "\nColored by pseudotime"
   , "\n")
@@ -189,7 +189,7 @@ ggsave(paste0(outGraph, "Trajectory_Pseudotime_paper.png")
 
 ## Plot Seurat clusters faceted by cluster
 Plot_Trajectory_Faceted_By_Seurat_Clusters <- function(){
-  browser()
+  # browser()
   print("Plot_Trajectory_Faceted_By_Seurat_Clusters")
 
   # Key of reordered cluster and Seurat ggplot colors
@@ -203,7 +203,7 @@ Plot_Trajectory_Faceted_By_Seurat_Clusters <- function(){
   # Add reordered clusters and seurat ggplot colors to monocle metatdata
   idx <- match(pData(mo_filtered)$cluster, cluster_colors_DF$Cluster)
   pData(mo_filtered)$Seurat_Cluster_Color <- cluster_colors_DF$Color[idx]
-  pData(mo_filtered)$Cluster_Reorder <- factor(pData(mo)$cluster
+  pData(mo_filtered)$Cluster_Reorder <- factor(pData(mo_filtered)$cluster
     , levels = cluster_reorder)
 
   # Subset to RG, IPC, excitatory Seurat clusters
@@ -222,19 +222,22 @@ Plot_Trajectory_Faceted_By_Seurat_Clusters <- function(){
       pData(mo_filtered)$clusterX <- FALSE
       idx <- pData(mo_filtered)$cluster %in% cluster
       pData(mo_filtered)$clusterX[idx] <- TRUE
+      # Subset monocle object by cells in Seurat cluster for ggplot aes
+      ss_mo_filtered <- mo_filtered[ ,pData(mo_filtered)$clusterX == TRUE]
 
       # Extract Seurat cluster color
       seurat_cluster_color <- pData(mo_filtered)$Seurat_Cluster_Color[
         pData(mo_filtered)$cluster %in% cluster][1]
       seurat_cluster_color <- as.character(seurat_cluster_color)
 
-      print(head(pData(mo_filtered)))
       print(seurat_cluster_color)
-      print(dim(pData(mo_filtered)))
 
       # Plot Seurat clusters on trajectory
       gg <- plot_cell_trajectory(mo_filtered, 1, 2, color_by = "clusterX"
         , cell_size = 0.001, show_branch_points = FALSE) +
+        geom_point(aes(x = data_dim_1, y = data_dim_2, color = clusterX
+          , alpha = clusterX), size = 0.001) +
+        scale_alpha_discrete(range = c(0, 1)) +
         scale_colour_manual(values = c("grey", seurat_cluster_color)) +
         ggtitle(paste0("Cluster: ", cluster)) +
         theme(legend.position = "none"
@@ -247,9 +250,14 @@ Plot_Trajectory_Faceted_By_Seurat_Clusters <- function(){
   return(ggL)
 }
 ggL <- Plot_Trajectory_Faceted_By_Seurat_Clusters()
-Plot_Grid(ggL, ncol = 4, title = "Test")
+Plot_Grid(ggL, ncol = 5, rel_height = 0.2
+  , title = paste0(graphCodeTitle
+  , "\n\nMonocle trajectory"
+  , "\nCells from progenitor, IPC, and excitatory neuron Seurat clusters"
+  , "\nColored by Seurat clusters"
+  , "\n"))
 ggsave(paste0(outGraph, "Trajectory_SeuratCluster_Facet_paper.png")
-  , width = 13, height = 8)
+  , width = 13, height = 6)
 ################################################################################
 
 ### Plots
