@@ -39,6 +39,11 @@ load("../analysis/analyzed_data/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegN
 # centSO <- ssCentSO; rm(ssCentSO)
 # noCentExM <- ssNoCentExM; rm(ssNoCentExM)
 
+# Cluster DE genes
+cluster_DE_DF <- read.table(
+  "../analysis/tables/Seurat_ClusterDE/DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/res054/Seurat_ClusterDE_ClusterX_Vs_All_Clusters.txt"
+  , header = TRUE)
+
 # Cell cycle markers used for phase determination (Tirosh et al. 2016)
 ccGenes <- readLines(con = "../source/regev_lab_cell_cycle_genes.txt")
 # We can segregate this list into markers of G2/M phase and markers of S
@@ -74,6 +79,8 @@ theme_update(axis.line = element_line(colour = "black")
   , panel.border = element_blank()
 )
 ################################################################################
+
+### Load analyzed data
 
 # DE cell types
 deDF <- read.csv(paste0(outTable, "DE_CellTypes.csv"))
@@ -361,9 +368,22 @@ Percent_Signature_DE_Genes <- function(
     ]
 
   print(c(length(genes1), length(genes2), length(genes3), length(genes4)))
+  # Calculate percent
+  percents <- c(
+    length(intersect(genes1, genes2))/length(genes1) * 100
+    , length(intersect(genes3, genes4))/length(genes3) * 100
+  )
+  # Calculate porportion pvalue
+  pvalues <- c(
+    prop.test(length(intersect(genes1, genes2)), length(genes1), p = 0.5, correct = FALSE)$p.value
+    , prop.test(length(intersect(genes3, genes4)), length(genes3), p = 0.5, correct = FALSE)$p.value
+  )
+
+  # Format
   percent_signature_DF <- data.frame(
-    Percent = c(length(intersect(genes1, genes2))/length(genes1) * 100
-      , length(intersect(genes3, genes4))/length(genes3) * 100)
+    Percent_1 = percents
+    , Percent_2 = 100-percents
+    , Pvalue = pvalues
     , Signature = c(
       deDF$DE_Group[
         deDF$Comparison == comparison_1 &
@@ -380,10 +400,11 @@ Percent_Signature_DE_Genes <- function(
 
 # Percent of DE signature genes in mix state DE
 ggDF <- rbind(
+  # RG IP
   S_phase = Percent_Signature_DE_Genes(
     comparison_1 = "RG_vs_IP"
     , comparison_2 = "RG_vs_RGIP_Sphase"
-    , fold_change = 0.01
+    , fold_change = 0
     , fdr = 1.1
     , transition_state = "RG vs RGIP"
     , phase = "S phase"
@@ -391,16 +412,16 @@ ggDF <- rbind(
   , G2M_phase = Percent_Signature_DE_Genes(
     comparison_1 = "RG_vs_IP"
     , comparison_2 = "RG_vs_RGIP_G2Mphase"
-    , fold_change = 0.01
+    , fold_change = 0
     , fdr = 1.1
     , transition_state = "RG vs RGIP"
     , phase = "G2M phase"
   )
-
+  # RG Neuron
   , S_phase = Percent_Signature_DE_Genes(
     comparison_1 = "RG_vs_Neuron"
     , comparison_2 = "RG_vs_RGNeuron_Sphase"
-    , fold_change = 0.01
+    , fold_change = 0
     , fdr = 1.1
     , transition_state = "RG vs RGNeuron"
     , phase = "S phase"
@@ -408,16 +429,16 @@ ggDF <- rbind(
   , G2M_phase = Percent_Signature_DE_Genes(
     comparison_1 = "RG_vs_Neuron"
     , comparison_2 = "RG_vs_RGNeuron_G2Mphase"
-    , fold_change = 0.01
+    , fold_change = 0
     , fdr = 1.1
     , transition_state = "RG vs RGNeuron"
     , phase = "G2M phase"
   )
-
+  # IP neuron
   , S_phase = Percent_Signature_DE_Genes(
       comparison_1 = "IP_vs_Neuron"
     , comparison_2 = "IP_vs_IPNeuron_Sphase"
-    , fold_change = 0.01
+    , fold_change = 0
     , fdr = 1.1
     , transition_state = "IP vs IPNeuron"
     , phase = "S phase"
@@ -425,7 +446,7 @@ ggDF <- rbind(
   , G2M_phase = Percent_Signature_DE_Genes(
       comparison_1 = "IP_vs_Neuron"
     , comparison_2 = "IP_vs_IPNeuron_G2Mphase"
-    , fold_change = 0.01
+    , fold_change = 0
     , fdr = 1.1
     , transition_state = "IP vs IPNeuron"
     , phase = "G2M phase"
@@ -436,17 +457,39 @@ ggDF$Phase <- factor(ggDF$Phase, levels = c("S phase", "G2M phase"))
 ggDF$Transition_State <- factor(ggDF$Transition_State
   , levels = c("RG vs RGIP", "RG vs RGNeuron", "IP vs IPNeuron")
 )
+
 # Plot
-ggplot(ggDF, aes(x = Phase, y = Percent, fill = Signature)) +
-  geom_bar(stat = "identity", position = position_dodge()) +
-  facet_grid(~Transition_State, scales = "free") +
-  ylim(c(0,100)) +
-  scale_fill_manual(values = c("#8dd3c7", "#bebada", "#fb8072")) +
-  ggplot_set_theme_publication +
-  ggtitle(paste0(graphCodeTitle
-    , "\n\nPercent of DE signature genes DE in expected direction in mixed marker cells"))
-ggsave(paste0(outGraph, "DE_PercentMixed_FDR1_FC0.pdf")
-  , width = 8, height = 4)
+Plot_PercentDE_Cell_Type_DE_Genes <- function(){
+  print("Plot_PercentDE_Cell_Type_DE_Genes")
+  # browser()
+  # Format for ggplot
+  idx <- seq(1, nrow(ggDF), 2)
+  ggDF$Percent_1[idx] <- ggDF$Percent_1[idx] * -1
+  idx <- seq(2, nrow(ggDF), 2)
+  ggDF$Percent_2[idx] <- ggDF$Percent_2[idx] * -1
+  ggDF$Signature <- factor(ggDF$Signature, levels = c("Neuron", "IP", "RG"))
+  ggDF <- melt(ggDF, id.vars = c("Signature", "Transition_State", "Phase", "Pvalue"))
+  ggDF$Transition_State_DE <-
+    gsub(".* vs ", "", ggDF$Transition_State)
+  idx <- c(seq(2,12,2), seq(13,24,2))
+  ggDF$Transition_State_DE[idx] <-
+    gsub(" vs .*", "", ggDF$Transition_State[idx])
+  # Plot
+  ggplot(ggDF, aes(x = Signature, y = value
+    , fill = Transition_State_DE)) +
+    facet_wrap(~Transition_State+Phase, scales = "free", ncol = 2) +
+    geom_bar(stat = "identity", position = position_dodge()) +
+    geom_text(aes(y = 95, label = signif(Pvalue, 2)), size = 2) +
+    coord_flip() +
+    ylim(c(-100,100)) +
+    ggplot_set_theme_publication +
+    ggtitle(paste0(graphCodeTitle
+      , "\nPercent positive or negative fold change in mixed state cells"
+      , "\nof top cell type DE genes"))
+}
+Plot_PercentDE_Cell_Type_DE_Genes()
+ggsave(paste0(outGraph, "DE_Mixed_Percent_barplot.pdf")
+  , width = 7, height = 5)
 
 
 ## DE of DE signature genes in mix state DE
@@ -476,13 +519,12 @@ Signature_DE_Genes <- function(
     , levels = subset_transition_state_DE_DF$Gene
   )
 
-  subset_transition_state_DE_DF$DE_Group_2 <- as.factor(DE_group_label)
+  subset_transition_state_DE_DF$DE_Enriched <- as.factor(DE_group_label)
   subset_transition_state_DE_DF$Transition_State <- as.factor(transition_state)
   subset_transition_state_DE_DF$Phase <- as.factor(phase)
 
   return(subset_transition_state_DE_DF)
 }
-
 
 ggDFL <- list(
   Signature_DE_Genes(
@@ -595,97 +637,305 @@ ggL <- lapply(ggDFL, function(ggDF){
     ggtitle(paste0(
       "\nTransition state: ", ggDF$Transition_State
       , "\nCell cycle phase: ", ggDF$Phase
-      , "\nDE Signature: ", ggDF$DE_Group_2
+      , "\nDE Signature: ", ggDF$DE_Enriched
     ))
 })
 Plot_Grid(ggL, ncol = 4, title = "DE Mixed")
 ggsave(paste0(outGraph, "DE_Mixed_barplot.png"), width = 11, height = 9)
-################################################################################
 
-### DE of top expressed genes in cell type
 
-Signature_Top_Expressed_Genes <- function(
-  seurat_clusters, DE_comparison_2, transition_state, phase, fold_change_cutoff, cell_type_label){
+## Fold change of DE signature genes in mixed state cells barplot
 
+Fold_Change_Signature_DE_Genes <- function(
+  comparison_1, comparison_2, transition_state, phase, fold_change_cutoff, cell_types, transition_states, signature){
+
+  # Subset to cell type DE genes and calculate mean fold change
   if (fold_change_cutoff > 0) {
     fold_change_cutoff_idx <- deDF$Log2_FC_Group1_vs_Group2 > fold_change_cutoff
   } else if (fold_change_cutoff < 0) {
     fold_change_cutoff_idx <- deDF$Log2_FC_Group1_vs_Group2 < fold_change_cutoff
   }
-  exM <- noCentExM[, centSO@ident %in% seurat_clusters]
-  mean_expr <- rowMeans(exM)
-  genes1 <- names(head(sort(mean_expr, decreasing = TRUE), 250))
+  subset_deDF <- deDF[
+    fold_change_cutoff_idx &
+    deDF$FDR < 0.05 &
+    deDF$Comparison == comparison_1
+    , ]
+  genes1 <- subset_deDF$Gene
+  # Mean fold change
+  mn_cell_types <- mean(subset_deDF$Log2_FC_Group1_vs_Group2)
+  # Change negative fold changes to positive
+  if (mn_cell_types < 0){mn_cell_types <- mn_cell_types * -1}
+
+  # Subset transition state cells to cell type DE genes and calculate mean fold change
+  subset_transition_state_DE_DF <- transition_state_DE_DF[
+    transition_state_DE_DF$Gene %in% genes1 &
+    transition_state_DE_DF$Comparison == comparison_2
+    , ]
+  # Mean fold change
+  mn_transition_state <-
+    mean(subset_transition_state_DE_DF$Log2_FC_Group1_vs_Group2)
+  mn_transition_state <- mn_transition_state * -1
+  # # Change negative fold changes to positive
+  # if (mn_transition_state < 0){
+  #   mn_transition_state <- mn_transition_state * -1}
+
+  # Format
+  percent_DF <- data.frame(
+    Mean_Transition_State = mn_transition_state
+    , Mean_Cell_Types = mn_cell_types
+    , Percent_Fold_Change = mn_transition_state / mn_cell_types * 100
+    , Signature = signature
+    , Cell_Types = comparison_1
+    , Transition_States = transition_states
+    , Phase = phase
+  )
+  percent_DF$Signature <- factor(percent_DF$Signature
+    , levels = rev(c("RG", "IP", "Neuron")))
+  percent_DF$Phase <- factor(percent_DF$Phase
+    , levels = c("S phase", "G2M phase"))
+  percent_DF$Transition_States <- factor(percent_DF$Transition_States
+    , levels = c("RG vs RGIP", "RG vs RGNeuron", "IP vs IPNeuron"))
+  percent_DF$Cell_Types <- factor(percent_DF$Cell_Types
+    , levels = c("RG_vs_IP", "RG_vs_Neuron", "IP_vs_Neuron"))
+  return(percent_DF)
+}
+# Fold change of cell type enriched genes in mixed state cells versus cell types
+percent_fold_change_DFL <- list(
+  # RG IP
+  Fold_Change_Signature_DE_Genes(
+    comparison_1 = "RG_vs_IP"
+    , comparison_2 = "RG_vs_RGIP_Sphase"
+    , fold_change_cutoff = 0.25
+    , transition_states = "RG vs RGIP"
+    , phase = "S phase"
+    , signature = "RG"
+  )
+  , Fold_Change_Signature_DE_Genes(
+    comparison_1 = "RG_vs_IP"
+    , comparison_2 = "RG_vs_RGIP_Sphase"
+    , fold_change_cutoff = -0.25
+    , transition_states = "RG vs RGIP"
+    , phase = "S phase"
+    , signature = "IP"
+  )
+  , Fold_Change_Signature_DE_Genes(
+    comparison_1 = "RG_vs_IP"
+    , comparison_2 = "RG_vs_RGIP_G2Mphase"
+    , fold_change_cutoff = 0.25
+    , transition_states = "RG vs RGIP"
+    , phase = "G2M phase"
+    , signature = "RG"
+  )
+  , Fold_Change_Signature_DE_Genes(
+    comparison_1 = "RG_vs_IP"
+    , comparison_2 = "RG_vs_RGIP_G2Mphase"
+    , fold_change_cutoff = -0.25
+    , transition_states = "RG vs RGIP"
+    , phase = "G2M phase"
+    , signature = "IP"
+  )
+  # RG neuron
+  , Fold_Change_Signature_DE_Genes(
+    comparison_1 = "RG_vs_Neuron"
+    , comparison_2 = "RG_vs_RGNeuron_Sphase"
+    , fold_change_cutoff = 0.25
+    , transition_states = "RG vs RGNeuron"
+    , phase = "S phase"
+    , signature = "RG"
+  )
+  , Fold_Change_Signature_DE_Genes(
+    comparison_1 = "RG_vs_Neuron"
+    , comparison_2 = "RG_vs_RGNeuron_Sphase"
+    , fold_change_cutoff = -0.25
+    , transition_states = "RG vs RGNeuron"
+    , phase = "S phase"
+    , signature = "Neuron"
+  )
+  , Fold_Change_Signature_DE_Genes(
+    comparison_1 = "RG_vs_Neuron"
+    , comparison_2 = "RG_vs_RGNeuron_G2Mphase"
+    , fold_change_cutoff = 0.25
+    , transition_states = "RG vs RGNeuron"
+    , phase = "G2M phase"
+    , signature = "RG"
+  )
+  , Fold_Change_Signature_DE_Genes(
+    comparison_1 = "RG_vs_Neuron"
+    , comparison_2 = "RG_vs_RGNeuron_G2Mphase"
+    , fold_change_cutoff = -0.25
+    , transition_states = "RG vs RGNeuron"
+    , phase = "G2M phase"
+    , signature = "Neuron"
+  )
+  # IP neuron
+  , Fold_Change_Signature_DE_Genes(
+    comparison_1 = "IP_vs_Neuron"
+    , comparison_2 = "IP_vs_IPNeuron_Sphase"
+    , fold_change_cutoff = 0.25
+    , transition_states = "IP vs IPNeuron"
+    , phase = "S phase"
+    , signature = "IP"
+  )
+  , Fold_Change_Signature_DE_Genes(
+    comparison_1 = "IP_vs_Neuron"
+    , comparison_2 = "IP_vs_IPNeuron_Sphase"
+    , fold_change_cutoff = -0.25
+    , transition_states = "IP vs IPNeuron"
+    , phase = "S phase"
+    , signature = "Neuron"
+  )
+  , Fold_Change_Signature_DE_Genes(
+    comparison_1 = "IP_vs_Neuron"
+    , comparison_2 = "IP_vs_IPNeuron_G2Mphase"
+    , fold_change_cutoff = 0.25
+    , transition_states = "IP vs IPNeuron"
+    , phase = "G2M phase"
+    , signature = "IP"
+  )
+  , Fold_Change_Signature_DE_Genes(
+    comparison_1 = "IP_vs_Neuron"
+    , comparison_2 = "IP_vs_IPNeuron_G2Mphase"
+    , fold_change_cutoff = -0.25
+    , transition_states = "IP vs IPNeuron"
+    , phase = "G2M phase"
+    , signature = "Neuron"
+  )
+)
+percent_fold_change_DF <- do.call("rbind", percent_fold_change_DFL)
+# Plot
+ggplot(percent_fold_change_DF, aes(x = Signature, y = Percent_Fold_Change
+  , fill = Signature)) +
+  facet_wrap(~Cell_Types+Transition_States+Phase, scales = "free", ncol = 2) +
+  geom_bar(stat = "identity", position = position_dodge()) +
+  coord_flip() +
+  ylim(c(-100,100)) +
+  ggplot_set_theme_publication +
+  # scale_fill_manual(values = c(Neuron = "#fb8072", IP = "#bebada", RG = "#8dd3c7")) +
+  ggtitle(paste0(graphCodeTitle
+    , "\nDE fold change in mixed state cells versus cell types"
+    , "\nof top cell type enriched genes"))
+ggsave(paste0(outGraph
+  , "DE_Mixed_PercentFoldChange_barplot.pdf")
+  , width = 7, height = 5)
+################################################################################
+
+### DE of top eniched genes in cell type
+
+Subset_Transition_State_DE_By_Cell_Type_Enriched_Genes <- function(
+  seurat_clusters, DE_comparison_2, transition_state, phase, fold_change_cutoff, cell_type_label){
+
+  # Subset genes to top enriched for Seurat clusters of interest
+  genes1 <- cluster_DE_DF$Gene[cluster_DE_DF$Cluster == seurat_clusters]
+  # Subset by genes and mixed state comparison
   subset_transition_state_DE_DF <- transition_state_DE_DF[
     transition_state_DE_DF$Gene %in% genes1 &
     transition_state_DE_DF$Comparison == DE_comparison_2,
     ]
-
+  # Format
   subset_transition_state_DE_DF <- subset_transition_state_DE_DF[
     order(subset_transition_state_DE_DF$Log2_FC_Group1_vs_Group2), ]
   subset_transition_state_DE_DF$Gene <- factor(
     subset_transition_state_DE_DF$Gene
     , levels = subset_transition_state_DE_DF$Gene
   )
-
-  subset_transition_state_DE_DF$DE_Group_2 <- as.factor(cell_type_label)
+  subset_transition_state_DE_DF$DE_Enriched <- as.factor(cell_type_label)
   subset_transition_state_DE_DF$Transition_State <- as.factor(transition_state)
   subset_transition_state_DE_DF$Phase <- as.factor(phase)
 
   return(subset_transition_state_DE_DF)
 }
 
-ggDFL <- list(
-  Signature_Top_Expressed_Genes(
+subset_transition_state_DE_DFL <- list(
+  Subset_Transition_State_DE_By_Cell_Type_Enriched_Genes(
       seurat_clusters = c(7,9)
     , DE_comparison_2 = "RG_vs_RGIP_Sphase"
     , transition_state = "RG vs RGIP"
     , phase = "S phase"
-    , fold_change_cutoff = 0.25
     , cell_type_label = "RG"
   )
-  , Signature_Top_Expressed_Genes(
+  , Subset_Transition_State_DE_By_Cell_Type_Enriched_Genes(
+      seurat_clusters = c(7,9)
+    , DE_comparison_2 = "RG_vs_RGIP_G2Mphase"
+    , transition_state = "RG vs RGIP"
+    , phase = "G2M phase"
+    , cell_type_label = "RG"
+  )
+  , Subset_Transition_State_DE_By_Cell_Type_Enriched_Genes(
       seurat_clusters = c(2)
     , DE_comparison_2 = "RG_vs_RGIP_Sphase"
     , transition_state = "RG vs RGIP"
     , phase = "S phase"
-    , fold_change_cutoff = 0.25
     , cell_type_label = "IP"
   )
-  , Signature_Top_Expressed_Genes(
+  , Subset_Transition_State_DE_By_Cell_Type_Enriched_Genes(
+      seurat_clusters = c(2)
+    , DE_comparison_2 = "RG_vs_RGIP_G2Mphase"
+    , transition_state = "RG vs RGIP"
+    , phase = "G2M phase"
+    , cell_type_label = "IP"
+  )
+  , Subset_Transition_State_DE_By_Cell_Type_Enriched_Genes(
       seurat_clusters = c(7,9)
     , DE_comparison_2 = "RG_vs_RGNeuron_Sphase"
     , transition_state = "RG vs RGNeuron"
     , phase = "S phase"
-    , fold_change_cutoff = 0.25
     , cell_type_label = "RG"
   )
-  , Signature_Top_Expressed_Genes(
+  , Subset_Transition_State_DE_By_Cell_Type_Enriched_Genes(
+      seurat_clusters = c(7,9)
+    , DE_comparison_2 = "RG_vs_RGNeuron_G2Mphase"
+    , transition_state = "RG vs RGNeuron"
+    , phase = "G2M phase"
+    , cell_type_label = "RG"
+  )
+  , Subset_Transition_State_DE_By_Cell_Type_Enriched_Genes(
       seurat_clusters = c(0)
     , DE_comparison_2 = "RG_vs_RGNeuron_Sphase"
     , transition_state = "RG vs RGNeuron"
     , phase = "S phase"
-    , fold_change_cutoff = 0.25
     , cell_type_label = "Neuron"
   )
-  , Signature_Top_Expressed_Genes(
+  , Subset_Transition_State_DE_By_Cell_Type_Enriched_Genes(
+      seurat_clusters = c(0)
+    , DE_comparison_2 = "RG_vs_RGNeuron_G2Mphase"
+    , transition_state = "RG vs RGNeuron"
+    , phase = "G2M phase"
+    , cell_type_label = "Neuron"
+  )
+  , Subset_Transition_State_DE_By_Cell_Type_Enriched_Genes(
       seurat_clusters = c(2)
     , DE_comparison_2 = "IP_vs_IPNeuron_Sphase"
     , transition_state = "IP vs IPNeuron"
     , phase = "S phase"
-    , fold_change_cutoff = 0.25
     , cell_type_label = "IP"
   )
-  , Signature_Top_Expressed_Genes(
+  , Subset_Transition_State_DE_By_Cell_Type_Enriched_Genes(
+      seurat_clusters = c(2)
+    , DE_comparison_2 = "IP_vs_IPNeuron_G2Mphase"
+    , transition_state = "IP vs IPNeuron"
+    , phase = "G2M phase"
+    , cell_type_label = "IP"
+  )
+  , Subset_Transition_State_DE_By_Cell_Type_Enriched_Genes(
       seurat_clusters = c(0)
     , DE_comparison_2 = "IP_vs_IPNeuron_Sphase"
     , transition_state = "IP vs IPNeuron"
     , phase = "S phase"
-    , fold_change_cutoff = 0.25
+    , cell_type_label = "Neuron"
+  )
+  , Subset_Transition_State_DE_By_Cell_Type_Enriched_Genes(
+      seurat_clusters = c(0)
+    , DE_comparison_2 = "IP_vs_IPNeuron_G2Mphase"
+    , transition_state = "IP vs IPNeuron"
+    , phase = "G2M phase"
     , cell_type_label = "Neuron"
   )
 )
+subset_transition_state_DE_DF <-
+  do.call("rbind", subset_transition_state_DE_DFL)
 
-ggL <- lapply(ggDFL, function(ggDF){
+## Barplot
+ggL <- lapply(subset_transition_state_DE_DFL, function(ggDF){
   ggplot(ggDF, aes(x = Gene, y = Log2_FC_Group1_vs_Group2)) +
     geom_bar(stat = "identity") +
     ylab("Log2 fold change") +
@@ -698,44 +948,329 @@ ggL <- lapply(ggDFL, function(ggDF){
     ggtitle(paste0(
       "\nTransition state: ", ggDF$Transition_State
       , "\nCell cycle phase: ", ggDF$Phase
-      , "\nDE Signature: ", ggDF$DE_Group_2
+      , "\nDE Signature: ", ggDF$DE_Enriched
     ))
 })
-Plot_Grid(ggL, ncol = 4, title = "DE in mixed state cells of top cell type expressed genes")
-ggsave(paste0(outGraph, "TopCellTypeExpressed_Mixed_barplot.png")
-  , width = 11, height = 9)
+Plot_Grid(ggL, ncol = 4, title = "DE in mixed state cells of top cell type enriched genes")
+ggsave(paste0(outGraph, "TopCellTypeEnriched_Mixed_barplot.png")
+  , width = 11, height = 18)
+
+
+## Percentage of enriched genes DE in mixed state cells barplot
+
+PercentDE_Cell_Type_Enriched_Genes <- function(){
+  percent_DE_genes_LDF <- lapply(subset_transition_state_DE_DFL
+    , function(subset_transition_state_DE_DF){
+    print("PercentDE_Cell_Type_Enriched_Genes")
+    v1 <- subset_transition_state_DE_DF$Log2_FC_Group1_vs_Group2 > 0
+    pval1 <- prop.test(sum(v1), length(v1), p = 0.5, correct = FALSE)$p.value
+    v2 <- subset_transition_state_DE_DF$Log2_FC_Group1_vs_Group2 < 0
+    pval2 <- prop.test(sum(v2), length(v2), p = 0.5, correct = FALSE)$p.value
+    percent_DF <- as.data.frame(rbind(Percent_Of_Table(v1), Percent_Of_Table(v2)))
+    percent_DF$Pvalue <- c(pval1, pval2)
+    percent_DF$Signature <- subset_transition_state_DE_DF$DE_Enriched[1]
+    percent_DF$Transition_State <-
+      subset_transition_state_DE_DF$Transition_State[1]
+    percent_DF$Phase <- subset_transition_state_DE_DF$Phase[1]
+    return(percent_DF)
+  })
+  percent_DE_genes_DF <- do.call("rbind", percent_DE_genes_LDF)
+  return(percent_DE_genes_DF)
+}
+
+Plot_PercentDE_Cell_Type_Enriched_Genes <- function(){
+  print("Plot_PercentDE_Cell_Type_Enriched_Genes")
+  # Calculate percent
+  percent_DE_genes_DF <- PercentDE_Cell_Type_Enriched_Genes()
+  # Format for ggplot
+  percent_DE_genes_DF$Transition_State_DE <-
+    gsub(".* vs ", "", percent_DE_genes_DF$Transition_State)
+  idx <- seq(1, nrow(percent_DE_genes_DF)-1, 2)
+  percent_DE_genes_DF$Transition_State_DE <-
+    gsub(" vs .*", "", percent_DE_genes_DF$Transition_State)
+  percent_DE_genes_DF$Transition_State_DE[idx] <-
+    gsub(".* vs ", "", percent_DE_genes_DF$Transition_State[idx])
+  colnames(percent_DE_genes_DF)[c(1,2)] <- c("Percent_1", "Percent_2")
+  idx <- seq(2, nrow(percent_DE_genes_DF), 2)
+  percent_DE_genes_DF$Percent_1[idx] <- percent_DE_genes_DF$Percent_1[idx] * -1
+  percent_DE_genes_DF$Signature <- factor(
+    percent_DE_genes_DF$Signature, levels = c("Neuron", "IP", "RG"))
+  # Plot
+  ggplot(percent_DE_genes_DF, aes(x = Signature, y = Percent_1
+    , fill = Transition_State_DE)) +
+    facet_wrap(~Transition_State+Phase, scales = "free", ncol = 2) +
+    geom_bar(stat = "identity", position = position_dodge()) +
+    geom_text(aes(y = 95, label = signif(Pvalue, 2)), size = 2) +
+    coord_flip() +
+    ylim(c(-100,100)) +
+    ggplot_set_theme_publication +
+    ggtitle(paste0(graphCodeTitle
+      , "\nPercent positive or negative fold change in mixed state cells"
+      , "\nof top cell type enriched genes"))
+}
+Plot_PercentDE_Cell_Type_Enriched_Genes()
+ggsave(paste0(outGraph, "TopCellTypeEnriched_Mixed_Percent_barplot.pdf")
+  , width = 7, height = 5)
+
+## Fold change of enriched genes DE in mixed state cells barplot
+
+Fold_Change_Cell_Type_Enriched_Genes <- function(
+  signature, seurat_clusters, cell_types, transition_states, phase){
+
+    print("Fold_Change_Cell_Type_Enriched_Genes")
+
+    # Subset mixed state DE
+    subset_transition_state_DE_DF <- subset_transition_state_DE_DF[
+      with(subset_transition_state_DE_DF
+        , Transition_State == transition_states
+        & DE_Enriched == signature
+        & Phase == phase
+      ), ]
+    # Mean fold change
+    mn_transition_state <-
+      mean(subset_transition_state_DE_DF$Log2_FC_Group1_vs_Group2)
+    # Change negative fold changes to positive
+    if (mn_transition_state < 0){
+      mn_transition_state <- mn_transition_state * -1}
+
+    # Subset genes to top enriched for Seurat clusters of interest
+    genes1 <- cluster_DE_DF$Gene[cluster_DE_DF$Cluster == seurat_clusters]
+    subset_DE_DF <- deDF[! is.na(deDF$DE_Group), ]
+    subset_DE_DF <- subset_DE_DF[
+      with(subset_DE_DF
+        , Comparison == cell_types &
+        DE_Group == signature &
+        Gene %in% genes1
+      ), ]
+    # Mean fold change
+    mn_cell_types <- mean(subset_DE_DF$Log2_FC_Group1_vs_Group2)
+    mn_cell_types <- mn_cell_types * -1
+    # # Change negative fold changes to positive
+    # if (mn_cell_types < 0){mn_cell_types <- mn_cell_types * -1}
+
+    # Format
+    percent_DF <- data.frame(
+      Mean_Transition_State = mn_transition_state
+      , Mean_Cell_Types = mn_cell_types
+      , Percent_Fold_Change = mn_transition_state / mn_cell_types * 100
+      , Signature = signature
+      , Cell_Types = cell_types
+      , Transition_States = transition_states
+      , Phase = phase
+    )
+    return(percent_DF)
+}
+
+# Fold change of cell type enriched genes in mixed state cells versus cell types
+percent_fold_change_DFL <- list(
+  # RG IP
+  Fold_Change_Cell_Type_Enriched_Genes(
+    signature = "RG"
+    , seurat_clusters = c(7,9)
+    , cell_types = "RG_vs_IP"
+    , transition_states = "RG vs RGIP"
+    , phase = "S phase"
+  )
+  , Fold_Change_Cell_Type_Enriched_Genes(
+    signature = "RG"
+    , seurat_clusters = c(7,9)
+    , cell_types = "RG_vs_IP"
+    , transition_states = "RG vs RGIP"
+    , phase = "G2M phase"
+  )
+  , Fold_Change_Cell_Type_Enriched_Genes(
+    signature = "IP"
+    , seurat_clusters = c(2)
+    , cell_types = "RG_vs_IP"
+    , transition_states = "RG vs RGIP"
+    , phase = "S phase"
+  )
+  , Fold_Change_Cell_Type_Enriched_Genes(
+    signature = "IP"
+    , seurat_clusters = c(2)
+    , cell_types = "RG_vs_IP"
+    , transition_states = "RG vs RGIP"
+    , phase = "G2M phase"
+  )
+  # RG Neuron
+  , Fold_Change_Cell_Type_Enriched_Genes(
+    signature = "RG"
+    , seurat_clusters = c(7,9)
+    , cell_types = "RG_vs_Neuron"
+    , transition_states = "RG vs RGNeuron"
+    , phase = "S phase"
+  )
+  , Fold_Change_Cell_Type_Enriched_Genes(
+    signature = "RG"
+    , seurat_clusters = c(7,9)
+    , cell_types = "RG_vs_Neuron"
+    , transition_states = "RG vs RGNeuron"
+    , phase = "G2M phase"
+  )
+  , Fold_Change_Cell_Type_Enriched_Genes(
+    signature = "Neuron"
+    , seurat_clusters = c(0)
+    , cell_types = "RG_vs_Neuron"
+    , transition_states = "RG vs RGNeuron"
+    , phase = "S phase"
+  )
+  , Fold_Change_Cell_Type_Enriched_Genes(
+    signature = "Neuron"
+    , seurat_clusters = c(0)
+    , cell_types = "RG_vs_Neuron"
+    , transition_states = "RG vs RGNeuron"
+    , phase = "G2M phase"
+  )
+  # IP Neuron
+  , Fold_Change_Cell_Type_Enriched_Genes(
+    signature = "IP"
+    , seurat_clusters = c(2)
+    , cell_types = "IP_vs_Neuron"
+    , transition_states = "IP vs IPNeuron"
+    , phase = "S phase"
+  )
+  , Fold_Change_Cell_Type_Enriched_Genes(
+    signature = "IP"
+    , seurat_clusters = c(2)
+    , cell_types = "IP_vs_Neuron"
+    , transition_states = "IP vs IPNeuron"
+    , phase = "G2M phase"
+  )
+  , Fold_Change_Cell_Type_Enriched_Genes(
+    signature = "Neuron"
+    , seurat_clusters = c(0)
+    , cell_types = "IP_vs_Neuron"
+    , transition_states = "IP vs IPNeuron"
+    , phase = "S phase"
+  )
+  , Fold_Change_Cell_Type_Enriched_Genes(
+    signature = "Neuron"
+    , seurat_clusters = c(0)
+    , cell_types = "IP_vs_Neuron"
+    , transition_states = "IP vs IPNeuron"
+    , phase = "G2M phase"
+  )
+)
+percent_fold_change_DF <- do.call("rbind", percent_fold_change_DFL)
+# Format
+percent_fold_change_DF$Signature <- factor(percent_fold_change_DF$Signature
+  , levels = rev(c("RG", "IP", "Neuron")))
+percent_fold_change_DF$Phase <- factor(percent_fold_change_DF$Phase
+  , levels = c("S phase", "G2M phase"))
+percent_fold_change_DF$Transition_States <- factor(percent_fold_change_DF$Transition_States
+  , levels = c("RG vs RGIP", "RG vs RGNeuron", "IP vs IPNeuron"))
+percent_fold_change_DF$Cell_Types <- factor(percent_fold_change_DF$Cell_Types
+  , levels = c("RG_vs_IP", "RG_vs_Neuron", "IP_vs_Neuron"))
+# Plot
+ggplot(percent_fold_change_DF, aes(x = Signature, y = Percent_Fold_Change
+  , fill = Signature)) +
+  facet_wrap(~Cell_Types+Transition_States+Phase, scales = "free", ncol = 2) +
+  geom_bar(stat = "identity", position = position_dodge()) +
+  coord_flip() +
+  ylim(c(-100,100)) +
+  ggplot_set_theme_publication +
+  ggtitle(paste0(graphCodeTitle
+    , "\nDE fold change in mixed state cells versus cell types"
+    , "\nof top cell type enriched genes"))
+ggsave(paste0(outGraph
+  , "TopCellTypeEnriched_Mixed_PercentFoldChange_barplot.pdf")
+  , width = 7, height = 5)
 ################################################################################
 
 ### Percent of cells passing expression filters per cluster
 
+Mixed_Marker_By_Cluster_Percent <- function(
+  exM
+  , seuratO
+  , highThreshold
+  , lowThreshold
+  , type_keep
+  , cluster_order = NULL){
+    # browser()
+    print("Mixed_Marker_By_Cluster_Percent")
+    expr_flag_DF <- Average_MarkersExp_Per_Cell(exM = exM, seuratO = seuratO)
+    expr_flag_DF <- Positive_Negative_Expression_Flag(
+      exDF = expr_flag_DF
+      , highThreshold = highThreshold
+      , lowThreshold = lowThreshold
+    )
+    expr_flag_DF$Type_Plot <- expr_flag_DF$TYPE
+    expr_flag_DF$Type_Plot[! expr_flag_DF$Type_Plot %in% type_keep] <- "NA"
+    expr_flag_DF$Type_Plot <- droplevels(expr_flag_DF$Type_Plot)
+    expr_flag_DF <- aggregate(expr_flag_DF$Type_Plot
+      , list(expr_flag_DF$CLUSTER), Percent_Of_Table)
+    tmp_df <- as.data.frame(expr_flag_DF[ ,2])
+    tmp_df$CLUSTER <- expr_flag_DF[ ,1]
+    expr_flag_DF <- melt(tmp_df)
+    return(expr_flag_DF)
+}
+
 Mixed_Marker_By_Cluster_Percent_Barplot <- function(
-  exM, seuratO, highThreshold, lowThreshold, title, cluster_order = NULL) {
-
-  df <- Average_MarkersExp_Per_Cell(exM = exM, seuratO = seuratO)
-  df <- Positive_Negative_Expression_Flag(
-    exDF = df, highThreshold = 0.5, lowThreshold = 0.5)
-  df$TYPE[df$TYPE %in% c("Neuron+", "IP+", "RG+", "RG+ vRG- oRG-")] <- "NA"
-  df$TYPE <- droplevels(df$TYPE)
-  df <- aggregate(df$TYPE, list(df$CLUSTER), Percent_Of_Table)
-
-  df2 <- as.data.frame(df[ ,2])
-  df2$CLUSTER <- df[ ,1]
-  df <- melt(df2)
-
+  exM
+  , seuratO
+  , highThreshold
+  , lowThreshold
+  , type_keep
+  , title
+  , cluster_order = NULL) {
+  # browser()
+  print("Mixed_Marker_By_Cluster_Percent_Barplot")
+  expr_flag_DF <- Mixed_Marker_By_Cluster_Percent(
+    exM = exM
+    , seuratO = seuratO
+    , highThreshold = highThreshold
+    , lowThreshold = lowThreshold
+    , type_keep = type_keep
+    , cluster_order = cluster_order
+  )
+  # Format
   # Set cluster order
   if (! is.null(cluster_order)){
-    df$CLUSTER <- factor(df$CLUSTER, levels = cluster_order)
+    expr_flag_DF$CLUSTER <- factor(as.character(expr_flag_DF$CLUSTER)
+      , levels = as.character(cluster_order))
   }
-  df <- df[! is.na(df$CLUSTER), ]
-
-  gg <- ggplot(df, aes(x = CLUSTER, y = value, fill = variable)) +
+  expr_flag_DF <- expr_flag_DF[! is.na(expr_flag_DF$CLUSTER), ]
+  # Set marker plotting order
+  expr_flag_DF$variable <- as.character(expr_flag_DF$variable)
+  expr_flag_DF$variable[is.na(expr_flag_DF$variable)] <- "Unknown"
+  expr_flag_DF$variable <- factor(expr_flag_DF$variable
+    , levels = rev(
+      c("RG+", "IP+", "Neuron+", "IP+ RG+", "Neuron+ RG+"
+      , "Neuron+ IP+", "Interneuron+ IP+", "Endothelial+ IP+", "Unknown")
+    )
+  )
+  # Plot
+  gg <- ggplot(expr_flag_DF, aes(x = CLUSTER, y = value, fill = variable)) +
     geom_bar(stat = "identity") +
     scale_y_continuous(expand = c(0, 0), limits = c(0, 101)) +
-    # scale_fill_brewer(type = "qual", palette = "Set2", direction = 1) +
+    scale_fill_manual(
+      name = "Cell type markers"
+      # Set legend order and colors
+      , breaks = c(
+        "RG+"
+        , "IP+"
+        , "Neuron+"
+        , "IP+ RG+"
+        , "Neuron+ RG+"
+        , "Neuron+ IP+"
+        , "Interneuron+ IP+"
+        , "Endothelial+ IP+"
+        , "Unknown"
+      )
+      , values = c(
+        "RG+" = "#8DD1C6"
+        , "IP+" = "#BFBBDA"
+        , "Neuron+" = "#F47F73"
+        , "IP+ RG+" = "#A8C6D0"
+        , "Neuron+ RG+" = "#C9AC9A"
+        , "Neuron+ IP+" = "#CB9898"
+        , "Interneuron+ IP+" = "#A1B5D6"
+        , "Endothelial+ IP+" = "#BAC8A9"
+        , "Unknown" = "#E7E6E5")
+      ) +
     xlab("Cluster") +
     ylab("Percent of cells") +
     ggtitle(title)
-
   return(gg)
 }
 
@@ -743,16 +1278,22 @@ Mixed_Marker_By_Cluster_Percent_Barplot <- function(
 gg1 <- Mixed_Marker_By_Cluster_Percent_Barplot(
   exM = noCentExM, seuratO = centSO
   , highThreshold = 0.5, lowThreshold = 0.5
+  , type_keep = c("IP+ RG+", "Neuron+ RG+", "Neuron+ IP+", "Endothelial+ IP+"
+    , "Interneuron+ IP+")
   , title = "Keep CC\n+ = > 0.5 normalized expression\n- = < 0.5 normalized expression"
 )
 gg2 <- Mixed_Marker_By_Cluster_Percent_Barplot(
   exM = noCentExM, seuratO = centSO
   , highThreshold = 0.5, lowThreshold = 0.25
+  , type_keep = c("IP+ RG+", "Neuron+ RG+", "Neuron+ IP+", "Endothelial+ IP+"
+    , "Interneuron+ IP+")
   , title = "Keep CC\n+ = > 0.5 normalized expression\n- = < 0.25 normalized expression"
 )
 gg3 <- Mixed_Marker_By_Cluster_Percent_Barplot(
   exM = noCentExM, seuratO = centSO
   , highThreshold = 0.75, lowThreshold = 0.25
+  , type_keep = c("IP+ RG+", "Neuron+ RG+", "Neuron+ IP+", "Endothelial+ IP+"
+    , "Interneuron+ IP+")
   , title = "Keep CC\n+ = > 0.75 normalized expression\n- = < 0.25 normalized expression"
 )
 # Plot grid
@@ -771,6 +1312,8 @@ ggsave(paste0(outGraph, "PercentMixedCluster_Barplot.pdf")
 gg <- Mixed_Marker_By_Cluster_Percent_Barplot(
   exM = noCentExM, seuratO = centSO
   , highThreshold = 0.5, lowThreshold = 0.25
+  , type_keep = c("IP+ RG+", "Neuron+ RG+", "Neuron+ IP+", "Endothelial+ IP+"
+    , "Interneuron+ IP+")
   , cluster_order = c(9,7,8,10,2,0,1,4,3,13,5,6,11,12,14,15)
   , title = paste0(graphCodeTitle
     , "\n\nPercent of cells passing combinations of marker expression filters"
@@ -782,6 +1325,25 @@ gg <- Mixed_Marker_By_Cluster_Percent_Barplot(
 gg + ggplot_set_theme_publication
 # Save
 ggsave(paste0(outGraph, "PercentMixedCluster_Barplot_paper.pdf")
+  , width = 5, height = 3)
+
+# Paper - plot with reordered clusters
+gg <- Mixed_Marker_By_Cluster_Percent_Barplot(
+  exM = noCentExM, seuratO = centSO
+  , highThreshold = 0.5, lowThreshold = 0.25
+  , type_keep = c("IP+ RG+", "Neuron+ RG+", "Neuron+ IP+", "RG+", "IP+"
+    , "Neuron+")
+  , cluster_order = c(9,7,8,10,2,0,1,4,3,13,5,6,11,12,14,15)
+  , title = paste0(graphCodeTitle
+    , "\n\nPercent of cells passing combinations of marker expression filters"
+    , "\nKeep CC"
+    , "\n+ = > 0.5 normalized expression"
+    , "\n- = < 0.25 normalized expression"
+  )
+)
+gg + ggplot_set_theme_publication
+# Save
+ggsave(paste0(outGraph, "PercentMixedCluster_Barplot_paper_supp.pdf")
   , width = 5, height = 3)
 ################################################################################
 
@@ -879,7 +1441,7 @@ gg1 <- ggplot(tsneDF, aes(x = tSNE_1, y = tSNE_2)) +
     , aes(x = tSNE_1, y = tSNE_2, color = mix), size = 0.2) +
   scale_color_identity() +
   ggtitle("Green = RG; Red = IP") +
-  ggplot_set_theme_publication
+  ggplot_set_theme_publication_nolabels
 # RG Neuron
 tsneDF <- Mixed_tSNE_Format_Data_For_GGplot(
   green_genes = kmDF$Gene.Symbol[kmDF$Grouping == "RG"]
@@ -891,7 +1453,7 @@ gg2 <- ggplot(tsneDF, aes(x = tSNE_1, y = tSNE_2)) +
     , aes(x = tSNE_1, y = tSNE_2, color = mix), size = 0.2) +
   scale_color_identity() +
   ggtitle("Green = RG; Red = Neuron") +
-  ggplot_set_theme_publication
+  ggplot_set_theme_publication_nolabels
 # IP Neuron
 tsneDF <- Mixed_tSNE_Format_Data_For_GGplot(
   green_genes = kmDF$Gene.Symbol[kmDF$Grouping == "IP"]
@@ -903,7 +1465,7 @@ gg3 <- ggplot(tsneDF, aes(x = tSNE_1, y = tSNE_2)) +
     , aes(x = tSNE_1, y = tSNE_2, color = mix), size = 0.2) +
   scale_color_identity() +
   ggtitle("Green = IP; Red = Neuron") +
-  ggplot_set_theme_publication
+  ggplot_set_theme_publication_nolabels
 # Combine
 Plot_Grid(list(gg1, gg2, gg3), ncol = 3, rel_height = 0.2
   , title = paste0(graphCodeTitle
