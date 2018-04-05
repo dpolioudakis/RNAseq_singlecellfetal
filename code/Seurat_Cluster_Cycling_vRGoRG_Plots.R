@@ -92,6 +92,10 @@ transition_state_DE_DF <- read.csv(
 # Eigengenes of DE genes
 # ME_CellType_L
 load(file = paste0(outData, "ME_CellType.rdata"))
+
+# Eigengenes of cell type enriched genes
+# ME_CellTypeEnriched_L
+load(file = paste0(outData, "ME_CellTypeEnriched.rdata"))
 ################################################################################
 
 ### Plot eigengene of DE genes
@@ -298,6 +302,124 @@ Plot_Grid(ggL, ncol = 2, rel_height = 0.1, align = 'v', axis = 'r'
 ggsave(paste0(outGraph, "DE_ME_boxplot_paper.pdf")
   , height = 16, width = 6)
 
+
+# Plotting ME of cell type enriched genes
+
+# RG IP cluster 8
+gg1L <- Plot_ME_CellType_Genes(
+  me_markerFlag_DF = ME_CellTypeEnriched_L[["RG_to_IP_8"]]
+  , color_1 = "#8dd3c7", color_2 = "#bebada"
+)
+Plot_Grid(gg1L, ncol = 3, rel_height = 0.2
+  , title = paste0(graphCodeTitle
+    , "\n\nME of RG or IP cell type enriched genes in"
+    , "\ncluster 8 RG+, IP+, RG+IP+, Neuron-")
+)
+ggsave(paste0(outGraph, "CellTypeEnriched_ME_boxplot_RGpIPpNn_Cluster8.pdf")
+  , height = 8, width = 12)
+
+# RG IP cluster 10
+gg2L <- Plot_ME_CellType_Genes(
+  me_markerFlag_DF = ME_CellTypeEnriched_L[["RG_to_IP_10"]]
+  , color_1 = "#8dd3c7", color_2 = "#bebada"
+)
+Plot_Grid(gg2L, ncol = 3, rel_height = 0.2
+  , title = paste0(graphCodeTitle
+    , "\n\nME of RG vs IP cell type enriched genes in"
+    , "\ncluster 10 RG+, IP+, RG+IP+, Neuron-")
+)
+ggsave(paste0(outGraph, "CellTypeEnriched_ME_boxplot_RGpIPpNn_Cluster10.pdf")
+  , height = 8, width = 12)
+
+# RG neuron cluster 8
+gg3L <- Plot_ME_CellType_Genes(
+  me_markerFlag_DF = ME_CellTypeEnriched_L[["RG_to_Neuron_08"]]
+  , color_1 = "#8dd3c7", color_2 = "#fb8072"
+)
+Plot_Grid(gg3L, ncol = 3, rel_height = 0.2
+  , title = paste0(graphCodeTitle
+    , "\n\nME of RG vs Neuron cell type enriched genes in"
+    , "\ncluster 0,8 RG+, Neuron+, RG+Neuron+, IP-")
+)
+ggsave(paste0(outGraph, "CellTypeEnriched_ME_boxplot_RGpIPnNp_Cluster08.pdf")
+  , height = 8, width = 12)
+
+# RG neuron cluster 10
+gg4L <- Plot_ME_CellType_Genes(
+  me_markerFlag_DF = ME_CellTypeEnriched_L[["RG_to_Neuron_010"]]
+  , color_1 = "#8dd3c7", color_2 = "#fb8072"
+)
+Plot_Grid(gg4L, ncol = 3, rel_height = 0.2
+  , title = paste0(graphCodeTitle
+    , "\n\nME of RG vs Neuron cell type enriched genes in"
+    , "\ncluster 0,10 RG+, Neuron+, RG+Neuron+, IP-")
+)
+ggsave(paste0(outGraph, "CellTypeEnriched_ME_boxplot_RGpIPnNp_Cluster010.pdf")
+  , height = 8, width = 12)
+
+# IP neuron cluster 8
+gg5L <- Plot_ME_CellType_Genes(
+  me_markerFlag_DF = ME_CellTypeEnriched_L[["IP_to_Neuron_08"]]
+  , color_1 = "#bebada", color_2 = "#fb8072"
+)
+Plot_Grid(gg5L, ncol = 3, rel_height = 0.2
+  , title = paste0(graphCodeTitle
+    , "\n\nME of IP vs Neuron cell type enriched genes in"
+    , "\ncluster 0,8 IP+, Neuron+, IP+Neuron+, RG-")
+)
+ggsave(paste0(outGraph, "CellTypeEnriched_ME_boxplot_RGnIPpNp_Cluster08.pdf")
+  , height = 8, width = 12)
+
+# IP neuron cluster 10
+gg6L <- Plot_ME_CellType_Genes(
+  me_markerFlag_DF = ME_CellTypeEnriched_L[["IP_to_Neuron_010"]]
+  , color_1 = "#bebada", color_2 = "#fb8072"
+)
+Plot_Grid(gg6L, ncol = 3, rel_height = 0.2
+  , title = paste0(graphCodeTitle
+    , "\n\nME of IP vs Neuron cell type enriched genes in"
+    , "\ncluster 0,10 IP+, Neuron+, IP+Neuron+, RG-")
+)
+ggsave(paste0(outGraph, "CellTypeEnriched_ME_boxplot_RGnIPpNp_Cluster010.pdf")
+  , height = 8, width = 12)
+
+# Paper
+Append_List <- function(list_of_list_objects){
+  ggL <- append(list_of_list_objects[1], list_of_list_objects[2])
+  for(i in 3:length(list_of_list_objects)){
+    gg <- list_of_list_objects[i]
+    ggL <- append(ggL, gg)
+  }
+  return(ggL)
+}
+ggL <- Append_List(list_of_list_objects = c(
+  # RG IP
+  gg1L[2]
+  , gg2L[2]
+  , gg1L[5]
+  , gg2L[5]
+  # RG neuron
+  , gg3L[2]
+  , gg4L[2]
+  , gg3L[5]
+  , gg4L[5]
+  # IP neuron
+  , gg5L[2]
+  , gg6L[2]
+  , gg5L[5]
+  , gg6L[5]
+))
+ggL <- lapply(ggL, function(gg){
+  gg <- gg + ggtitle("") + xlab("")
+  return(gg)
+})
+Plot_Grid(ggL, ncol = 2, rel_height = 0.1, align = 'v', axis = 'r'
+  , title = paste0(graphCodeTitle
+    , "\n\nME of cell type enriched genes")
+)
+ggsave(paste0(outGraph, "CellTypeEnriched_ME_boxplot_paper.pdf")
+  , height = 16, width = 6)
+
 ## Average Expression
 # df1 <- Average_MarkersExp_Per_Cell(
 #   exM = noCentExM, seuratO = centSO)
@@ -471,9 +593,11 @@ Plot_PercentDE_Cell_Type_DE_Genes <- function(){
   ggDF <- melt(ggDF, id.vars = c("Signature", "Transition_State", "Phase", "Pvalue"))
   ggDF$Transition_State_DE <-
     gsub(".* vs ", "", ggDF$Transition_State)
-  idx <- c(seq(2,12,2), seq(13,24,2))
+  idx <- c(seq(1,12,2), seq(14,24,2))
   ggDF$Transition_State_DE[idx] <-
     gsub(" vs .*", "", ggDF$Transition_State[idx])
+  ggDF$Transition_State_DE <- factor(ggDF$Transition_State_DE
+    , levels = c("RGIP", "RGNeuron", "IPNeuron", "RG", "IP"))
   # Plot
   ggplot(ggDF, aes(x = Signature, y = value
     , fill = Transition_State_DE)) +
@@ -482,6 +606,17 @@ Plot_PercentDE_Cell_Type_DE_Genes <- function(){
     geom_text(aes(y = 95, label = signif(Pvalue, 2)), size = 2) +
     coord_flip() +
     ylim(c(-100,100)) +
+    scale_fill_manual(
+      breaks = c("RG", "IP", "Neuron", "RGIP", "RGNeuron", "IPNeuron")
+      , values = c(
+        "RG" = "#8DD1C6"
+        , "IP" = "#BFBBDA"
+        # , "Neuron" = "#F47F73"
+        , "RGIP" = "#A8C6D0"
+        , "RGNeuron" = "#C9AC9A"
+        , "IPNeuron" = "#CB9898"
+        )
+      ) +
     ggplot_set_theme_publication +
     ggtitle(paste0(graphCodeTitle
       , "\nPercent positive or negative fold change in mixed state cells"
@@ -699,6 +834,7 @@ Fold_Change_Signature_DE_Genes <- function(
     , levels = c("RG_vs_IP", "RG_vs_Neuron", "IP_vs_Neuron"))
   return(percent_DF)
 }
+
 # Fold change of cell type enriched genes in mixed state cells versus cell types
 percent_fold_change_DFL <- list(
   # RG IP
@@ -809,6 +945,14 @@ ggplot(percent_fold_change_DF, aes(x = Signature, y = Percent_Fold_Change
   geom_bar(stat = "identity", position = position_dodge()) +
   coord_flip() +
   ylim(c(-100,100)) +
+  scale_fill_manual(
+    breaks = c("RG", "IP", "Neuron")
+    , values = c(
+      "RG" = "#8DD1C6"
+      , "IP" = "#BFBBDA"
+      , "Neuron" = "#F47F73"
+      )
+    ) +
   ggplot_set_theme_publication +
   # scale_fill_manual(values = c(Neuron = "#fb8072", IP = "#bebada", RG = "#8dd3c7")) +
   ggtitle(paste0(graphCodeTitle
@@ -990,6 +1134,10 @@ Plot_PercentDE_Cell_Type_Enriched_Genes <- function(){
     gsub(" vs .*", "", percent_DE_genes_DF$Transition_State)
   percent_DE_genes_DF$Transition_State_DE[idx] <-
     gsub(".* vs ", "", percent_DE_genes_DF$Transition_State[idx])
+  percent_DE_genes_DF$Transition_State_DE <- factor(
+    percent_DE_genes_DF$Transition_State_DE
+    , levels = rev(c("RG", "IP", "Neuron", "RGIP", "RGNeuron", "IPNeuron"))
+  )
   colnames(percent_DE_genes_DF)[c(1,2)] <- c("Percent_1", "Percent_2")
   idx <- seq(2, nrow(percent_DE_genes_DF), 2)
   percent_DE_genes_DF$Percent_1[idx] <- percent_DE_genes_DF$Percent_1[idx] * -1
@@ -1002,6 +1150,17 @@ Plot_PercentDE_Cell_Type_Enriched_Genes <- function(){
     geom_bar(stat = "identity", position = position_dodge()) +
     geom_text(aes(y = 95, label = signif(Pvalue, 2)), size = 2) +
     coord_flip() +
+    scale_fill_manual(
+      breaks = c("RG", "IP", "Neuron", "RGIP", "RGNeuron", "IPNeuron")
+      , values = c(
+        "RG" = "#8DD1C6"
+        , "IP" = "#BFBBDA"
+        # , "Neuron" = "#F47F73"
+        , "RGIP" = "#A8C6D0"
+        , "RGNeuron" = "#C9AC9A"
+        , "IPNeuron" = "#CB9898"
+        )
+      ) +
     ylim(c(-100,100)) +
     ggplot_set_theme_publication +
     ggtitle(paste0(graphCodeTitle
@@ -1167,6 +1326,14 @@ ggplot(percent_fold_change_DF, aes(x = Signature, y = Percent_Fold_Change
   facet_wrap(~Cell_Types+Transition_States+Phase, scales = "free", ncol = 2) +
   geom_bar(stat = "identity", position = position_dodge()) +
   coord_flip() +
+  scale_fill_manual(
+    breaks = c("RG", "IP", "Neuron")
+    , values = c(
+      "RG" = "#8DD1C6"
+      , "IP" = "#BFBBDA"
+      , "Neuron" = "#F47F73"
+      )
+    ) +
   ylim(c(-100,100)) +
   ggplot_set_theme_publication +
   ggtitle(paste0(graphCodeTitle
