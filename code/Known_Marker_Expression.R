@@ -396,7 +396,7 @@ ssKmDF <- kmDF[c("Gene.Symbol", "Grouping")]
 ssKmDF <- ssKmDF[ssKmDF$Gene.Symbol %in% genes, ]
 ggDF <- merge(ssKmDF[c("Gene.Symbol", "Grouping")], centSO@scale.data
   , by.x = 1, by.y = "row.names", all.x = TRUE)
-Heatmaps_Combined(
+Heatmaps_By_Cluster_Combined(
   ggDF = ggDF, seuratO = centSO, lowerLimit = -1.5, upperLimit = 1.5
   , clusters1 = c(0:1), clusters2 = c(2:10), clusters3 = c(11:17)
   , title = paste0(graphCodeTitle
@@ -420,18 +420,15 @@ ggsave(paste0(outGraph, "KnownMarksSubset_Heatmap_NormalizedCenteredScaled.png")
 
 # Feature plot
 # Normalized, no mean centering scaling
-# Loop through and plot each group of genes
-ggL <- lapply(names(kmDFL), function(grouping) {
-  print(grouping)
-  genes <- kmDF$Gene.Symbol[kmDF$Grouping == grouping]
-  ggDF <- Mean_Expression(ggDF, genes, noCentExM)
-  ggDF <- Set_Limits(ggDF, limLow = 0, limHigh = 3)
-  ggFp <- Feature_Plot(ggDF, title = paste0("\n", grouping)
-    , limLow = 0, limHigh = 3)
-  return(ggFp)
-})
-ggTsne <- TSNE_Plot(centSO)
-ggL <- append(list(ggTsne), ggL)
+ggL <- FeaturePlot(
+  genes = kmDF$Gene.Symbol
+  , tsneDF = ggDF
+  , seuratO = centSO
+  , exM = noCentExM
+  , limLow = -1
+  , limHigh = 3
+  , geneGrouping = kmDF$Grouping
+  , centScale = FALSE)
 # plot_grid combine tSNE graphs
 pg <- plot_grid(plotlist = ggL, ncol = 3, align = 'v', axis = 'r')
 # now add the title
@@ -445,24 +442,21 @@ title <- ggdraw() + draw_label(paste0(graphCodeTitle
   , "\ntSNE PC 1-40"
   , "\n"))
 # rel_heights values control title margins
-plot_grid(title, pg, ncol = 1, rel_heights = c(0.1, 1))
+plot_grid(title, pg, ncol = 1, rel_heights = c(0.05, 1))
 ggsave(paste0(outGraph, "KnownMarks_FeaturePlot_Normalized.png")
   , width = 14, height = length(ggL)*1.25)
 
 # Feature plot
 # Normalized, mean centered scaled
-# Loop through and plot each group of genes
-ggL <- lapply(names(kmDFL), function(grouping) {
-  print(grouping)
-  genes <- kmDF$Gene.Symbol[kmDF$Grouping == grouping]
-  ggDF <- Mean_Expression(ggDF, genes, centSO@scale.data)
-  ggDF <- Set_Limits(ggDF, limLow = -1.5, limHigh = 1.5)
-  ggFp <- Feature_Plot_CentScale(ggDF, title = paste0("\n", grouping)
-    , limLow = -1.5, limHigh = 1.5)
-  return(ggFp)
-})
-ggTsne <- TSNE_Plot(centSO)
-ggL <- append(list(ggTsne), ggL)
+ggL <- FeaturePlot(
+  genes = kmDF$Gene.Symbol
+  , tsneDF = ggDF
+  , seuratO = centSO
+  , exM = centSO@scale.data
+  , limLow = -1.5
+  , limHigh = 1.5
+  , geneGrouping = kmDF$Grouping
+  , centScale = TRUE)
 # plot_grid combine tSNE graphs
 pg <- plot_grid(plotlist = ggL, ncol = 3, align = 'v', axis = 'r')
 # now add the title
@@ -476,7 +470,7 @@ title <- ggdraw() + draw_label(paste0(graphCodeTitle
   , "\ntSNE PC 1-40"
   , "\n"))
 # rel_heights values control title margins
-plot_grid(title, pg, ncol = 1, rel_heights = c(0.1, 1))
+plot_grid(title, pg, ncol = 1, rel_heights = c(0.05, 1))
 ggsave(paste0(outGraph, "KnownMarks_FeaturePlot_NormalizedCenteredScaled.png")
   , width = 14, height = length(ggL)*1.25)
 
@@ -516,48 +510,60 @@ ggsave(paste0(outGraph, "KnownMarks_ViolinPlot_Normalized.png")
 
 # Heatmap
 # Normalized, no mean centering scaling
-ggDF <- merge(kmDF[c("Gene.Symbol", "Grouping")], noCentExM
-  , by.x = 1, by.y = "row.names", all.x = TRUE)
-Heatmaps_Combined(
-  ggDF = ggDF, seuratO = centSO, lowerLimit = 0, upperLimit = 3
-  , clusters1 = c(0:1), clusters2 = c(2:10), clusters3 = c(11:17)
-  , title = paste0(graphCodeTitle
-    , "\n\nExpression of published marker genes by cluster"
-    , "\nx-axis: Marker genes"
-    , "\ny-axis: Cells ordered by cluster"
-    , "\nNormalized expression"
-    , "\n\nRemove cells < 200 genes detected"
-    , "\nRemove cells > 3192 (3 SD) genes detected"
-    , "\nRemove genes detected in < 3 cells"
-    , "\nNormalize expression"
-    , "\nRegress out nUMI, donor, library lab"
-    , "\nSeurat clustering with PC1-40"
-    , "\n"))
+geneGroupDF <- data.frame(GENE = kmDF$Gene.Symbol, GROUP = kmDF$Grouping)
+ggL <- Heatmaps_By_Cluster_Combined(
+  geneGroupDF = geneGroupDF, exprM = noCentExM, seuratO = centSO
+  , lowerLimit = 0, upperLimit = 3, geneOrder = FALSE
+  , clusters1 = c(0:1), clusters2 = c(2:10), clusters3 = c(11:16)
+)
+pg <- plot_grid(plotlist = ggL, ncol = 3, align = 'h', axis = 'b')
+# now add the title
+title <- paste0(graphCodeTitle
+  , "\n\nExpression of published marker genes by cluster"
+  , "\nx-axis: Marker genes"
+  , "\ny-axis: Cells ordered by cluster"
+  , "\nNormalized expression"
+  , "\n\nRemove cells < 200 genes detected"
+  , "\nRemove cells > 3192 (3 SD) genes detected"
+  , "\nRemove genes detected in < 3 cells"
+  , "\nNormalize expression"
+  , "\nRegress out nUMI, donor, library lab"
+  , "\nSeurat clustering with PC1-40"
+  , "\n")
+title <- ggdraw() + draw_label(title)
+# rel_heights values control title margins
+pg <- plot_grid(title, pg, ncol = 1, rel_heights = c(0.05, 1))
 ggsave(paste0(outGraph, "KnownMarks_Heatmap_Normalized.png")
-  , width = 16, height = 60, limitsize = FALSE)
+  , width = 16, height = 80, limitsize = FALSE)
 
 # Heatmap
 # Normalized, mean centered and scaled
-ggDF <- merge(kmDF[c("Gene.Symbol", "Grouping")], centSO@scale.data
-  , by.x = 1, by.y = "row.names", all.x = TRUE)
-Heatmaps_Combined(
-  ggDF = ggDF, seuratO = centSO, lowerLimit = -1.5, upperLimit = 1.5
-  , clusters1 = c(0:1), clusters2 = c(2:10), clusters3 = c(11:17)
-  , title = paste0(graphCodeTitle
-    , "\n\nExpression of published marker genes by cluster"
-    , "\nx-axis: Marker genes"
-    , "\ny-axis: Cells ordered by cluster"
-    , "\nNormalized expression, mean centered, variance scaled"
-    , "\n\nRemove cells < 200 genes detected"
-    , "\nRemove cells > 3192 (3 SD) genes detected"
-    , "\nRemove genes detected in < 3 cells"
-    , "\nNormalize expression"
-    , "\nRegress out nUMI, donor, library lab"
-    , "\nMean center variance scale expression"
-    , "\nSeurat clustering with PC1-40"
-    , "\n"))
+geneGroupDF <- data.frame(GENE = kmDF$Gene.Symbol, GROUP = kmDF$Grouping)
+ggL <- Heatmaps_By_Cluster_Combined(
+  geneGroupDF = geneGroupDF, exprM = centSO@scale.data, seuratO = centSO
+  , lowerLimit = -1.5, upperLimit = 1.5, geneOrder = FALSE
+  , clusters1 = c(0:1), clusters2 = c(2:10), clusters3 = c(11:16)
+)
+pg <- plot_grid(plotlist = ggL, ncol = 3, align = 'h', axis = 'b')
+# now add the title
+title <- paste0(graphCodeTitle
+  , "\n\nExpression of published marker genes by cluster"
+  , "\nx-axis: Marker genes"
+  , "\ny-axis: Cells ordered by cluster"
+  , "\nNormalized expression, mean centered, variance scaled"
+  , "\n\nRemove cells < 200 genes detected"
+  , "\nRemove cells > 3192 (3 SD) genes detected"
+  , "\nRemove genes detected in < 3 cells"
+  , "\nNormalize expression"
+  , "\nRegress out nUMI, donor, library lab"
+  , "\nMean center variance scale expression"
+  , "\nSeurat clustering with PC1-40"
+  , "\n")
+title <- ggdraw() + draw_label(title)
+# rel_heights values control title margins
+pg <- plot_grid(title, pg, ncol = 1, rel_heights = c(0.05, 1))
 ggsave(paste0(outGraph, "KnownMarks_Heatmap_NormalizedCenteredScaled.png")
-  , width = 16, height = 60, limitsize = FALSE)
+  , width = 16, height = 80, limitsize = FALSE)
 ################################################################################
 
 ### Cell cycle genes
@@ -651,7 +657,7 @@ ggsave(paste0(outGraph, "CellCycle_FeaturePlot_NormalizedCenteredScaled.png")
 # Normalized, no mean centering scaling
 ggDF <- merge(ccDF[c("Gene.Symbol", "Grouping")], noCentExM
   , by.x = 1, by.y = "row.names", all.x = TRUE)
-Heatmaps_Combined(
+Heatmaps_By_Cluster_Combined(
   ggDF = ggDF, seuratO = centSO, lowerLimit = 0, upperLimit = 3
   , clusters1 = c(0:1), clusters2 = c(2:10), clusters3 = c(11:17)
   , title = paste0(graphCodeTitle
@@ -672,7 +678,7 @@ ggsave(paste0(outGraph, "CellCycle_Heatmap_Normalized.png")
 # Normalized, mean centered and scaled
 ggDF <- merge(ccDF[c("Gene.Symbol", "Grouping")], centSO@scale.data
   , by.x = 1, by.y = "row.names", all.x = TRUE)
-Heatmaps_Combined(
+Heatmaps_By_Cluster_Combined(
   ggDF = ggDF, seuratO = centSO, lowerLimit = -1.5, upperLimit = 1.5
   , clusters1 = c(0:1), clusters2 = c(2:10), clusters3 = c(11:17)
   , title = paste0(graphCodeTitle
@@ -935,7 +941,7 @@ dev.off()
 # Normalized, no mean centering scaling
 ggDF <- merge(lmDF[c("Gene", "cluster")], noCentExM
   , by.x = 1, by.y = "row.names", all.x = TRUE)
-Heatmaps_Combined(
+Heatmaps_By_Cluster_Combined(
   ggDF = ggDF, seuratO = centSO, lowerLimit = 0, upperLimit = 3
   , clusters1 = c(0:1), clusters2 = c(2:10), clusters3 = c(11:17)
   , title = paste0(graphCodeTitle
@@ -958,7 +964,7 @@ ggsave(paste0(outGraph, "Lake_Heatmap_Normalized.png")
 # Normalized, mean centered and scaled
 ggDF <- merge(lmDF[c("Gene", "cluster")], centSO@scale.data
   , by.x = 1, by.y = "row.names", all.x = TRUE)
-Heatmaps_Combined(
+Heatmaps_By_Cluster_Combined(
   ggDF = ggDF, seuratO = centSO, lowerLimit = -1.5, upperLimit = 1.5
   , clusters1 = c(0:1), clusters2 = c(2:10), clusters3 = c(11:17)
   , title = paste0(graphCodeTitle
