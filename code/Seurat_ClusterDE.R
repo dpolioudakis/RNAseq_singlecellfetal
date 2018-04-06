@@ -31,6 +31,7 @@ print(paste0("Cluster ID: ", clusterID))
 ## Inputs
 # Seurat
 load("../analysis/analyzed_data/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_seuratO.Robj")
+rm(noCentExM)
 # load("../analysis/analyzed_data/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_TEST5000_seuratO.Robj")
 # centSO <- ssCentSO
 # noCentExM <- ssNoCentExM
