@@ -78,17 +78,20 @@ print(paste0(
   "### Finding differentially expressed genes for cluster ", clusterID)
 )
 
-# # Filter cells
-# df <- DE_Filters_ExpMatrix(centSO
-#   , minPercent = 10, foldChange = 0.2, clusterID = clusterID)
+# Filter cells
+exDF <- DE_Filters_ExpMatrix(
+  so = centSO, minPercent = 10, clusterID = clusterID
+)
 
 # DE Linear model
 termsDF <- centSO@meta.data[c("nUMI", "librarylab", "individual")]
+termsDF <- termsDF[row.names(termsDF) %in% colnames(exDF), ]
+
 # Add term TRUE/FALSE cell is in cluster
 termsDF$cluster <- FALSE
 termsDF$cluster[centSO@ident == clusterID] <- TRUE
 mod <- "y ~ cluster+nUMI+librarylab+individual"
-deLM <- DE_Linear_Model(exDatDF = centSO@data, termsDF = termsDF, mod = mod)
+deLM <- DE_Linear_Model(exDatDF = exDF, termsDF = termsDF, mod = mod)
 
 # Format LM output into data frame
 deDF <- Format_DE(deLM, centSO, clusterID)
