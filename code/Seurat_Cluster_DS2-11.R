@@ -20,13 +20,15 @@ require(irlba)
 require(gridExtra)
 require(cowplot)
 require("ggdendro")
-# require(xlsx)
 source("Function_Library.R")
 
 args <- commandArgs(trailingOnly = TRUE)
 print(args)
 
 # load("../analysis/analyzed_data/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_seuratO.Robj")
+# load("../analysis/analyzed_data/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_TEST5000_seuratO.Robj")
+# centSO <- ssCentSO
+# noCentExM <- ssNoCentExM
 
 ## Input data
 # Digital gene expression
@@ -387,6 +389,20 @@ noCentExM <- RegressCovariates(centSO@data, covDF)
 ### QC plots
 
 print("### QC plots")
+
+# Paper - violin plot of nGene, nUMI, percent MT
+fmetDF <- centSO@meta.data
+ggDF <- fmetDF[ ,c("nGene", "nUMI", "percent.mito")]
+ggDF$percent.mito <- ggDF$percent.mito * 100
+ggDF <- melt(ggDF)
+means_DF <- aggregate(value~variable, ggDF, mean)
+# ggplot
+ggplot(ggDF, aes(y = value, x = variable)) +
+  geom_violin(aes(fill = variable)) +
+  geom_text(data = means_DF, aes(label = round(value,2), y = value)) +
+  facet_wrap(~variable, ncol = 3, scales = "free") +
+  ggplot_set_theme_publication
+ggsave(paste0(outGraph, "QC_violinPlot_paper.pdf"), width = 8, height = 4)
 
 # Mean nUMI and mean nGene for filtered data
 df1 <- data.frame(Mean_nGene = mean(centSO@meta.data$nGene)
@@ -1510,6 +1526,74 @@ ggplot(ggDF, aes(x = nGene, y = Freq)) +
   ggtitle(paste0(graphCodeTitle
     , "\nGenes detected per cluster versus number of cells per cluster"))
 ggsave(paste0(outGraph, "PC1-40_nCellVsnGene_ScatterPlot.pdf")
+  , width = 7, height = 7)
+
+# Variance of gene expression per cluster
+Plot_Expr_Variance_By_Cluster <- function(number_top_genes){
+  expr_DF <- melt(noCentExM)
+  idx <- match(expr_DF$Var2, names(centSO@ident))
+  expr_DF$Cluster <- centSO@ident[idx]
+  expr_DFL <- split(expr_DF, expr_DF$Cluster)
+  var_DFL <- lapply(expr_DFL, function(ss_expr_DF){
+    mn_expr_DF <- aggregate(value~Var1, ss_expr_DF, mean)
+    mn_expr_DF[order(-mn_expr_DF$value), ]
+    top_genes <- mn_expr_DF$Var1[1:number_top_genes]
+    ss_expr_DF <- with(ss_expr_DF, ss_expr_DF[Var1 %in% top_genes, ])
+    var_DF <- aggregate(value~Var1+Cluster, ss_expr_DF, var)
+    return(var_DF)
+  })
+  var_DF <- do.call("rbind", var_DFL)
+  ggplot(var_DF, aes(x = Cluster, y = value, fill = Cluster)) +
+    geom_boxplot() +
+    coord_cartesian(ylim = c(0, 1)) +
+    xlab("Cluster") +
+    ylab("Variance")
+}
+Plot_Expr_Variance_By_Cluster(number_top_genes = 1000) +
+  ggtitle(paste0(graphCodeTitle
+    , "\n\nVariance of expression for"
+    , "\ntop 1000 most highly expressed genes in each cluster"
+    , "\nSubset dataset to 5000 cells"))
+ggsave(paste0(outGraph, "PC1-40_Cluster_Metrics_Variance_Top1000.png")
+  , width = 7, height = 7)
+Plot_Expr_Variance_By_Cluster(number_top_genes = 35543) +
+  ggtitle(paste0(graphCodeTitle
+    , "\n\nVariance of expression for all genes"
+    , "\nSubset dataset to 5000 cells"))
+ggsave(paste0(outGraph, "PC1-40_Cluster_Metrics_Variance.png")
+  , width = 7, height = 7)
+
+# Variance of gene expression by cell type
+Plot_Expr_Variance_By_Cell_Type <- function(){
+  expr_DF <- melt(noCentExM)
+  idx <- match(expr_DF$Var2, names(centSO@ident))
+  expr_DF$Cluster <- centSO@ident[idx]
+  expr_DF$Cell_Type <- NA
+  expr_DF$Cell_Type[expr_DF$Cluster %in% c(7,8,9,10)] <- "Progenitors"
+  expr_DF$Cell_Type[expr_DF$Cluster %in% c(3,4)] <- "Maturing EN"
+  expr_DFL <- split(expr_DF, expr_DF$Cell_Type)
+  var_DFL <- lapply(expr_DFL, function(ss_expr_DF){
+    mn_expr_DF <- aggregate(value~Var1, ss_expr_DF, mean)
+    mn_expr_DF[order(-mn_expr_DF$value), ]
+    top_genes <- mn_expr_DF$Var1[1:1000]
+    ss_expr_DF <- with(ss_expr_DF, ss_expr_DF[Var1 %in% top_genes, ])
+    var_DF <- aggregate(value~Var1+Cell_Type, ss_expr_DF, var)
+    return(var_DF)
+  })
+  var_DF <- do.call("rbind", var_DFL)
+  ggplot(var_DF, aes(x = Cell_Type, y = value, fill = Cell_Type)) +
+    geom_boxplot() +
+    coord_cartesian(ylim = c(0, 1)) +
+    xlab("Cell types") +
+    ylab("Variance") +
+    ggtitle(paste0(graphCodeTitle
+      , "\n\nVariance of expression for top 1000 most highly expressed genes"
+      , "\nProgenitors (vRG, oRG, cycling progenitors 7,8,9,10)"
+      , "\nvs maturing excitatory neurons (Deep layer and callosal 3,4)"
+      , "\nSubset dataset to 5000 cells"))
+}
+Plot_Expr_Variance_By_Cell_Type()
+ggsave(paste0(outGraph, "PC1-40_Variance_ProgenitorvsNeuron.png")
   , width = 7, height = 7)
 
 # TBR1 expression per cluster
