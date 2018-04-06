@@ -171,7 +171,56 @@ ggsave(paste0(outGraph
 )
 
 
-## Subset of marker genes feature plots
+## Subset of marker genes feature plots - mean expression
+
+# Genes
+genesL <- list(
+  vRG = c("CRYAB")
+  , oRG = c("HOPX")
+  , RG = c("VIM", "PAX6", "HES1", "SOX2")
+  , IPC = c("EOMES")
+  , Neuron = c("STMN2", "NEUROD6")
+  , "Excitatory deep layer" = c("BCL11B", "TBR1", "SOX5")
+  , "Excitatory upper layer" = c("SATB2")
+  , Interneuron = c("DLX1", "DLX2", "SST", "CALB2")
+  , OPC = c("OLIG1", "OLIG2")
+  , Endothelial = c("ITM2A", "CLDN5")
+  , Pericyte = c("RGS5")
+  , Microglia = c("AIF1", "CX3CR1")
+)
+gene_group_DF <- melt(genesL)
+# Collect tSNE values for ggplot
+tsneDF <- as.data.frame(centSO@dr$tsne@cell.embeddings)
+# Normalized centered scaled
+ggL <- FeaturePlot(
+  genes = gene_group_DF$value
+  , tsneDF = tsneDF
+  , seuratO = centSO
+  , exM = centSO@scale.data
+  , limLow = -1.5
+  , limHigh = 1.5
+  , geneGrouping = NULL
+  , centScale = TRUE
+)
+ggL <- lapply(ggL, function(gg){
+  gg <- gg + ggplot_set_theme_publication_nolabels +
+    theme(legend.position = "none")
+  return(gg)
+})
+Plot_Grid(
+  ggPlotsL = ggL[-1], ncol = 6, rel_height = 0.1, align = 'v', axis = 'r'
+  , title = paste0(graphCodeTitle
+    , "\n\nExpression of marker genes"
+    , "\nNormalized centered scaled expression"
+    , "\n")
+)
+ggsave(paste0(outGraph
+    , "KnownMarksSubset_FeaturePlotIndividual_NormalizedCenteredScaled_paper.png"
+  )
+  , width = 24, height = 16, limitsize = FALSE
+)
+
+## Subset of marker genes feature plots - individual genes
 
 # Genes
 gene_group_DF <- kmDF[kmDF$Grouping %in% c("vRG", "oRG", "RG", "IP", "Neuron"
