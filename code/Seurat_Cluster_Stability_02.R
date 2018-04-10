@@ -17,9 +17,10 @@ require(Matrix)
 require(fpc)
 require(methods)
 require(dplyr)
+source("Function_Library.R")
 
 ## Input
-load("../analysis/analyzed_data/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_centSO.Robj")
+load("../analysis/analyzed_data/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_seuratO.Robj")
 rm(noCentExM)
 # load("../analysis/analyzed_data/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_TEST5000_centSO.Robj")
 # centSO <- ssCentSO
@@ -126,16 +127,20 @@ write.csv(jcrdM, paste0(outTable, "JaccardBoot.csv"), quote = FALSE
   , row.names = TRUE)
 
 # Barplot of jaccard index
-ggplot(mean_jcrd_DF, aes(y = Jaccard_Mean, x = Cluster, fill = Cluster)) +
+ggplot(mean_jcrd_DF, aes(y = Jaccard_Mean, x = Cluster_Reorder
+  , fill = Cluster_Reorder)) +
   geom_bar(stat = "identity") +
   ylab("Jaccard index") +
   ggtitle(paste0(graphCodeTitle, "\n\nSeurat cluster stability: Jaccard Index"))
 ggsave(paste0(outGraph, "Jaccard_Index.pdf"))
 # Paper
-ggplot(mean_jcrd_DF, aes(y = Jaccard_Mean, x = Cluster_Reorder
-  , fill = Cluster)) +
+ggplot(mean_jcrd_DF, aes(y = Jaccard_Mean, x = Cluster
+  , fill = Cluster_Reorder)) +
   geom_bar(stat = "identity") +
+  scale_y_continuous(expand = c(0, 0), limits = c(0, 1)) +
+  # ylim(c(0,1)) +
   ylab("Jaccard index") +
+  ggplot_set_theme_publication +
   ggtitle(paste0(graphCodeTitle, "\n\nSeurat cluster stability: Jaccard Index"))
 ggsave(paste0(outGraph, "Jaccard_Index_paper.pdf"))
 ################################################################################

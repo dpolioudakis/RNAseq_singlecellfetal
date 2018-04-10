@@ -18,11 +18,11 @@
 #$ -cwd
 #$ -V
 #$ -S /bin/bash
-#$ -N SeuratDE
+#$ -N Stability
 #$ -o logs/Seurat_Cluster_Stability_01_QSUB_$JOB_ID_$TASK_ID.log
 #$ -e logs/Seurat_Cluster_Stability_01_QSUB_$JOB_ID_$TASK_ID.error
 #$ -l h_data=128G,h_rt=12:00:00,highp
-#$ -t 1-20
+#$ -t 1-1000
 ##########################################################################
 echo ""
 echo "Starting Seurat_Cluster_Stability_01_QSUB.sh ${SGE_TASK_ID}... "$(date)
@@ -39,7 +39,7 @@ LD_LIBRARY_PATH=/u/local/compilers/gcc/4.9.3/lib:/u/local/compilers/gcc/4.9.3/li
 LIBRARY_PATH=/u/local/compilers/gcc/4.9.3/lib:/u/local/compilers/gcc/4.9.3/lib64:$LIBRARY_PATH
 
 ## Run Seurat_Cluster_Stability.R
-${pathRscript} Seurat_Cluster_Stability.R ${SGE_TASK_ID}
+${pathRscript} Seurat_Cluster_Stability_01.R ${SGE_TASK_ID}
 ##########################################################################
 
 echo ""
