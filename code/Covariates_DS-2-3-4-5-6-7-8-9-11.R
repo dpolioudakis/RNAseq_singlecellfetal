@@ -22,14 +22,14 @@ require(biomaRt)
 ## Load data
 
 # Digital gene expression and metadata: exDF and metDF
-load("../analysis/Expression_Matrix_Compile/Expression_Matrix_Compile_dge_FtMm250_DS-2-3-4-5-6-7-8-9-11.Rdata")
+load("../analysis/analyzed_data/Expression_Matrix_Compile/Expression_Matrix_Compile_dge_FtMm250_DS-2-3-4-5-6-7-8-9-11.Rdata")
 # # Subsetting for testing
 # idx <- sample(1:ncol(exDF), 500)
 # exDF <- exDF[idx]
 # metDF <- metDF[idx, ]
 # Seurat object for variable genes and scaled data
-load("../analysis/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_seuratO.Robj")
-# load("../analysis/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_TEST_seuratO.Robj")
+load("../analysis/analyzed_data/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_seuratO.Robj")
+# load("../analysis/analyzed_data/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_TEST_seuratO.Robj")
 # centSO <- ssCentSO
 # noCentExM <- ssNoCentExM
 
@@ -46,7 +46,7 @@ outGraphs <- "../analysis/graphs/Covariates/Covariates_DS-2-3-4-5-6-7-8-9-11_"
 dir.create(dirname(outGraphs), recursive = TRUE)
 graphsTitle <- "Covariates_DS-2-3-4-5-6-7-8-9-11.R"
 # Data
-outData <- "../analysis/Covariates/Covariates_DS-2-3-4-5-6-7-8-9-11_"
+outData <- "../analysis/analyzed_data/Covariates/Covariates_DS-2-3-4-5-6-7-8-9-11_"
 dir.create(dirname(outData), recursive = TRUE)
 
 ## ggplot2 theme
@@ -285,7 +285,7 @@ pairsDat[sapply(pairsDat, is.character)] <- lapply(pairsDat[sapply(pairsDat
 
 cond <- labels2colors(nmCvDF$LIBRARY)  ## colors
 
-png(paste0(outGraphs, "CovariatesMatrix_FtMm250_SeuratNormVarGenes.png")
+png(paste0(outGraphs, "CovariatesMatrix_FtMm250_SeuratNormVarGenes_TEST.png")
   , height = 12, width = 12, units = "in", res = 300)
 pairs(cbind(topPCs, pairsDat), col = cond, pch = 19
   , upper.panel = panel.cor
@@ -298,13 +298,152 @@ dev.off()
 save(pcAll, pcVar, pcNmVar, file = paste0(outData, "PCA.Rdata"))
 ################################################################################
 
+### Plots for paper
+
+load(paste0(outData, "PCA.Rdata"))
+
+# Useful function for comparing multivariate data
+panel.cor.paper <- function(x, y, digits = 2, prefix = "", cex.cor, ...) {
+  usr <- par("usr"); on.exit(par(usr))
+  par(usr = c(0, 1, 0, 1))
+  if (class(x) == "numeric" & class(y) == "numeric") {
+    r <- abs(cor(x, y, use = "pairwise.complete.obs", method = "spearman"))
+  } else {
+    lmout <- lm(y~x)
+    r <- sqrt(abs(summary(lmout)$adj.r.squared))
+  }
+  ll <- par("usr")
+  color <- colorRampPalette(c("white", "red"))(100)
+  rect(ll[1], ll[3], ll[2], ll[4], col = color[r*100])
+  txt <- format(c(r, 0.123456789), digits = digits)[1]
+  txt <- paste0(prefix, txt)
+  text(0.5, 0.5, txt, )
+}
+
+## Raw counts
+
+topPCs <- pcAll$rotation[ ,1:5];
+# Calculate variance explained by each PC
+varExp <- (pcAll$sdev)^2 / sum(pcAll$sdev^2)
+topVar <- varExp[1:5]
+colnames(topPCs) <- paste("Expression\n", colnames(topPCs)
+  , " (", signif(100 * topVar[1:5], 2), "%)", sep = "")
+
+## Correlation matrix of expression PCs and technical covariates
+
+pairsDat <- data.frame(cvDF)
+# Convert character columns to factor
+pairsDat[sapply(pairsDat, is.character)] <- lapply(pairsDat[sapply(pairsDat
+  , is.character)], as.factor)
+
+cond <- labels2colors(cvDF$LIBRARY)  ## colors
+
+pdf(paste0(outGraphs, "CovariatesMatrix_FtMm250_CountsAllGenes_paper.pdf")
+  , height = 12, width = 12)
+pairs(cbind(topPCs, pairsDat), col = cond, pch = 19
+  , upper.panel = panel.cor.paper
+  , lower.panel = NULL
+  , main = paste0(
+    "Covariates and MaxQuant Comparison -- |Spearman's rho| correlation values"
+    ,"\nRaw counts - All genes"))
+dev.off()
+
+## Normalized and batch corrected
+
+# Subset expression dataframe to Seurat variable genes
+nmVarDF <- centSO@scale.data[row.names(centSO@scale.data) %in% centSO@var.genes, ]
+# Subset covariates to cells remaining after Seurat filters
+idx <- match(colnames(nmVarDF), row.names(cvDF))
+idx <- idx[! is.na(idx)]
+nmCvDF <- cvDF[idx, ]
+nmVarDF <- nmVarDF[ ,colnames(nmVarDF) %in% rownames(cvDF)]
+
+topPCs <- pcNmVar$rotation[,1:5];
+# Calculate variance explained by each PC
+varExp <- (pcNmVar$sdev)^2 / sum(pcNmVar$sdev^2)
+topVar <- varExp[1:5]
+colnames(topPCs) <- paste("Expression\n", colnames(topPCs)
+  , " (", signif(100 * topVar[1:5], 2), "%)", sep = "")
+
+## Correlation matrix of expression PCs and technical covariates
+
+pairsDat <- data.frame(nmCvDF)
+# Convert character columns to factor
+pairsDat[sapply(pairsDat, is.character)] <- lapply(pairsDat[sapply(pairsDat
+  , is.character)], as.factor)
+
+pdf(paste0(outGraphs, "CovariatesMatrix_FtMm250_SeuratNormVarGenes_paper.pdf")
+  , height = 12, width = 12)
+pairs(cbind(topPCs, pairsDat), pch = 19
+  , upper.panel = panel.cor.paper
+  , lower.panel = NULL
+  , main = paste0(
+    "Covariates and MaxQuant Comparison -- |Spearman's rho| correlation values"
+    ,"\nSeurat normalized, centered, scaled - Variable genes"))
+dev.off()
+################################################################################
+
+# ### Correlation matrix for ggplot
+#
+#
+# # Subset expression dataframe to Seurat variable genes
+# nmVarDF <- centSO@scale.data[row.names(centSO@scale.data) %in% centSO@var.genes, ]
+# # Subset covariates to cells remaining after Seurat filters
+# idx <- match(colnames(nmVarDF), row.names(cvDF))
+# idx <- idx[! is.na(idx)]
+# nmCvDF <- cvDF[idx, ]
+# nmVarDF <- nmVarDF[ ,colnames(nmVarDF) %in% rownames(cvDF)]
+#
+# # Centers the mean of all genes - this means the PCA gives us the eigenvectors
+# # of the geneXgene covariance matrix, allowing us to assess the proportion of
+# # variance each component contributes to the data
+# meanCenteredM <- t(scale(t(nmVarDF), scale = FALSE))
+#
+#
+# library("ggcorrplot")
+# dat_DF <- cbind(topPCs, pairsDat)
+# # dat_DF <- dat_DF[sample(1:nrow(dat_DF), 1000), ]
+# dat_DF$DONOR <- as.factor(dat_DF$DONOR)
+# dat_DF$nGene <- as.numeric(dat_DF$nGene)
+# # Compute a correlation matrix
+# corr_M <- matrix(NA, ncol(dat_DF), ncol(dat_DF))
+# rownames(corr_M) <- colnames(dat_DF)
+# colnames(corr_M) <- colnames(dat_DF)
+# for(i in 1:nrow(corr_M)){
+#   for(j in 1:ncol(corr_M)){
+#     x <- dat_DF[ ,rownames(corr_M)[i]]
+#     y <- dat_DF[ ,colnames(corr_M)[j]]
+#     print(str(y))
+#     if (class(x) == "numeric" & class(y) == "numeric") {
+#       print("Both numeric")
+#       r <- abs(cor(x, y, use = "pairwise.complete.obs", method = "spearman"))
+#     } else {
+#       lmout <- lm(y~x)
+#       summary(multinom(as.factor(dat_DF$REGION)~as.numeric(dat_DF[,1])))
+#       r <- sqrt(abs(summary(lmout)$adj.r.squared))
+#     }
+#     corr_M[i,j] <- r
+#   }
+# }
+#
+#
+#
+#
+# # Visualize
+# ggcorrplot(corr, p.mat = cor_pmat(my_data),
+#            hc.order = TRUE, type = "lower",
+#            color = c("#FC4E07", "white", "#00AFBB"),
+#            outline.col = "white", lab = TRUE)
+
+################################################################################
+
 ## Bootstrap regression
-# 
+#
 # covDF <- data.frame(metDatDF[ ,c("ExpCondition", "RIN.y", "X260.230"
 #   , "X260.280", "ExtractionDate.y")], topPCdatSeq)
 # covDF$ExpCondition <- as.numeric(covDF$ExpCondition)
 # covDF$ExtractionDate.y <- as.numeric(covDF$ExtractionDate.y)
-# 
+#
 # # Factors must be coded as numeric for bootstrap
 # RegressCovariatesBootstrap <- function (exM, covDF) {
 #   # 1) lme using covariates on unnormalized data
@@ -330,7 +469,7 @@ save(pcAll, pcVar, pcNmVar, file = paste0(outData, "PCA.Rdata"))
 #     bs.results <- boot(data = data.frame(thisexp, covDF), statistic = bs,
 #       R = numboot, formula = thisexp~ExpCondition+RIN.y+X260.230+X260.280+ExtractionDate.y+Seq.PC1+Seq.PC2+Seq.PC3+Seq.PC4+Seq.PC5)
 #     ## get the median - we can sometimes get NA values here... so let's exclude
-#     ## these - old code #bs.stats <- apply(bs.results$t,2,median) 
+#     ## these - old code #bs.stats <- apply(bs.results$t,2,median)
 #     bs.stats <- rep(NA, ncol(bs.results$t)) ##ncol is 3 here (thisexp, construct and extracted)
 #     for (n in 1:ncol(bs.results$t)) {
 #       bs.stats[n] <- median(na.omit(bs.results$t[ ,n]))
@@ -340,6 +479,4 @@ save(pcAll, pcVar, pcNmVar, file = paste0(outData, "PCA.Rdata"))
 #     # cat('Done for Gene',i,'\n')
 #   }
 # }
-# 
-
-
+#
