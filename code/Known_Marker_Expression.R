@@ -171,7 +171,7 @@ ggsave(paste0(outGraph
 )
 
 
-## Subset of marker genes feature plots - mean expression
+## Subset of marker genes feature plots  - individual genes
 
 # Genes
 genesL <- list(
@@ -217,15 +217,15 @@ Plot_Grid(
 ggsave(paste0(outGraph
     , "KnownMarksSubset_FeaturePlotIndividual_NormalizedCenteredScaled_paper.png"
   )
-  , width = 24, height = 16, limitsize = FALSE
+  , width = 24, height = 16, limitsize = FALSE, dpi = 150
 )
 
-## Subset of marker genes feature plots - individual genes
+## Subset of marker genes feature plots - mean expression
 
 # Genes
 gene_group_DF <- kmDF[kmDF$Grouping %in% c("vRG", "oRG", "RG", "IP", "Neuron"
   , "Excitatory Deep Layer Cortical", "Excitatory Upper Layer Cortical"
-  , "GABAergic interneuron "), ]
+  , "GABAergic interneuron"), ]
 # Collect tSNE values for ggplot
 tsneDF <- as.data.frame(centSO@dr$tsne@cell.embeddings)
 # Normalized centered scaled
