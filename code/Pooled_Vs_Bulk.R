@@ -114,13 +114,6 @@ QueryBiomaRt <- function (genesList, filters, attributes) {
   bmDF
 }
 
-Convert_Mixed_GeneSym_EnsID_To_EnsID <- function(ids){
-  idx <- match(ids, bmDF$hgnc_symbol)
-  ens <- bmDF$ensembl_gene_id[idx]
-  ids[! is.na(ens)] <- as.character(ens[! is.na(ens)])
-  return(ids)
-}
-
 # Subset to higher in bulk or higher in pooled
 Subset_Two_SD <- function(dataset) {
   idx <- data.frame(
