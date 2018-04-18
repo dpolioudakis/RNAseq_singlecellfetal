@@ -36,7 +36,7 @@ load("../analysis/analyzed_data/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegN
 
 # Cluster DE table
 deDF <- read.table(
-  "../analysis/tables/Seurat_ClusterDE_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_ClusterDE_DS2-11_ClusterX_Vs_All_Clusters.txt"
+  "../analysis/tables/Seurat_ClusterDE/DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/res054/Seurat_ClusterDE_ClusterX_Vs_All_Clusters.txt"
   , header = TRUE)
 
 # Luis metaMat results
@@ -301,6 +301,56 @@ Seurat_Heatmap_By_Cluster_Hclust_Genes <- function(genes, clusterOrder) {
 
   return(pg)
 }
+
+# Expression heatmap, cells ordered by cluster
+Plot_Marker_Genes_Heatmap_SetColWidths <- function(
+  geneGroupDF
+  , exprM = centSO@scale.data
+  , seuratO = centSO
+  , clusters = c(0:15)
+  , lowerLimit = -1.5
+  , upperLimit = 1.5
+  , geneOrder = TRUE
+  , clusterOrder = c(9,7,8,10,2,0,1,4,3,13,5,6,11,12,14,15)
+  ) {
+
+  print("Plot_Marker_Genes_Heatmap_SetColWidths")
+
+  # Heatmap plot
+  # Normalized, mean centered and scaled
+  ggDF <- Heatmap_By_Cluster_Format_Data(
+    geneGroupDF = geneGroupDF
+    , exprM = exprM
+    , seuratO = seuratO
+    , clusters = clusters
+    , lowerLimit = lowerLimit
+    , upperLimit = upperLimit
+    , geneOrder = geneOrder
+    , clusterOrder = clusterOrder
+  )
+
+  print("Heatmap_By_Cluster: plotting...")
+  # ggplot
+  gg <- ggplot(ggDF, aes(x = variable, y = GENE_GROUP, fill = value)) +
+    geom_tile() +
+    facet_grid(GROUP~SEURAT_CLUSTERS, space = "free_y", scales = "free"
+      , drop = TRUE) +
+    # scale_fill_gradient2(high = "#d7191c", low = "#2c7bb6")
+    scale_fill_distiller(name = "Normalized\nexpression", type = "div"
+      , palette = 5, direction = -1, limits = c(lowerLimit, upperLimit)) +
+    theme_bw() +
+    theme(strip.text.x = element_text(angle = 90)) +
+    theme(strip.text.y = element_text(angle = 0)) +
+    theme(strip.background = element_blank()) +
+    theme(axis.text.x = element_blank()) +
+    theme(axis.ticks = element_blank()) +
+    theme(text = element_text(size = 12)) +
+    theme(axis.text.y = element_text(size = 10)) +
+    ylab("Genes") +
+    xlab("Cells ordered by cluster")
+  # gg <- gg + ...
+  return(gg)
+}
 ################################################################################
 
 ### Figures for paper
@@ -371,6 +421,117 @@ ggplot(df1, aes(x = AGE, y = value, group = 1)) +
 ggsave(paste0(outGraph, "BrainSpan_Fit.pdf"), width = 7, height = 3)
 ggsave(paste0(outGraph, "BrainSpan_Fit.png"), width = 7, height = 3)
 
+# Heatmap of enriched human specific genes
+# Heatmap plot
+# Normalized, mean centered and scaled
+Heatmap_Of_Expression_By_Cluster <- function(genes){
+  geneGroupDF <- data.frame(GENE = genes, GROUP = NA)
+  ggL <- lapply(c(9,7,8,10,2,0,1,4,3,13,5,6,11,12,14,15), function(cluster){
+    # tryCatch(
+      Heatmap_By_Cluster(
+        geneGroupDF = geneGroupDF
+        , exprM = as.matrix(centSO@scale.data)
+        , seuratO = centSO
+        , clusters = cluster
+        , lowerLimit = -1.5
+        , upperLimit = 1.5
+        , geneOrder = TRUE
+      )
+      # , error = function(e) NULL)
+  })
+  # Remove nulls from ggplot list
+  ggL <- ggL[! sapply(ggL, is.null)]
+  # Extract legend
+  legend <- get_legend(ggL[[1]])
+  # Format - remove axis labels
+  # ggL[[1]] <- ggL[[1]] + theme(
+  #   axis.title.x = element_blank()
+  #   , legend.position = "none"
+  #   , strip.text.y = element_blank())
+  labels <- ggL[[1]]
+  # margin: top, right, bottom, and left
+  labels <- ggL[[1]] + theme(
+    plot.margin = unit(c(1, -1, 1, 1), "cm")
+    , legend.position = "none"
+    , axis.title.x = element_blank()
+    , strip.text.y = element_blank())
+  ggL[1:length(ggL)] <- lapply(ggL[1:length(ggL)], function(gg) {
+    gg + theme(
+      strip.text.y = element_blank()
+      , legend.position = "none"
+      , axis.title.y = element_blank()
+      , axis.text.y = element_blank()
+      , axis.ticks.y = element_blank()
+      , axis.title.x = element_blank()
+      # margin: top, right, bottom, and left
+      , plot.margin = unit(c(1, 0.05, 1, 0.05), "cm")
+    )
+  })
+
+  # Combine individual heatmaps and dendrogram
+  rel_widths <- data.frame(log((table(centSO@ident) + 1), 5))
+  rel_widths <- rel_widths[match(c(9,7,8,10,2,0,1,4,3,13,5,6,11,12,14,15), rel_widths$Var1), ]
+  rel_widths <- as.vector(rel_widths$Freq) + 1
+
+  rel_widths <- c(30, rel_widths)
+  # Combine
+  pg <- plot_grid(plotlist = append(list(labels), ggL)
+    , ncol = length(rel_widths), rel_widths = rel_widths
+    , align = 'h', axis = 't'
+  )
+  return(pg)
+}
+## oRG
+print("Heatmap of oRG enriched human specific genes")
+genes_DF <- deDF[deDF$Cluster == 7, ]
+genes_DF <- genes_DF[order(-genes_DF$Log2_Fold_Change), ]
+genes <- intersect(
+  genes_DF$Gene
+  , as.character(hsDF$Gene[hsDF$Set == "Human-specific"])
+)
+genes <- rev(genes)
+pg <- Heatmap_Of_Expression_By_Cluster(genes)
+# Title
+title = paste0(graphCodeTitle
+  , "\n\nExpression of oRG enriched Allen human specific genes"
+  , "\nx-axis: Genes"
+  , "\ny-axis: Cells ordered by cluster"
+  , "\nNormalized expression, mean centered, variance scaled"
+  , "\n")
+# now add the title
+title <- ggdraw() + draw_label(title)
+# rel_heights values control title margins
+plot_grid(title, pg, ncol = 1, rel_heights = c(0.2, 1))
+# Save
+ggsave(paste0(
+  outGraph, "Heatmap_NormalizedCenteredScaled_oRG_paper.png")
+  , width = 12, height = 6, limitsize = FALSE)
+## Collosal
+print("Heatmap of collosal enriched human specific genes")
+genes_DF <- deDF[deDF$Cluster == 4, ]
+genes_DF <- genes_DF[order(-genes_DF$Log2_Fold_Change), ]
+genes <- intersect(
+  genes_DF$Gene
+  , as.character(hsDF$Gene[hsDF$Set == "Human-specific"])
+)
+genes <- rev(genes)
+pg <- Heatmap_Of_Expression_By_Cluster(genes)
+# Title
+title = paste0(graphCodeTitle
+  , "\n\nExpression of collosal enriched Allen human specific genes"
+  , "\nx-axis: Genes"
+  , "\ny-axis: Cells ordered by cluster"
+  , "\nNormalized expression, mean centered, variance scaled"
+  , "\n")
+# now add the title
+title <- ggdraw() + draw_label(title)
+# rel_heights values control title margins
+plot_grid(title, pg, ncol = 1, rel_heights = c(0.2, 1))
+# Save
+ggsave(paste0(
+  outGraph, "Heatmap_NormalizedCenteredScaled_collosal_paper.png")
+  , width = 12, height = 6, limitsize = FALSE)
+
 # Heatmap + hclust of human specific genes
 print("Heatmap + hclust of human specific genes")
 genes <- as.character(hsDF$Gene[hsDF$Set == "Human-specific"])
@@ -394,6 +555,58 @@ plot_grid(title, pg, ncol = 1, rel_heights = c(0.075, 1))
 ggsave(paste0(
   outGraph, "HeatmapDend_NormalizedCenteredScaled.png")
   , width = 12, height = 28, limitsize = FALSE)
+
+## oRG
+genes_DF <- deDF[deDF$Cluster == 7, ]
+genes_DF <- genes_DF[order(-genes_DF$Log2_Fold_Change), ]
+genes <- intersect(
+  genes_DF$Gene
+  , as.character(hsDF$Gene[hsDF$Set == "Human-specific"])
+)
+genes <- rev(genes)
+geneGroupDF <- data.frame(
+  GENE = genes
+  , GROUP = NA
+)
+gg <- Plot_Marker_Genes_Heatmap_SetColWidths(geneGroupDF = geneGroupDF)
+gg + ggtitle(paste0(graphCodeTitle
+  , "\n\nExpression of Allen human specific genes"
+  , "\nx-axis: Genes"
+  , "\ny-axis: Cells ordered by cluster"
+  , "\nNormalized expression, mean centered, variance scaled"
+  , "\n")
+)
+ggsave(paste0(outGraph
+    , "HeatmapSetColWidths_NormalizedCenteredScaled_oRG_paper.png"
+  )
+  , width = 12, height = 6
+)
+
+## Collosal
+genes_DF <- deDF[deDF$Cluster == 4, ]
+genes_DF <- genes_DF[order(-genes_DF$Log2_Fold_Change), ]
+genes <- intersect(
+  genes_DF$Gene
+  , as.character(hsDF$Gene[hsDF$Set == "Human-specific"])
+)
+genes <- rev(genes)
+geneGroupDF <- data.frame(
+  GENE = genes
+  , GROUP = NA
+)
+gg <- Plot_Marker_Genes_Heatmap_SetColWidths(geneGroupDF = geneGroupDF)
+gg + ggtitle(paste0(graphCodeTitle
+  , "\n\nExpression of Allen human specific genes"
+  , "\nx-axis: Genes"
+  , "\ny-axis: Cells ordered by cluster"
+  , "\nNormalized expression, mean centered, variance scaled"
+  , "\n")
+)
+ggsave(paste0(outGraph
+    , "HeatmapSetColWidths_NormalizedCenteredScaled_Collosal_paper.png"
+  )
+  , width = 12, height = 6
+)
 ################################################################################
 
 ### metaMat cluster DE oRG human specific genes and expression ranking in RG

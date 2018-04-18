@@ -300,6 +300,56 @@ Seurat_Heatmap_By_Cluster_Hclust_Genes <- function(genes, clusterOrder) {
 
   return(pg)
 }
+
+# Expression heatmap, cells ordered by cluster
+Plot_Marker_Genes_Heatmap_SetColWidths <- function(
+  geneGroupDF
+  , exprM = centSO@scale.data
+  , seuratO = centSO
+  , clusters = c(0:15)
+  , lowerLimit = -1.5
+  , upperLimit = 1.5
+  , geneOrder = TRUE
+  , clusterOrder = c(9,7,8,10,2,0,1,4,3,13,5,6,11,12,14,15)
+  ) {
+
+  print("Plot_Marker_Genes_Heatmap_SetColWidths")
+
+  # Heatmap plot
+  # Normalized, mean centered and scaled
+  ggDF <- Heatmap_By_Cluster_Format_Data(
+    geneGroupDF = geneGroupDF
+    , exprM = exprM
+    , seuratO = seuratO
+    , clusters = clusters
+    , lowerLimit = lowerLimit
+    , upperLimit = upperLimit
+    , geneOrder = geneOrder
+    , clusterOrder = clusterOrder
+  )
+
+  print("Heatmap_By_Cluster: plotting...")
+  # ggplot
+  gg <- ggplot(ggDF, aes(x = variable, y = GENE_GROUP, fill = value)) +
+    geom_tile() +
+    facet_grid(GROUP~SEURAT_CLUSTERS, space = "free_y", scales = "free"
+      , drop = TRUE) +
+    # scale_fill_gradient2(high = "#d7191c", low = "#2c7bb6")
+    scale_fill_distiller(name = "Normalized\nexpression", type = "div"
+      , palette = 5, direction = -1, limits = c(lowerLimit, upperLimit)) +
+    theme_bw() +
+    theme(strip.text.x = element_text(angle = 90)) +
+    theme(strip.text.y = element_text(angle = 0)) +
+    theme(strip.background = element_blank()) +
+    theme(axis.text.x = element_blank()) +
+    theme(axis.ticks = element_blank()) +
+    theme(text = element_text(size = 12)) +
+    theme(axis.text.y = element_text(size = 10)) +
+    ylab("Genes") +
+    xlab("Cells ordered by cluster")
+  # gg <- gg + ...
+  return(gg)
+}
 ################################################################################
 
 ### Format
@@ -612,6 +662,30 @@ plot_grid(title, pg, ncol = 1, rel_heights = c(0.12, 1))
 ggsave(paste0(
   outGraph, "TADA_HeatmapDend_NormalizedCenteredScaled.png")
   , width = 12, height = 14, limitsize = FALSE)
+
+## Heatmap of ASD TADA genes with fixed column widths
+genes_DF <- deDF[deDF$Cluster %in% c(0,1,3,4,13,5,6), ]
+genes_DF <- genes_DF[order(-genes_DF$Log2_Fold_Change), ]
+genes <- intersect(genes_DF$Gene, tada)
+genes <- rev(genes)
+geneGroupDF <- data.frame(
+  GENE = genes
+  , GROUP = NA
+)
+gg <- Plot_Marker_Genes_Heatmap_SetColWidths(geneGroupDF = geneGroupDF)
+gg + ggtitle(paste0(graphCodeTitle
+  graphCodeTitle
+    , "\n\nExpression of ASD TADA genes"
+    , "\nx-axis: Genes"
+    , "\ny-axis: Cells ordered by cluster"
+    , "\nNormalized expression, mean centered, variance scaled"
+    , "\n")
+)
+ggsave(paste0(outGraph
+    , "TADA_HeatmapSetColWidths_NormalizedCenteredScaled_paper.png"
+  )
+  , width = 12, height = 6
+)
 ################################################################################
 
 ### Human specific or primate specific + TADA
