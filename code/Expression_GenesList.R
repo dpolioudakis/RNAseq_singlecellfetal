@@ -154,7 +154,7 @@ Plot_Expression_FeaturePlotCentScale_Run <- function(){
     outGraph, "FeaturePlot_NormCentScale.png")
     , width = 15, height = 2.5+length(ggL)*1.25, limitsize = FALSE)
 }
-Plot_Expression_FeaturePlot_Run()
+Plot_Expression_FeaturePlotCentScale_Run()
 
 
 Plot_Expression_FeaturePlot_Run <- function(){
@@ -191,7 +191,7 @@ Plot_Expression_FeaturePlot_Run()
 
 ## Heatmaps
 
-Plot_Expression_HeatmapCentScale(){
+Plot_Expression_HeatmapCentScale <- function(){
   print("Plot_Expression_Heatmap")
   # Cluster index
   cluster_annot_idx <- c(
