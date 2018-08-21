@@ -544,7 +544,7 @@ Plot_ME_CellTypeEnriched_Genes_Run <- function(){
     , gg4L[5]
     , gg6L[5]
   ))
-  Plot_Grid(ggL, ncol = 2, rel_height = 0.1, align = 'v', axis = 'r'
+  Plot_Grid(ggL, ncol = 3, rel_height = 0.1, align = 'v', axis = 'r'
     , title = paste0(graphCodeTitle
       , "\n\nME of cell type enriched genes")
   )
