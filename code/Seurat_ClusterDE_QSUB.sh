@@ -22,7 +22,7 @@
 #$ -o logs/Seurat_ClusterDE_QSUB_$JOB_ID_$TASK_ID.log
 #$ -e logs/Seurat_ClusterDE_QSUB_$JOB_ID_$TASK_ID.error
 #$ -l h_data=256G,h_rt=3:00:00,highp
-#$ -t 1-18
+#$ -t 1-16
 ##########################################################################
 echo ""
 echo "Starting Seurat_ClusterDE_QSUB.sh ${SGE_TASK_ID}... "$(date)

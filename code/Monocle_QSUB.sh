@@ -15,7 +15,7 @@
 #$ -N Monocle
 #$ -o logs/Monocle_QSUB_$JOB_ID.log
 #$ -e logs/Monocle_QSUB_$JOB_ID.error
-#$ -l h_data=256G,h_rt=4:00:00,highp
+#$ -l h_data=256G,h_rt=24:00:00,highp
 ################################################################################
 
 echo ""

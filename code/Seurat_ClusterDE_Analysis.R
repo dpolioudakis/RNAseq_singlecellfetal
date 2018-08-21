@@ -35,22 +35,22 @@ load("../analysis/analyzed_data/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegN
 bmDF <- read.csv("../source/BiomaRt_Compile_GeneInfo_GRCh38_Ensembl87.csv"
   , header = TRUE)
 
-# Kang
-# Non regressed data
-load("../neurogenesis/orig.data/InVivoData/WGCNAinput_SestanBrain.RData")
-kangExM <- t(datExpr)
-rm(datExpr)
-# sampleKey is ProcessedKangMetaData.csv
-kangMtDF <- sampleKey
-kangAnnotRaw <- read.csv("../neurogenesis/orig.data/InVivoData/annot.csv", row.names = 1)
-kangAnnotnet2 <- kangAnnotRaw[which(rownames(kangAnnotRaw) %in% rownames(kangExM)), ]
-
-# Miller
-load("../neurogenesis/orig.data/LCMDE/AllenLCM.Rdata")
-millerExDF = AllenLCM$datExpr
-millerMtDF = AllenLCM$datTraits
-millerZonesDF = read.csv("../neurogenesis/orig.data/LCMDE/LCM_Zones_CPio.csv")
-millerAnnotRawDF = read.csv("../neurogenesis/orig.data/LCMDE/annot.csv", row.names = 1)
+# # Kang
+# # Non regressed data
+# load("../neurogenesis/orig.data/InVivoData/WGCNAinput_SestanBrain.RData")
+# kangExM <- t(datExpr)
+# rm(datExpr)
+# # sampleKey is ProcessedKangMetaData.csv
+# kangMtDF <- sampleKey
+# kangAnnotRaw <- read.csv("../neurogenesis/orig.data/InVivoData/annot.csv", row.names = 1)
+# kangAnnotnet2 <- kangAnnotRaw[which(rownames(kangAnnotRaw) %in% rownames(kangExM)), ]
+#
+# # Miller
+# load("../neurogenesis/orig.data/LCMDE/AllenLCM.Rdata")
+# millerExDF = AllenLCM$datExpr
+# millerMtDF = AllenLCM$datTraits
+# millerZonesDF = read.csv("../neurogenesis/orig.data/LCMDE/LCM_Zones_CPio.csv")
+# millerAnnotRawDF = read.csv("../neurogenesis/orig.data/LCMDE/annot.csv", row.names = 1)
 
 # DE of clusters
 inTables <- list.files("../analysis/tables/Seurat_ClusterDE/DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/res054"
@@ -136,92 +136,134 @@ ldf <- lapply(inTables, function(inDE) {
   df <- df[with(df, FDR < 0.05 & Log2_Fold_Change > 0.2), ]
   df <- df[order(-df$Log2_Fold_Change), ]
   # Add ensembl IDs
-  df$Ensembl <- Convert_Mixed_GeneSym_EnsID_To_EnsID(as.character(df$Gene))
+  # df$Ensembl <- Convert_Mixed_GeneSym_EnsID_To_EnsID(as.character(df$Gene))
   return(df)
 })
 clusterDeDF <- do.call("rbind", ldf)
+# Round percentages
+clusterDeDF$Percent_Cluster <- round(clusterDeDF$Percent_Cluster, 1)
+clusterDeDF$Percent_All <- round(clusterDeDF$Percent_All, 1)
 # Check
 head(clusterDeDF)
+tail(clusterDeDF)
+dim(clusterDeDF)
 length(grep("ENSG", clusterDeDF$Ensembl))
-nrow(clusterDeDF)
+head(clusterDeDF[order(clusterDeDF$Cluster, clusterDeDF$Gene), ], 20)
 # Write out as tab delimited
 write.table(x = clusterDeDF
   , file = paste0(outTable, "ClusterX_Vs_All_Clusters.txt")
   , sep = "\t", quote = FALSE, row.names = FALSE
 )
 
-
-## Kang convert probe ids to ensembl
-etzId <- kangAnnotRaw$ENTREZ_ID[match(row.names(kangExM), rownames(kangAnnotRaw))]
-ensId <- bmDF$ensembl_gene_id[match(etzId, bmDF$entrezgene)]
-row.names(kangExM) <- ensId
-
-
-## Miller
-
-# Subset to samples from neocortix layers
-toMatch <- paste(millerZonesDF$Label, collapse = "|")
-wellIDs <- millerMtDF$well_id[grep(toMatch, millerMtDF$structure_acronym)]
-millerMtDF <- millerMtDF[millerMtDF$well_id %in% wellIDs, ]
-millerExDF <- millerExDF[ ,colnames(millerExDF) %in% wellIDs]
-
-# Subset to entrez annotated probes
-millerExDF <- millerExDF[! is.na(millerAnnotRawDF$ENTREZ_ID), ]
-millerAnnot <- millerAnnotRawDF[! is.na(millerAnnotRawDF$ENTREZ_ID), ]
-
-# Convert Miller expression matrix to entrez
-# Miller rows match Miller annotation rows
-row.names(millerExDF) <- millerAnnot$ENTREZ_ID
-
-# Get maximum expression probe
-genes = unique(millerAnnot$ENTREZ_ID)
-keepind = matrix(nrow = 0, ncol = 0);
-for (ii in 1:length(genes)) {
-  genematchind = which(millerAnnot$ENTREZ_ID == genes[ii]);
-  if (length(genematchind) > 1) {
-    themeans = rowMeans(millerExDF[genematchind, ]);
-    maxind = which(themeans == max(themeans))[1];
-    keepind = c(keepind, genematchind[maxind]);
-  } else {
-    keepind = c(keepind, genematchind);
-  }
-}
-millerExDF = millerExDF[keepind, ];
-rownames(millerExDF) = genes;
-millerAnnot = millerAnnot[keepind, ];
-
-# Convert entrez to ensembl
-# Subset to genes that have ensembl
-millerExDF <- millerExDF[row.names(millerExDF) %in% bmDF$entrezgene, ]
-millerExDF$Ensembl <- bmDF$ensembl_gene_id[
-  match(row.names(millerExDF), bmDF$entrezgene)]
-# Take average expression of genes that have same ensembl
-# millerExDF <- aggregate(.~Ensembl, millerExDF, mean)
-##### Averaging not working correctly, removed duplicates as place holder
-millerExDF <- millerExDF[! duplicated(millerExDF$Ensembl), ]
-row.names(millerExDF) <- millerExDF$Ensembl
-millerExDF <- millerExDF[ ,-1]
+# Format for paper
+cluster_DE_paper_DF <- clusterDeDF
+# cluster_DE_paper_DF <- read.table(paste0(outTable, "ClusterX_Vs_All_Clusters.txt"), header = TRUE)
+cluster_DE_paper_DF$Cluster_number <- cluster_DE_paper_DF$Cluster
+# Cluster annotations
+cluster_annot <- c(
+  "9" = "vRG"
+  , "7" = "oRG"
+  , "8" = "Cycling progenitor S phase"
+  , "10" = "Cycling progenitor G2/M phase"
+  , "2" = "IPC"
+  , "0" = "Excitatory neuron new born migrating"
+  , "1" = "Excitatory neuron"
+  , "4" = "Excitatory neuron (collosal)"
+  , "3" = "Deep layer excitatory neuron 1"
+  , "13" = "Deep layer excitatory neuron 2"
+  , "5" = "Interneuron (SST)"
+  , "6" = "Interneuron (CALB2)"
+  , "11" = "Oligodendrocyte precursor"
+  , "12" = "Endothelial"
+  , "14" = "Pericyte"
+  , "15" = "Microglia"
+)
+idx <- match(cluster_DE_paper_DF$Cluster_number, names(cluster_annot))
+cluster_DE_paper_DF$Cluster <- cluster_annot[idx]
+cluster_DE_paper_DF <- cluster_DE_paper_DF[c("Ensembl", "Gene", "Cluster"
+  , "Cluster_number", "Log2_Fold_Change", "Pvalue", "FDR", "Percent_Cluster"
+  , "Percent_All")]
+colnames(cluster_DE_paper_DF) <- c("Ensembl", "Gene", "Cluster"
+  , "Cluster number", "Log2 fold change", "P-value", "FDR"
+  , "Percent expressed cluster", "Percent expressed all cells")
+# Write out as csv
+write.csv(x = cluster_DE_paper_DF
+  , file = paste0(outTable, "Cluster enriched paper.csv")
+  , quote = FALSE, row.names = FALSE
+)
 
 
-# row.names(millerExDF) <- millerAnnot$SYMBOL
-
-
-# Add Zone column combining laminar zones from different regions
-millerMtDF$Zone <- millerMtDF$structure_acronym
-millerMtDF$Zone <- gsub("[f|t|p|o]SZ.*o",   "SZo", millerMtDF$Zone)
-millerMtDF$Zone <- gsub("[f|t|p|o]SZ.*i",   "SZi", millerMtDF$Zone)
-for (i in 1:nrow(millerZonesDF)) {
-  millerMtDF$Zone <- gsub(
-    as.character(millerZonesDF[i,"Label"])
-    , as.character(millerZonesDF[i,"Zone"])
-    , millerMtDF$Zone)
-}
-millerMtDF$Zone <- gsub("CPori", "CPi", millerMtDF$Zone)
-millerMtDF$Zone <- gsub("SZori", "SZi", millerMtDF$Zone)
-
-# # Subset to frontal cortex
-# millerMtDF <- millerMtDF[grep("^f.*", millerMtDF$structure_acronym), ]
-# millerExDF <- millerExDF[ ,grep("^f.*", millerMtDF$structure_acronym)]
+# ## Kang convert probe ids to ensembl
+# etzId <- kangAnnotRaw$ENTREZ_ID[match(row.names(kangExM), rownames(kangAnnotRaw))]
+# ensId <- bmDF$ensembl_gene_id[match(etzId, bmDF$entrezgene)]
+# row.names(kangExM) <- ensId
+#
+#
+# ## Miller
+#
+# # Subset to samples from neocortix layers
+# toMatch <- paste(millerZonesDF$Label, collapse = "|")
+# wellIDs <- millerMtDF$well_id[grep(toMatch, millerMtDF$structure_acronym)]
+# millerMtDF <- millerMtDF[millerMtDF$well_id %in% wellIDs, ]
+# millerExDF <- millerExDF[ ,colnames(millerExDF) %in% wellIDs]
+#
+# # Subset to entrez annotated probes
+# millerExDF <- millerExDF[! is.na(millerAnnotRawDF$ENTREZ_ID), ]
+# millerAnnot <- millerAnnotRawDF[! is.na(millerAnnotRawDF$ENTREZ_ID), ]
+#
+# # Convert Miller expression matrix to entrez
+# # Miller rows match Miller annotation rows
+# row.names(millerExDF) <- millerAnnot$ENTREZ_ID
+#
+# # Get maximum expression probe
+# genes = unique(millerAnnot$ENTREZ_ID)
+# keepind = matrix(nrow = 0, ncol = 0);
+# for (ii in 1:length(genes)) {
+#   genematchind = which(millerAnnot$ENTREZ_ID == genes[ii]);
+#   if (length(genematchind) > 1) {
+#     themeans = rowMeans(millerExDF[genematchind, ]);
+#     maxind = which(themeans == max(themeans))[1];
+#     keepind = c(keepind, genematchind[maxind]);
+#   } else {
+#     keepind = c(keepind, genematchind);
+#   }
+# }
+# millerExDF = millerExDF[keepind, ];
+# rownames(millerExDF) = genes;
+# millerAnnot = millerAnnot[keepind, ];
+#
+# # Convert entrez to ensembl
+# # Subset to genes that have ensembl
+# millerExDF <- millerExDF[row.names(millerExDF) %in% bmDF$entrezgene, ]
+# millerExDF$Ensembl <- bmDF$ensembl_gene_id[
+#   match(row.names(millerExDF), bmDF$entrezgene)]
+# # Take average expression of genes that have same ensembl
+# # millerExDF <- aggregate(.~Ensembl, millerExDF, mean)
+# ##### Averaging not working correctly, removed duplicates as place holder
+# millerExDF <- millerExDF[! duplicated(millerExDF$Ensembl), ]
+# row.names(millerExDF) <- millerExDF$Ensembl
+# millerExDF <- millerExDF[ ,-1]
+#
+#
+# # row.names(millerExDF) <- millerAnnot$SYMBOL
+#
+#
+# # Add Zone column combining laminar zones from different regions
+# millerMtDF$Zone <- millerMtDF$structure_acronym
+# millerMtDF$Zone <- gsub("[f|t|p|o]SZ.*o",   "SZo", millerMtDF$Zone)
+# millerMtDF$Zone <- gsub("[f|t|p|o]SZ.*i",   "SZi", millerMtDF$Zone)
+# for (i in 1:nrow(millerZonesDF)) {
+#   millerMtDF$Zone <- gsub(
+#     as.character(millerZonesDF[i,"Label"])
+#     , as.character(millerZonesDF[i,"Zone"])
+#     , millerMtDF$Zone)
+# }
+# millerMtDF$Zone <- gsub("CPori", "CPi", millerMtDF$Zone)
+# millerMtDF$Zone <- gsub("SZori", "SZi", millerMtDF$Zone)
+#
+# # # Subset to frontal cortex
+# # millerMtDF <- millerMtDF[grep("^f.*", millerMtDF$structure_acronym), ]
+# # millerExDF <- millerExDF[ ,grep("^f.*", millerMtDF$structure_acronym)]
 ################################################################################
 
 ## Plot pvalues
@@ -251,14 +293,14 @@ Plot_DE_Pval_Hist <- function(){
     # rel_heights values control title margins
     plot_grid(title, pg, ncol = 1, rel_heights = c(0.2, 1))
   })
-  Plot_Grid(pgL, rel_height = 0.01, ncol = 1
+  Plot_Grid(pgL, rel_height = 0.05, ncol = 1
     , title = paste0(graphCodeTitle
       , "\n\nHistograms of p-values before and after Benjamini Hochberg correction")
   )
 }
 Plot_DE_Pval_Hist()
-ggsave(paste0(outGraph, "Pvalue_Histogram_Cluster", clusterID, ".pdf")
-  , width = 9, height = 40)
+ggsave(paste0(outGraph, "Pvalue_Histogram_Cluster.pdf")
+  , width = 9, height = 45)
 
 
 # ## Expression heatmaps of DE genes
@@ -529,14 +571,20 @@ ggsave(paste0(outGraph, "DE_NumberVsnGene_ScatterPlot.pdf")
 
 ### Hierarchical cluster by Seurat cluster mean expression of DE genes
 
-# Top 10 DE genes
-clusterDe10DF <- data.frame(
-  clusterDeDF %>% group_by(Cluster) %>% top_n(10, Log2_Fold_Change))
+# Top DE genes
+clusterDeTopDF <- data.frame(
+  clusterDeDF %>% group_by(Cluster) %>% top_n(20, Log2_Fold_Change))
+
+# Subset to clusters of interest
+clusterDeTopDF <- clusterDeTopDF[clusterDeTopDF$Cluster != 16, ]
 
 # Subset expression matrix
 df <- data.frame(t(centSO@scale.data[
   row.names(centSO@scale.data) %in% clusterDeDF$Gene, ]))
 df$ClusterID <- centSO@ident
+# Subset to clusters of interest
+df <- df[df$ClusterID %in% clusterDeTopDF$Cluster, ]
+# Mean
 df <- aggregate(.~ClusterID, df, mean)
 row.names(df) <- df$ClusterID
 df <- df[ ,colnames(df) != "ClusterID"]
@@ -561,7 +609,7 @@ ggsave(paste0(outGraph, "hclust_dend.pdf"))
 # Heatmap plot
 # Use the dendrogram label data to position the labels
 # Order genes by dendro order
-geneGroupDF <- data.frame(GENE = clusterDe10DF$Gene, GROUP = clusterDe10DF$Cluster)
+geneGroupDF <- data.frame(GENE = clusterDeTopDF$Gene, GROUP = clusterDeTopDF$Cluster)
 geneGroupDF$GROUP <- factor(geneGroupDF$GROUP, levels = hclust_order)
 geneGroupDF <- geneGroupDF[order(geneGroupDF$GROUP), ]
 # Plot heatmap
@@ -632,7 +680,78 @@ title <- ggdraw() + draw_label(title)
 # rel_heights values control title margins
 pg <- plot_grid(title, pg, ncol = 1, rel_heights = c(0.05, 1))
 
-ggsave(paste0(outGraph, "hclust_heatmap.png"), width = 12, height = 28)
+ggsave(paste0(outGraph, "hclust_heatmap.png"), width = 12, height = 56
+  , limitsize = FALSE)
+
+## Markers in heatmap
+
+Intersect_Top_DE_Genes_And_Markers <- function(clusters, groupings){
+  genes <- intersect(
+    clusterDeTopDF$Gene[clusterDeTopDF$Cluster %in% clusters]
+    , kmDF$Gene.Symbol[kmDF$Grouping %in% groupings]
+  )
+  return(genes)
+}
+# "RGS5"
+Intersect_Top_DE_Genes_And_Markers(
+  clusters = 14
+  , groupings = c("Pericyte")
+)
+# "CCL3" "AIF1"
+Intersect_Top_DE_Genes_And_Markers(
+  clusters = 15
+  , groupings = c("Microglia")
+)
+# "ITM2A" "CLDN5" "ESAM"
+Intersect_Top_DE_Genes_And_Markers(
+  clusters = 12
+  , groupings = c("Endothelial Cell")
+)
+# "SOX5"
+Intersect_Top_DE_Genes_And_Markers(
+  clusters = c(3,13)
+  , groupings = c("Excitatory Deep Layer Cortical", "Neuron")
+)
+# "DLX1" "DLX2" "LHX6" "DLX5"
+Intersect_Top_DE_Genes_And_Markers(
+  clusters = c(5,6)
+  , groupings = c("GABAergic interneuron")
+)
+# "STMN2"   "NEUROD6" "SATB2"
+Intersect_Top_DE_Genes_And_Markers(
+  clusters = c(4)
+  , groupings = c("Neuron", "Excitatory Upper Layer Cortical")
+)
+# [1] "PPP1R17" "SSTR2"   "EOMES"   "PENK"
+Intersect_Top_DE_Genes_And_Markers(
+  clusters = c(2)
+  , groupings = c("IP")
+)
+# [1] "SATB2"   "STMN2"   "NEUROD6"
+Intersect_Top_DE_Genes_And_Markers(
+  clusters = c(1)
+  , groupings = c("Neuron", "Excitatory Upper Layer Cortical")
+)
+# "NEUROD6" "POU3F2"
+Intersect_Top_DE_Genes_And_Markers(
+  clusters = c(0)
+  , groupings = c("Neuron", "Excitatory Upper Layer Cortical")
+)
+# [1] "HMGB2" "SOX2"
+Intersect_Top_DE_Genes_And_Markers(
+  clusters = c(8,10)
+  , groupings = c("RG", "IP")
+)
+# [1] "PTPRZ1" "OLIG1"  "PDGFRA"
+Intersect_Top_DE_Genes_And_Markers(
+  clusters = c(11)
+  , groupings = c("OPC")
+)
+# "VIM"    "PTPRZ1" "SOX2"   "SLC1A3" "HES1"   "HOPX"
+Intersect_Top_DE_Genes_And_Markers(
+  clusters = c(7,9)
+  , groupings = c("RG", "oRG", "vRG")
+)
 ################################################################################
 
 ### Heatmaps
@@ -643,156 +762,156 @@ geneGroupDF <- data.frame(GENE = as.character(top10$Gene)
   , GROUP = top10$Cluster)
 
 Heatmap_By_Cluster(geneGroupDF = geneGroupDF, exprM = centSO@scale.data
-  , seuratO = centSO, clusters = c(1:16), lowerLimit = -1.5, upperLimit = 1.5
+  , seuratO = centSO, clusters = c(1:15), lowerLimit = -1.5, upperLimit = 1.5
   # , geneOrder = TRUE
   , clusterOrder = c(9,7,8,10,2,0,1,4,3,13,5,6,11,12,14,15)
 )
 ggsave(paste0(outGraph, "Top10DE_ExprHeatmap_CentScale.png")
   , width = 13, height = 24)
 ################################################################################
-
-### DE genes expression across Kang et al. cortex stages 1-8
-
-## Plot DE genes expression across Kang et al. cortex stages 1-8
-
-ggL <- lapply(sort(unique(clusterDeDF$Cluster)), function(cluster){
-  # Subset DE data frame to cluster
-  specificClusterDeDF <- clusterDeDF[clusterDeDF$Cluster == cluster, ]
-  # Subset to genes > 0.4 log fold change
-  specificClusterDeDF <- specificClusterDeDF[specificClusterDeDF$Log2_Fold_Change > 0.4, ]
-  # Subset Kang expression matrix to DE genes
-  exM <- kangExM[row.names(kangExM) %in% specificClusterDeDF$Ensembl, ]
-  # Format for ggplot2 and add stage
-  df <- melt(exM)
-  df$Stage <- kangMtDF$Stage[match(df$Var2, kangMtDF$X)]
-  # Plot
-  gg <- ggplot(df, aes(x = Stage, y = value)) +
-    geom_jitter(size = 0.01, alpha = 0.2) +
-    stat_summary(geom = "pointrange", fun.data = mean_cl_normal,
-      fun.args = list(conf.int = 0.95), color = "red", fatten = 0.25) +
-    # stat_summary(fun.y = "mean", color = "red", size = 1, geom = "point") +
-    # geom_smooth(method = "loess") +
-    ylab("Normalized expression") +
-    ggtitle(paste0("Cluster ", cluster))
-  return(gg)
-})
-Plot_Grid(ggPlotsL = ggL, ncol = 4, rel_height = 0.15
-  , title = paste0(graphCodeTitle
-    , "\n\nSeurat cluster DE genes expression in Kang cortex stage 1-8"
-    , "\nDE > 0.4 log fold change"
-    , "\nRed points = mean"
-    , "\nRed bar = 95% confidence intervals"
-    , "\nBlack points = expression of each gene in each sample"))
-ggsave(paste0(outGraph, "KangExpr.png"), width = 13, height = 18)
-
-
-## Correlation to Kang stages
-
-# Convert hgnc symbols to ensembl and leave ensembl IDs unchanged
-# (Gene IDs are a mix of hgnc symbols and ensembl IDs for those genes that have
-# no hgnc symbol)
-
-
-Convert_Mixed_GeneSym_EnsID_To_EnsID <- function(ids){
-  idx <- match(ids, bmDF$hgnc_symbol)
-  ens <- bmDF$ensembl_gene_id[idx]
-  ids[! is.na(ens)] <- as.character(ens[! is.na(ens)])
-  return(ids)
-}
-
-Cluster_Correlation_To_Kang_Stages <- function (topGenes) {
-  ll <- lapply(sort(unique(clusterDeDF$Cluster)), function(cluster){
-    # Subset expression matrix to cells in cluster
-    exM <- noCentExM[ ,centSO@ident %in% cluster]
-    # Convert hgnc symbols to ensembl and leave ensembl IDs unchanged
-    # (Gene IDs are a mix of hgnc symbols and ensembl IDs for those genes that have
-    # no hgnc symbol)
-    row.names(exM) <- Convert_Mixed_GeneSym_EnsID_To_EnsID(row.names(exM))
-    # Subset to genes above mean expression threshold
-    rMns <- rowMeans(exM)
-    rMns <- sort(rMns, decreasing = TRUE)
-    ids <- names(rMns)[1:topGenes]
-    ssKangExM <- kangExM[row.names(kangExM) %in% ids, ]
-    df <- melt(ssKangExM)
-    df$Stage <- kangMtDF$Stage[match(df$Var2, kangMtDF$X)]
-    df <- aggregate(value~Stage+Var1, df, mean)
-    df <- dcast(df, Var1~Stage)
-    df$Cluster_Mean_Expression <- rMns[match(df$Var1, names(rMns))]
-    scor <- apply(df[ ,-1], 2, function(col){
-      cor(df$Cluster_Mean_Expression, col, method = "spearman")
-    })
-    return(scor)
-  })
-  df <- do.call("cbind", ll)
-  df <- df[-9, ]
-  colnames(df) <- sort(unique(clusterDeDF$Cluster))
-  df <- melt(df)
-  return(df)
-}
-
-Plot_Cluster_Correlation_To_Kang_Stages <- function (ggDF, topGenes) {
-  ggplot(ggDF, aes(x = Var1, y = Var2, fill = value)) +
-    geom_tile() +
-    scale_fill_gradient(low = "white", high = "red", space = "Lab"
-      , name = "Spearman") +
-    geom_text(aes(label = round(value, 2))) +
-    scale_x_continuous(breaks = unique(ggDF$Var1)) +
-    scale_y_continuous(breaks = unique(ggDF$Var2)) +
-    xlab("Stage") +
-    ylab("Cluster") +
-    ggtitle(paste0("Used top ", topGenes, " expressed genes in cluster"))
-}
-
-df <- Cluster_Correlation_To_Kang_Stages(topGenes = 2500)
-gg1 <- Plot_Cluster_Correlation_To_Kang_Stages(ggDF = df, topGenes = 2500)
-
-df <- Cluster_Correlation_To_Kang_Stages(topGenes = 5000)
-gg2 <- Plot_Cluster_Correlation_To_Kang_Stages(ggDF = df, topGenes = 5000)
-
-df <- Cluster_Correlation_To_Kang_Stages(topGenes = 10000)
-gg3 <- Plot_Cluster_Correlation_To_Kang_Stages(ggDF = df, topGenes = 10000)
-
-Plot_Grid(ggPlotsL = list(gg1, gg2, gg3), ncol = 3, rel_height = 0.15
-  , title = paste0(graphCodeTitle
-    , "\n\nCorrelation of Seurat cluster mean expression profile to"
-    , "\nKang stage expression")
-)
-ggsave(paste0(outGraph, "KangCorrelation.png"), width = 16, height = 9)
-################################################################################
-
-### DE genes across Miller zones
-
-## Expression across Miller zones
-
-ggL <- lapply(sort(unique(clusterDeDF$Cluster)), function(cluster){
-  # Subset DE data frame to cluster
-  specificClusterDeDF <- clusterDeDF[clusterDeDF$Cluster == cluster, ]
-  # Subset to genes > 0.4 log fold change
-  specificClusterDeDF <- specificClusterDeDF[specificClusterDeDF$Log2_Fold_Change > 0.4, ]
-  # Subset Kang expression matrix to DE genes
-  exM <- millerExDF[row.names(millerExDF) %in% specificClusterDeDF$Ensembl, ]
-  # Format for ggplot2 and add stage
-  df <- melt(exM)
-  df$Zone <- millerMtDF$Zone[match(df$variable, millerMtDF$well_id)]
-  df$Zone <- factor(df$Zone, levels = c("VZ", "SZi", "SZo", "IZ", "SP", "CPi", "CPo", "MZ", "SG"))
-  df <- df[! is.na(df$Zone), ]
-  # Plot
-  gg <- ggplot(df, aes(x = Zone, y = value)) +
-    geom_jitter(size = 0.01, alpha = 0.2) +
-    stat_summary(geom = "pointrange", fun.data = mean_cl_normal,
-      fun.args = list(conf.int = 0.95), color = "lightcoral", alpha = 0.75) +
-    stat_summary(fun.y = "mean", color = "red", size = 1, geom = "point") +
-    # geom_smooth(method = "loess") +
-    ylab("Normalized expression") +
-    ggtitle(paste0("Cluster ", cluster))
-  return(gg)
-})
-Plot_Grid(ggPlotsL = ggL, ncol = 4, rel_height = 0.15
-  , title = paste0(graphCodeTitle
-    , "\n\nSeurat cluster DE genes expression in Miller zones"
-    , "\nDE > 0.4 log fold change"
-    , "\nRed points = mean"
-    , "\nBlue bar = 95% confidence intervals"
-    , "\nBlack points = expression of each gene in each sample"))
-ggsave(paste0(outGraph, "MillerExpr.png"), width = 13, height = 18)
-################################################################################
+#
+# ### DE genes expression across Kang et al. cortex stages 1-8
+#
+# ## Plot DE genes expression across Kang et al. cortex stages 1-8
+#
+# ggL <- lapply(sort(unique(clusterDeDF$Cluster)), function(cluster){
+#   # Subset DE data frame to cluster
+#   specificClusterDeDF <- clusterDeDF[clusterDeDF$Cluster == cluster, ]
+#   # Subset to genes > 0.4 log fold change
+#   specificClusterDeDF <- specificClusterDeDF[specificClusterDeDF$Log2_Fold_Change > 0.4, ]
+#   # Subset Kang expression matrix to DE genes
+#   exM <- kangExM[row.names(kangExM) %in% specificClusterDeDF$Ensembl, ]
+#   # Format for ggplot2 and add stage
+#   df <- melt(exM)
+#   df$Stage <- kangMtDF$Stage[match(df$Var2, kangMtDF$X)]
+#   # Plot
+#   gg <- ggplot(df, aes(x = Stage, y = value)) +
+#     geom_jitter(size = 0.01, alpha = 0.2) +
+#     stat_summary(geom = "pointrange", fun.data = mean_cl_normal,
+#       fun.args = list(conf.int = 0.95), color = "red", fatten = 0.25) +
+#     # stat_summary(fun.y = "mean", color = "red", size = 1, geom = "point") +
+#     # geom_smooth(method = "loess") +
+#     ylab("Normalized expression") +
+#     ggtitle(paste0("Cluster ", cluster))
+#   return(gg)
+# })
+# Plot_Grid(ggPlotsL = ggL, ncol = 4, rel_height = 0.15
+#   , title = paste0(graphCodeTitle
+#     , "\n\nSeurat cluster DE genes expression in Kang cortex stage 1-8"
+#     , "\nDE > 0.4 log fold change"
+#     , "\nRed points = mean"
+#     , "\nRed bar = 95% confidence intervals"
+#     , "\nBlack points = expression of each gene in each sample"))
+# ggsave(paste0(outGraph, "KangExpr.png"), width = 13, height = 18)
+#
+#
+# ## Correlation to Kang stages
+#
+# # Convert hgnc symbols to ensembl and leave ensembl IDs unchanged
+# # (Gene IDs are a mix of hgnc symbols and ensembl IDs for those genes that have
+# # no hgnc symbol)
+#
+#
+# Convert_Mixed_GeneSym_EnsID_To_EnsID <- function(ids){
+#   idx <- match(ids, bmDF$hgnc_symbol)
+#   ens <- bmDF$ensembl_gene_id[idx]
+#   ids[! is.na(ens)] <- as.character(ens[! is.na(ens)])
+#   return(ids)
+# }
+#
+# Cluster_Correlation_To_Kang_Stages <- function (topGenes) {
+#   ll <- lapply(sort(unique(clusterDeDF$Cluster)), function(cluster){
+#     # Subset expression matrix to cells in cluster
+#     exM <- noCentExM[ ,centSO@ident %in% cluster]
+#     # Convert hgnc symbols to ensembl and leave ensembl IDs unchanged
+#     # (Gene IDs are a mix of hgnc symbols and ensembl IDs for those genes that have
+#     # no hgnc symbol)
+#     row.names(exM) <- Convert_Mixed_GeneSym_EnsID_To_EnsID(row.names(exM))
+#     # Subset to genes above mean expression threshold
+#     rMns <- rowMeans(exM)
+#     rMns <- sort(rMns, decreasing = TRUE)
+#     ids <- names(rMns)[1:topGenes]
+#     ssKangExM <- kangExM[row.names(kangExM) %in% ids, ]
+#     df <- melt(ssKangExM)
+#     df$Stage <- kangMtDF$Stage[match(df$Var2, kangMtDF$X)]
+#     df <- aggregate(value~Stage+Var1, df, mean)
+#     df <- dcast(df, Var1~Stage)
+#     df$Cluster_Mean_Expression <- rMns[match(df$Var1, names(rMns))]
+#     scor <- apply(df[ ,-1], 2, function(col){
+#       cor(df$Cluster_Mean_Expression, col, method = "spearman")
+#     })
+#     return(scor)
+#   })
+#   df <- do.call("cbind", ll)
+#   df <- df[-9, ]
+#   colnames(df) <- sort(unique(clusterDeDF$Cluster))
+#   df <- melt(df)
+#   return(df)
+# }
+#
+# Plot_Cluster_Correlation_To_Kang_Stages <- function (ggDF, topGenes) {
+#   ggplot(ggDF, aes(x = Var1, y = Var2, fill = value)) +
+#     geom_tile() +
+#     scale_fill_gradient(low = "white", high = "red", space = "Lab"
+#       , name = "Spearman") +
+#     geom_text(aes(label = round(value, 2))) +
+#     scale_x_continuous(breaks = unique(ggDF$Var1)) +
+#     scale_y_continuous(breaks = unique(ggDF$Var2)) +
+#     xlab("Stage") +
+#     ylab("Cluster") +
+#     ggtitle(paste0("Used top ", topGenes, " expressed genes in cluster"))
+# }
+#
+# df <- Cluster_Correlation_To_Kang_Stages(topGenes = 2500)
+# gg1 <- Plot_Cluster_Correlation_To_Kang_Stages(ggDF = df, topGenes = 2500)
+#
+# df <- Cluster_Correlation_To_Kang_Stages(topGenes = 5000)
+# gg2 <- Plot_Cluster_Correlation_To_Kang_Stages(ggDF = df, topGenes = 5000)
+#
+# df <- Cluster_Correlation_To_Kang_Stages(topGenes = 10000)
+# gg3 <- Plot_Cluster_Correlation_To_Kang_Stages(ggDF = df, topGenes = 10000)
+#
+# Plot_Grid(ggPlotsL = list(gg1, gg2, gg3), ncol = 3, rel_height = 0.15
+#   , title = paste0(graphCodeTitle
+#     , "\n\nCorrelation of Seurat cluster mean expression profile to"
+#     , "\nKang stage expression")
+# )
+# ggsave(paste0(outGraph, "KangCorrelation.png"), width = 16, height = 9)
+# ################################################################################
+#
+# ### DE genes across Miller zones
+#
+# ## Expression across Miller zones
+#
+# ggL <- lapply(sort(unique(clusterDeDF$Cluster)), function(cluster){
+#   # Subset DE data frame to cluster
+#   specificClusterDeDF <- clusterDeDF[clusterDeDF$Cluster == cluster, ]
+#   # Subset to genes > 0.4 log fold change
+#   specificClusterDeDF <- specificClusterDeDF[specificClusterDeDF$Log2_Fold_Change > 0.4, ]
+#   # Subset Kang expression matrix to DE genes
+#   exM <- millerExDF[row.names(millerExDF) %in% specificClusterDeDF$Ensembl, ]
+#   # Format for ggplot2 and add stage
+#   df <- melt(exM)
+#   df$Zone <- millerMtDF$Zone[match(df$variable, millerMtDF$well_id)]
+#   df$Zone <- factor(df$Zone, levels = c("VZ", "SZi", "SZo", "IZ", "SP", "CPi", "CPo", "MZ", "SG"))
+#   df <- df[! is.na(df$Zone), ]
+#   # Plot
+#   gg <- ggplot(df, aes(x = Zone, y = value)) +
+#     geom_jitter(size = 0.01, alpha = 0.2) +
+#     stat_summary(geom = "pointrange", fun.data = mean_cl_normal,
+#       fun.args = list(conf.int = 0.95), color = "lightcoral", alpha = 0.75) +
+#     stat_summary(fun.y = "mean", color = "red", size = 1, geom = "point") +
+#     # geom_smooth(method = "loess") +
+#     ylab("Normalized expression") +
+#     ggtitle(paste0("Cluster ", cluster))
+#   return(gg)
+# })
+# Plot_Grid(ggPlotsL = ggL, ncol = 4, rel_height = 0.15
+#   , title = paste0(graphCodeTitle
+#     , "\n\nSeurat cluster DE genes expression in Miller zones"
+#     , "\nDE > 0.4 log fold change"
+#     , "\nRed points = mean"
+#     , "\nBlue bar = 95% confidence intervals"
+#     , "\nBlack points = expression of each gene in each sample"))
+# ggsave(paste0(outGraph, "MillerExpr.png"), width = 13, height = 18)
+# ################################################################################

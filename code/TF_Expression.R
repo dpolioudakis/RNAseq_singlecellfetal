@@ -386,23 +386,26 @@ genes <- c(
   , "NEUROD6", "CSRP2"
   , "TBR1", "ST18"
 )
-ggL <- FeaturePlot_CentScale(
+ggL <- FeaturePlot(
   genes = genes
   , tsneDF = as.data.frame(centSO@dr$tsne@cell.embeddings)
-  , seuratO = centSO, limLow = -1.5, limHigh = 1.5
-)
-legend <- get_legend(ggL[[2]])
+  , seuratO = centSO
+  , exM = centSO@scale.data
+  , limLow = -1.5
+  , limHigh = 1.5
+  , geneGrouping = NULL
+  , centScale = TRUE)
 ggL <- lapply(ggL, function(gg){
-  gg <- gg + theme(legend.position = "none")
-  # gg <- gg + theme(text = element_text(size = 20))
+  gg <- gg + ggplot_set_theme_publication
   # gg <- gg + theme(plot.title = element_text(size = 20))
   return(gg)
 })
-Plot_Grid(ggPlotsL = ggL, ncol = 3, rel_height = 0.2, align = 'v', axis = 'r'
+ggL[[1]] <- ggL[[1]] + theme(legend.position = "none")
+Plot_Grid(ggL, ncol = 3, rel_height = 0.2, align = 'v', axis = 'r'
   , title = paste0(graphCodeTitle
     , "\n\ntSNE colored by normalized centered scaled expression"))
 ggsave(paste0(outGraph, "TFsOfInterest_FeaturePlot_paper.png")
-  , width = 8, height = 8)
+  , width = 12, height = 10)
 
 ## Expression heatmap
 

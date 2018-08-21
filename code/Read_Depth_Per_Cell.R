@@ -42,7 +42,7 @@ nCells <- c(
 # Split some of brain 2 cells to aggregate separately because have same indeces
 # as brain 3
 ss1DF <- ssDF[1:5, ]
-ss2DF <- ssDF[6:53, ]
+ss2DF <- ssDF[6:69, ]
 
 rdDF <- data.frame(READ_DEPTH = c(tapply(ss1DF$Number.of.input.reads, ss1DF$SampleID, sum)
   , tapply(ss2DF$Number.of.input.reads, ss2DF$SampleID, sum))

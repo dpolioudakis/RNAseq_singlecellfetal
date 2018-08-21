@@ -77,9 +77,15 @@ dir.create(dirname(outGraph), recursive = TRUE)
 outTable <- "../analysis/tables/Pooled_Vs_Bulk/DS2-11/Pooled_Vs_Bulk_"
 dir.create(dirname(outTable), recursive = TRUE)
 outTableGpro <- "../analysis/tables/Pooled_Vs_Bulk/DS2-11/gprofiler/Pooled_Vs_Bulk_gprofiler_"
-dir.create("../analysis/tables/Pooled_Vs_Bulk/DS2-11/gprofiler", recursive = TRUE)
+dir.create(dirname(outTableGpro), recursive = TRUE)
 outTableGproIds <- "../analysis/tables/Pooled_Vs_Bulk/DS2-11/gprofiler_goIDs/Pooled_Vs_Bulk_gprofiler_goIDs_"
-dir.create("../analysis/tables/Pooled_Vs_Bulk/DS2-11/gprofiler_goIDs", recursive = TRUE)
+dir.create(dirname(outTableGproIds), recursive = TRUE)
+outTable_GOelite_background <- "/u/home/d/dpolioud/project-geschwind/RNAseq_singlecellfetal/analysis/tables/Pooled_Vs_Bulk/DS2-11/GOElite/background"
+outTable_GOelite_genes <- "/u/home/d/dpolioud/project-geschwind/RNAseq_singlecellfetal/analysis/tables/Pooled_Vs_Bulk/DS2-11/GOElite/genes"
+outTable_GOelite_output <- "/u/home/d/dpolioud/project-geschwind/RNAseq_singlecellfetal/analysis/tables/Pooled_Vs_Bulk/DS2-11/GOElite/output"
+dir.create(outTable_GOelite_background, recursive = TRUE)
+dir.create(outTable_GOelite_genes, recursive = TRUE)
+dir.create(outTable_GOelite_output, recursive = TRUE)
 outAnalysis <- "../analysis/analyzed_data/Pooled_Vs_Bulk/DS2-11/Pooled_Vs_Bulk_"
 dir.create(dirname(outAnalysis), recursive = TRUE)
 
@@ -249,10 +255,13 @@ Pool_Size_Correlation <- function(
   # Do not exceed number of cells in dataset with sampling
   nSamp <- nSamp[nSamp < ncol(sc_ex_DF)]
 
-  # Format
-  # Merge bulk and pooled means, use union of genes
+  # # Merge bulk and pooled means, use union of genes
+  # combo_mean_ex_DF <- merge(mean_bulk_ex_DF, sc_ex_DF
+  #   , by = "row.names", all = TRUE)
+  # Merge bulk and pooled means, use intersection of genes
   combo_mean_ex_DF <- merge(mean_bulk_ex_DF, sc_ex_DF
-    , by = "row.names", all = TRUE)
+    , by = "row.names")
+  # Format
   names(combo_mean_ex_DF)[1] <- "ensembl_gene_id"
   combo_mean_ex_DF <- combo_mean_ex_DF[
     , ! names(combo_mean_ex_DF) == "hgnc_symbol"]
@@ -684,6 +693,47 @@ Gprofiler_Run <- function(){
   })
   return(gpro_results_DFLL)
 }
+
+## Run GO elite as nohupped shell script:
+Run_GOelite <- function(){
+  print("Run_GOelite")
+
+  # Intersected genes from GZCP datasets
+  genes <- row.names(bias_flag_DF)[bias_flag_DF["GZCP_Datasets"] == "Bulk high"]
+  background_genes <- row.names(bias_flag_DF)
+  genes_path <- paste0(outTable_GOelite_genes, "/GZCP_Datasets/genes.txt")
+  dir.create(dirname(genes_path), recursive = TRUE)
+  background_path <- paste0(outTable_GOelite_background
+    , "/GZCP_Datasets/genes.txt")
+  dir.create(dirname(background_path), recursive = TRUE)
+  goelite_output_path <- paste0(outTable_GOelite_output, "/GZCP_Datasets")
+  dir.create(goelite_output_path, recursive = TRUE)
+  write.table(genes, file = genes_path, quote = FALSE, row.names = FALSE
+    , col.names = FALSE)
+  write.table(background_genes, file = background_path, quote = FALSE
+    , row.names = FALSE, col.names = FALSE)
+  nperm <- as.integer(10) # or 50000
+  system(paste0(
+    "python ~/bin/GO-Elite_v.1.2.5-Py/GO_Elite.py --species Hs --mod Ensembl --permutations ", nperm, "  --method \"z-score\" --zscore 1.96 --pval 0.01 --num 5 --input ",dirname(genes_path)," --denom ", dirname(background_path), " --output ", goelite_output_path," &", sep=""))
+
+  # Intersected genes from GZ datasets
+  genes <- row.names(bias_flag_DF)[bias_flag_DF["GZ_Datasets"] == "Bulk high"]
+  background_genes <- row.names(bias_flag_DF)
+  genes_path <- paste0(outTable_GOelite_genes, "/GZ_Datasets/genes.txt")
+  dir.create(dirname(genes_path), recursive = TRUE)
+  background_path <- paste0(outTable_GOelite_background
+    , "/GZ_Datasets/genes.txt")
+  dir.create(dirname(background_path), recursive = TRUE)
+  goelite_output_path <- paste0(outTable_GOelite_output, "/GZ_Datasets")
+  dir.create(goelite_output_path, recursive = TRUE)
+  write.table(genes, file = genes_path, quote = FALSE, row.names = FALSE
+    , col.names = FALSE)
+  write.table(background_genes, file = background_path, quote = FALSE
+    , row.names = FALSE, col.names = FALSE)
+  nperm <- as.integer(10) # or 50000
+  system(paste0(
+    "python ~/bin/GO-Elite_v.1.2.5-Py/GO_Elite.py --species Hs --mod Ensembl --permutations ", nperm, "  --method \"z-score\" --zscore 1.96 --pval 0.01 --num 5 --input ",dirname(genes_path)," --denom ", dirname(background_path), " --output ", goelite_output_path," &", sep=""))
+}
 ################################################################################
 
 ### Process data
@@ -707,4 +757,6 @@ save(pool_corr_DF
   , gpro_results_DFLL
   , file = paste0(outAnalysis, "Processed_Data.RData")
 )
+
+Run_GOelite()
 ################################################################################

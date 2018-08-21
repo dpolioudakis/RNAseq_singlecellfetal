@@ -25,7 +25,7 @@
 #$ -t 1-18
 ##########################################################################
 echo ""
-echo "Starting Digital_Gene_Expression.sh ${SGE_TASK_ID}... "$(date)
+echo "Starting Seurat_ClusterMarkers.sh ${SGE_TASK_ID}... "$(date)
 echo ""
 ##########################################################################
 
@@ -43,5 +43,5 @@ ${pathRscript} Seurat_ClusterMarkers.R ${SGE_TASK_ID}
 ##########################################################################
 
 echo ""
-echo "End of Digital_Gene_Expression.sh ${SGE_TASK_ID}... "$(date)
+echo "End of Seurat_ClusterMarkers.sh ${SGE_TASK_ID}... "$(date)
 ##########################################################################

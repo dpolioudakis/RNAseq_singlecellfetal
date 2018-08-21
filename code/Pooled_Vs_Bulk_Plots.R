@@ -50,6 +50,7 @@ outTableGpro <- "../analysis/tables/Pooled_Vs_Bulk/DS2-11/gprofiler/Pooled_Vs_Bu
 dir.create("../analysis/tables/Pooled_Vs_Bulk/DS2-11/gprofiler", recursive = TRUE)
 outTableGproIds <- "../analysis/tables/Pooled_Vs_Bulk/DS2-11/gprofiler_goIDs/Pooled_Vs_Bulk_gprofiler_goIDs_"
 dir.create("../analysis/tables/Pooled_Vs_Bulk/DS2-11/gprofiler_goIDs", recursive = TRUE)
+outTable_GOelite_output <- "/u/home/d/dpolioud/project-geschwind/RNAseq_singlecellfetal/analysis/tables/Pooled_Vs_Bulk/DS2-11/GOElite/output"
 outAnalysis <- "../analysis/analyzed_data/Pooled_Vs_Bulk/DS2-11/Pooled_Vs_Bulk_"
 dir.create(dirname(outAnalysis), recursive = TRUE)
 
@@ -108,7 +109,9 @@ Venn_Diagram_3_Wrapper <- function(
 }
 
 ## Correlation to bulk as pool size increases
-gg <- ggplot(pool_corr_DF, aes(
+# Subset dropseq pools
+gg_DF <- pool_corr_DF[-c(31:93,124:153), ]
+gg <- ggplot(gg_DF, aes(
   x = Number_of_cells, y = Spearman, color = Dataset_label)) +
   facet_wrap(~Dataset_label, ncol = 2, scales = "free") +
   geom_line() +
@@ -146,6 +149,8 @@ ggplot(ggDF, aes(x = Number_of_cells, y = value, col = variable)) +
 ggsave(paste0(outGraph, "Pool_Size_Genes_Detected.pdf"), height = 7, width = 11)
 
 ## Scatter plots of pooled vs bulk with fit and spearman
+
+# Union genes
 # Format for ggplot
 df1 <- melt(mean_cpm_DF[
       c("Bulk", "Bulk_GZ", "Dropseq", "Fluidigm_HT", "Fluidigm_LT")
@@ -167,6 +172,8 @@ ggDF$value <- log(ggDF$value + 1, 2)
 ggDF$Bulk <- log(ggDF$Bulk + 1, 2)
 labelsDatasetSpr <- c(paste0(unique(ggDF$variable), "\nSpearman: ", sprL))
 names(labelsDatasetSpr) <- unique(ggDF$variable)
+ggDF$variable <- factor(ggDF$variable
+  , levels = c("Dropseq", "Dropseq_GZ", "Fluidigm_HT", "Fluidigm_HT_GZ", "Fluidigm_LT", "Pollen")
 # ggplot
 gg <- ggplot(ggDF, aes(x = value, y = Bulk, color = variable)) +
   facet_wrap("variable", ncol = 2
@@ -182,9 +189,59 @@ gg <- ggplot(ggDF, aes(x = value, y = Bulk, color = variable)) +
     , "\nPooled scRNA-seq vs Bulk RNA-seq"
     , "\n"
     , "\nMean of CPM across samples and pools"))
-ggsave(paste0(outGraph, "Scatter.png"), width = 6.5, height = 9)
+ggsave(paste0(outGraph, "Scatter_union.png"), width = 6.5, height = 9)
 gg + ggplot_set_theme_publication
-ggsave(paste0(outGraph, "Scatter_paper.png"), width = 6.5, height = 9)
+ggsave(paste0(outGraph, "Scatter_union_paper.png")
+  , width = 6.5, height = 9)
+
+# Intersection genes
+# Format for ggplot
+df1 <- melt(mean_cpm_DF[
+      c("Bulk", "Bulk_GZ", "Dropseq", "Fluidigm_HT", "Fluidigm_LT")
+      ]
+    , measure.vars = c("Dropseq", "Fluidigm_HT", "Fluidigm_LT")
+  )
+df2 <- melt(mean_cpm_DF[
+    c("Bulk", "Bulk_GZ", "Dropseq_GZ", "Pollen", "Fluidigm_HT_GZ")
+  ]
+  , measure.vars = c("Dropseq_GZ", "Pollen", "Fluidigm_HT_GZ")
+)
+df2$Bulk <- df2$Bulk_GZ
+ggDF <- rbind(df1, df2)
+# Subset to intersection genes (genes in both bulk and scRNA-seq dataset)
+ggDF <- ggDF[ggDF$value != 0 & ggDF$Bulk != 0 & ggDF$Bulk_GZ != 0, ]
+# Spearman
+sprL <- lapply(split(ggDF, ggDF$variable), function(df) {
+  cor(df$Bulk, df$value, method = "spearman")})
+sprL <- lapply(sprL, round, 2)
+ggDF$value <- log(ggDF$value + 1, 2)
+ggDF$Bulk <- log(ggDF$Bulk + 1, 2)
+labelsDatasetSpr <- c(paste0(unique(ggDF$variable), "\nSpearman: ", sprL))
+names(labelsDatasetSpr) <- unique(ggDF$variable)
+ggDF$variable <- factor(ggDF$variable
+  , levels = c("Dropseq", "Dropseq_GZ", "Fluidigm_HT", "Fluidigm_HT_GZ", "Fluidigm_LT", "Pollen")
+)
+# ggplot
+gg <- ggplot(ggDF, aes(x = value, y = Bulk, color = variable)) +
+  facet_wrap("variable", ncol = 2
+    , labeller = labeller(variable = labelsDatasetSpr), scales = "free") +
+  geom_point(alpha = 0.15, shape = 1, size = 0.25) +
+  xlim(c(0, 15)) +
+  ylim(c(0, 15)) +
+  stat_smooth(col = "black") +
+  ylab("Bulk: log2(mean CPM + 1)") +
+  xlab("Pooled: log2(mean CPM + 1)") +
+  ggtitle(paste0(graphCodeTitle
+    , "\n"
+    , "\nPooled scRNA-seq vs Bulk RNA-seq"
+    , "\n"
+    , "\nMean of CPM across samples and pools"))
+ggsave(paste0(outGraph, "Scatter_intersection.png"), width = 6.5, height = 9)
+gg + ggplot_set_theme_publication
+ggsave(paste0(outGraph, "Scatter_intersection_paper.png")
+  , width = 6.5, height = 9)
+ggsave(paste0(outGraph, "Scatter_intersection_paper.pdf")
+  , width = 6.5, height = 9)
 
 ## Table of number of genes biased toward bulk or single-cell
 dfl1 <- lapply(names(bias_flag_DF), function(name){
@@ -238,6 +295,7 @@ gg <- ggplot(ggDF, aes(x = Mean_Pooled, y = Mean_Bulk)) +
 ggsave(paste0(outGraph, "ScatterSubset.png"), width = 6, height = 9)
 gg + ggplot_set_theme_publication
 ggsave(paste0(outGraph, "ScatterSubset_paper.png"), width = 6, height = 9)
+ggsave(paste0(outGraph, "ScatterSubset_paper.pdf"), width = 6, height = 9)
 # density plot
 ggDF <- melt(ggDF)
 ggplot(ggDF, aes(x = value)) +
@@ -633,6 +691,7 @@ ggsave(paste0(outGraph, "GO_paper.pdf"), width = 14, height = 6)
 
 ## Marker expression
 df1 <- ratio_log2_mean_cpm_DF[ ,"Dropseq", drop = FALSE]
+df1$Dropseq <- scale(df1$Dropseq)
 df1$ensembl_gene_id <- row.names(df1)
 idx <- match(df1$ensembl_gene_id, mean_cpm_DF$ensembl_gene_id)
 df1$hgnc_symbol <- mean_cpm_DF$hgnc_symbol[idx]
@@ -644,7 +703,7 @@ df1$Grouping[is.na(df1$Grouping)] <- "Non-marker gene"
 ggplot(df1, aes(x = Grouping, y = Dropseq)) +
   geom_boxplot() +
   theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
-  ylab("Z-score (<- Bulk, Pooled ->)") +
+  ylab("Ratio (<- Bulk, Pooled ->)") +
   ggtitle(paste0(graphCodeTitle
     , "\n"
     , "\nEnrichment or depletion of cell type markers in pooled versus bulk"
@@ -660,7 +719,7 @@ ggplot(df1, aes(x = hgnc_symbol, y = Dropseq)) +
   coord_cartesian(ylim = c(-5, 5)) +
   theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
   theme(text = element_text(size = 12)) +
-  ylab("Z-score (<- Bulk, Pooled ->)") +
+  ylab("Ratio (<- Bulk, Pooled ->)") +
   ggtitle(paste0(graphCodeTitle
     , "\n"
     , "\nEnrichment or depletion of cell type markers in pooled versus bulk"
@@ -686,6 +745,7 @@ df1 <- df1[df1$Grouping %in% c(
 # Markers combined as boxplot
 ggplot(df1, aes(x = Grouping, y = Dropseq)) +
   geom_boxplot() +
+  coord_cartesian(ylim = c(-5, 5)) +
   theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
   ylab("Z-score (<- Bulk, Pooled ->)") +
   ggtitle(paste0(graphCodeTitle
@@ -694,7 +754,7 @@ ggplot(df1, aes(x = Grouping, y = Dropseq)) +
     , "\n"
     , "\nDrop-seq GZ CP"
     , "\nRatio of log2(CPM + 1) pooled versus bulk"))
-ggsave(paste0(outGraph, "KnownMarkersCombined_paper.pdf")
+ggsave(paste0(outGraph, "KnownMarkersCombined_zscore_paper.pdf")
   , width = 5, height = 6)
 ################################################################################
 
@@ -1104,6 +1164,61 @@ lapply(names(gproLDF), function(name) {
 # ggplot(ggDF, aes(y = NEG_LOG10_PVALUE, x = term.name)) +
 #   geom_bar(stat = "identity") +
 #   coord_flip()
+################################################################################
+
+### GO elite
+
+Format_GOelite_Input <- function(in_path, dataset_label){
+  # Load
+  goelite_DF <- read.table(in_path, header = TRUE, sep = "\t")
+  # Format
+  goelite_DF <- goelite_DF[
+    goelite_DF$Ontology.Name %in% c(
+        "homophilic cell adhesion"
+      , "axon guidance"
+      , "synaptic transmission"
+      , "regulation of dendrite development")
+    , c("Ontology.Name", "Z.Score")]
+  goelite_DF$Dataset <- dataset_label
+  return(goelite_DF)
+}
+
+# Load and format goelite results
+goelite_DF <- rbind(
+  Format_GOelite_Input(
+    in_path = paste0(outTable_GOelite_output
+      , "/GZCP_Datasets/GO-Elite_results/CompleteResults/ORA_pruned/"
+      , "genes-GO_z-score_elite.txt")
+    , dataset_label = "GZCP_Datasets"
+  )
+  , Format_GOelite_Input(
+    in_path = paste0(outTable_GOelite_output
+      , "/GZ_Datasets/GO-Elite_results/CompleteResults/ORA_pruned/"
+      , "genes-GO_z-score_elite.txt")
+    , dataset_label = "GZ_Datasets"
+  )
+)
+# Plot
+ggplot(goelite_DF, aes(x = Ontology.Name, y = Z.Score, fill = Dataset)) +
+  geom_bar(stat = "identity") +
+  facet_wrap(~Dataset, scale = "free_x") +
+  # scale_fill_manual(values = c("#e31a1c", "#bdbdbd", "#1f78b4")) +
+  geom_hline(yintercept = 1.96, color = "red") +
+  coord_flip() +
+  xlab("GO terms") +
+  ylab("Z-score") +
+  ggtitle(paste0(graphCodeTitle
+    , "\n"
+    , "\nSelected GO terms from bulk biased gene lists"
+    , "\nGZ CP single-cell datasets (Drop-seq, Fluidigm HT, Fluidigm LT)"
+    , "\nGZ single-cell datasets (Drop-seq GZ, Fluidigm HT GZ, Pollen)"
+    , "\n"))
+ggsave(paste0(outGraph, "GO_GOelite_paper.pdf"), width = 6, height = 4)
+# goelite_DF[with(goelite_DF
+#   , goelite_DF$Ontology.Type == "biological_process" &
+#   goelite_DF$Number.in.Ontology < 1000 &
+#   goelite_DF$Number.Changed > 5
+#   ), ]
 ################################################################################
 
 ### Expression of genes biased towards pool or bulk by cluster

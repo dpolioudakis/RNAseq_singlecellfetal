@@ -18,7 +18,7 @@
 #$ -N KnownMks
 #$ -o logs/Known_Marker_Expression_QSUB_$JOB_ID_$TASK_ID.log
 #$ -e logs/Known_Marker_Expression_QSUB_$JOB_ID_$TASK_ID.error
-#$ -l h_data=128G,h_rt=3:00:00,highp
+#$ -l h_data=128G,h_rt=24:00:00,highp
 #$ -t 1-1
 ################################################################################
 echo ""

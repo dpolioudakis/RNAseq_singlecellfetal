@@ -21,18 +21,12 @@ require(ggplot2)
 require(cowplot)
 require(fdrtool)
 require(ggdendro)
+require(ggpubr)
 source("Function_Library.R")
 
 # Set variable to gene of interest
 
 ## Inputs
-
-# # Log normalized, regressed nUMI and percent mito
-# # seuratO
-# load("../analysis/DS002003_exon_FtMm250_Seurat_NoScale.Robj")
-# # Log normalized, regressed nUMI and percent mito, mean centered and scaled
-# # fetb
-# load("../analysis/Cluster_Seurat/Cluster_Seurat_exon_FtMm250_fetb_seurat.Robj")
 
 # Seurat
 # PC 1-40
@@ -88,21 +82,47 @@ hsDF <- read.csv("../source/Bakken_2016_AllenDevMacaque_ST10_HumanSpecific.csv"
 # symbols have the excel conversion error in this data, but it will get removed
 # when we overlap things
 iosDF <- read.csv(
-  "../source/metaMat/Gene_Lists/geschwindlabshares/Hi-C/traitsenrichment/data/Lists/AllDeNovoByGene.csv")
+  "../source/Gene_Lists/geschwindlabshares/Hi-C/traitsenrichment/data/Lists/AllDeNovoByGene.csv")
 
 # de Rubeis ASD - from Luis metaMat
 rubDF <- read.table(
-  "../source/metaMat/Gene_Lists/geschwindlabshares/Hi-C/traitsenrichment/data/Lists/deRubeis_mutationlist.txt"
+  "../source/Gene_Lists/geschwindlabshares/Hi-C/traitsenrichment/data/Lists/deRubeis_mutationlist.txt"
   , header = TRUE, sep = "\t")
 
 # TADA Sanders 2015 = from Luis metaMat
 tadaDF <- read.csv(
-  "../source/metaMat/Gene_Lists/geschwindlabshares/Hi-C/traitsenrichment/data/Lists/Sanders_2015_TADA.csv")
+  "../source/Gene_Lists/geschwindlabshares/Hi-C/traitsenrichment/data/Lists/Sanders_2015_TADA.csv")
 
-ihartDF <- read.csv("../source/metaMat/Gene_Lists/ASD.risk-genes.ForDamon.SingleCellExp_2018-04-18.csv")
+ihartDF <- read.csv("../source/Gene_Lists/ASD.risk-genes.ForDamon.SingleCellExp_2018-04-18.csv")
+
+# Epilepsy risk genes
+epilepsy_DF <- read.table(
+  "../source/Gene_Lists/High-Confidence_Epilepsy_Risk_Genes_Ruzzo_2018-05-11.txt", fill = TRUE, header = TRUE, sep = "\t"
+)
+
+# ID risk genes
+# de novo ID: NEJM + Lancet
+listMat <- read.table("../source/Gene_Lists/geschwindlabshares/Hi-C/traitsenrichment/data/Lists/ID_denovo_deLigt_NEJM.txt", header=T, sep="\t", fill=T)
+nejm <- as.character(listMat$Gene[listMat$nature_of_mutation=="D"])
+listMat <- read.table("../source/Gene_Lists/geschwindlabshares/Hi-C/traitsenrichment/data/Lists/ID_denovo_Rauch_Lancet.txt", header=T, sep="\t", fill=T)
+lancet <- as.character(listMat$Gene_symbol[
+  listMat$Type %in% c("frameshift", "nonsense", "splice")])
+id_genes <- as.character(unique(c(lancet, nejm)))
 
 # Known marker Luis table
 kmDF <- read.csv("../source/MarkersforSingleCell_2017-10-11_Markers.csv")
+
+# Biomart gene info
+bmDF <- read.csv("../source/BiomaRt_Compile_GeneInfo_GRCh38_Ensembl87.csv"
+  , header = TRUE)
+
+# BrainSpan developmental transcriptome (FPKM)
+bsDF <- read.csv(
+  "../source/BrainSpan_DevTranscriptome/genes_matrix_csv/expression_matrix.csv", header = FALSE)
+bs_rnames <- read.csv(
+  "../source/BrainSpan_DevTranscriptome/genes_matrix_csv/rows_metadata.csv")
+bsMtDF <- read.csv(
+  "../source/BrainSpan_DevTranscriptome/genes_matrix_csv/columns_metadata.csv")
 
 ## Variables
 graphCodeTitle <- "ASD_Expression.R"
@@ -123,63 +143,6 @@ theme_update(axis.line = element_line(colour = "black")
 ################################################################################
 
 ### Functions
-
-Subset_To_Specific_Clusters <- function(deDF, cluster, okayClusters, fcHigh, fcLow) {
-  # Clusters gene cannot be DE in
-  clsNo <- clusterOrder[! c(0:17) %in% okayClusters]
-  # Gene is > X FC in cluster
-  genes1 <- deDF$Gene[deDF$Log2_Fold_Change > fcHigh & deDF$Cluster == cluster]
-  # Genes in clusters genes cannot be DE in > 0.3
-  genes2 <- deDF$Gene[deDF$Log2_Fold_Change > fcLow & deDF$Cluster %in% clsNo]
-  # Check
-  print(table(genes1 %in% genes2))
-  # Remove genes in clusters genes cannot be DE in
-  genes1 <- genes1[! genes1 %in% genes2]
-  # Filter DE DF
-  utdeDF <- deDF[deDF$Gene %in% genes1, ]
-  utdeDF <- utdeDF[utdeDF$Cluster == cluster, ]
-  return(utdeDF)
-}
-
-Combine_DE_and_Expression <- function(deDF, exDF) {
-  # Column for setting order of genes
-  utdeDF$ORDER <- seq(1, nrow(utdeDF))
-  # Merge with expression data frame
-  ggDF <- merge(utdeDF[c("Cluster", "Cluster", "ORDER")], exDF
-    , by.x = 1, by.y = "row.names", all.x = TRUE)
-  ggDF$Cluster <- as.factor(ggDF$Cluster)
-  # Set order
-  ggDF <- ggDF[order(-ggDF$ORDER), ]
-  # Remove order variable now set
-  ggDF <- ggDF[ ,! colnames(ggDF) == "ORDER"]
-}
-
-DE_oRG_vs_vRG_Boxplot <- function(genes, title) {
-  df <- deOvDF[row.names(deOvDF) %in% genes, ]
-  df[ ,2] <- round(df[ ,2], 2)
-  ggplot(df, aes(x = Gene, y = Log_Fold_Change_oRGvsvRG, fill = Human_specific)) +
-    geom_bar(stat = "identity") +
-    geom_text(aes(label = signif(Pvalue_oRGvsvRG, 2)
-      , y = Log_Fold_Change_oRGvsvRG, x = Gene), angle = 90) +
-    theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-    xlab("Genes") +
-    ylab("Log fold change") +
-    ggtitle(title)
-}
-
-DE_oRG_vs_vRG_Neuron_IPC_Boxplot <- function(genes, title) {
-  df <- deOnivDF[row.names(deOnivDF) %in% genes, ]
-  df[ ,2] <- round(df[ ,2], 2)
-  ggplot(df, aes(x = Gene, y = Log_Fold_Change_oRG_vs_vRG_Neuron_IPC
-    , fill = Human_specific)) +
-    geom_bar(stat = "identity") +
-    geom_text(aes(label = signif(Pvalue_oRG_vs_vRG_Neuron_IPC, 2)
-      , y = Log_Fold_Change_oRG_vs_vRG_Neuron_IPC, x = Gene), angle = 90) +
-    theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
-    xlab("Genes") +
-    ylab("Log fold change") +
-    ggtitle(title)
-}
 
 Intersection_Of_Cells_Expressing_Both <- function(gene1, gene2){
   v1 <- noCentExM[row.names(noCentExM) %in% c(gene1), ] > 0.5
@@ -208,7 +171,6 @@ Intersection_tSNE_Plots <- function(genes) {
   })
   return(ggL)
 }
-
 
 Number_Of_Cells_Intersection_Heatmap <- function(genes, title){
   m1 <- noCentExM[row.names(noCentExM) %in% genes, ] > 0.5
@@ -388,61 +350,54 @@ Seurat_Heatmap_By_Cluster_Hclust_Genes <- function(genes, clusterOrder) {
   return(pg)
 }
 
-# Expression heatmap, cells ordered by cluster
-Plot_Marker_Genes_Heatmap_SetColWidths <- function(
-  geneGroupDF
-  , exprM = centSO@scale.data
-  , seuratO = centSO
-  , clusters = c(0:15)
-  , lowerLimit = -1.5
-  , upperLimit = 1.5
-  , geneOrder = TRUE
-  , clusterOrder = c(9,7,8,10,2,0,1,4,3,13,5,6,11,12,14,15)
-  ) {
-
-  print("Plot_Marker_Genes_Heatmap_SetColWidths")
-
-  # Heatmap plot
-  # Normalized, mean centered and scaled
-  ggDF <- Heatmap_By_Cluster_Format_Data(
-    geneGroupDF = geneGroupDF
-    , exprM = exprM
-    , seuratO = seuratO
-    , clusters = clusters
-    , lowerLimit = lowerLimit
-    , upperLimit = upperLimit
-    , geneOrder = geneOrder
-    , clusterOrder = clusterOrder
-  )
-
-  print("Heatmap_By_Cluster: plotting...")
-  # ggplot
-  gg <- ggplot(ggDF, aes(x = variable, y = Gene_Group, fill = value)) +
-    geom_tile() +
-    facet_grid(Group~SEURAT_CLUSTERS, space = "free_y", scales = "free"
-      , drop = TRUE) +
-    # scale_fill_gradient2(high = "#d7191c", low = "#2c7bb6")
-    scale_fill_distiller(name = "Normalized\nexpression", type = "div"
-      , palette = 5, direction = -1, limits = c(lowerLimit, upperLimit)) +
-    theme_bw() +
-    theme(strip.text.x = element_text(angle = 90)) +
-    theme(strip.text.y = element_text(angle = 0)) +
-    theme(strip.background = element_blank()) +
-    theme(axis.text.x = element_blank()) +
-    theme(axis.ticks = element_blank()) +
-    theme(text = element_text(size = 12)) +
-    theme(axis.text.y = element_text(size = 10)) +
-    ylab("Genes") +
-    xlab("Cells ordered by cluster")
-  # gg <- gg + ...
-  return(gg)
+## BrainSpan
+Calculate_BrainSpan_Expression <- function(genes){
+  # Subset to cortex, remove visual and cerebellar
+  subset_BsMt_DF <- bsMtDF[grep("cortex", bsMtDF$structure_name), ]
+  subset_BsMt_DF <- subset_BsMt_DF[
+    subset_BsMt_DF$structure_name != "cerebellar cortex" &
+    subset_BsMt_DF$structure_name != "primary visual cortex (striate cortex, area V1/17)", ]
+  ssBsDF <- bsDF[ ,subset_BsMt_DF$column_num]
+  bsDF[bs_rnames$gene_symbol == "TCF7L2", ]
+  # Log2 transform
+  ssBsDF <- log(ssBsDF, 2)
+  # Subset to genes of interest
+  idx <- match(genes, bs_rnames$gene_symbol)
+  idx <- idx[! is.na(idx)]
+  df1 <- bs_rnames[idx, ]
+  ssBsDF <- ssBsDF[df1$row_num, ]
+  row.names(ssBsDF) <- df1$gene_symbol
+  # Genes as columns
+  ssBsDF <- as.data.frame(t(ssBsDF))
+  # Remove outliers by stdev
+  ssBsDF <- as.data.frame(apply(ssBsDF, 2, function(x) {
+    Remove_Outliers_By_SD(x, nStdev = 2.5)
+    }))
+  # Add age
+  ssBsDF$Age <- factor(subset_BsMt_DF$age, levels = unique(subset_BsMt_DF$age))
+  # Add donor ID
+  ssBsDF$Donor <- factor(subset_BsMt_DF$donor_id
+    , levels = unique(subset_BsMt_DF$donor_id))
+  # Add structure ID
+  ssBsDF$Structure <- factor(subset_BsMt_DF$structure_acronym
+    , levels = unique(subset_BsMt_DF$structure_acronym))
+  # Format
+  ssBsDF <- melt(ssBsDF)
+  return(ssBsDF)
 }
 ################################################################################
 
 ### Format
 
+## Dropseq DE table
+deDF <- deDF[deDF$Cluster != 16, ]
+
 ## Lake
 lake_DE_DF <- lake_DE_DF[ ,1:7]
+# Subset to clusters in frontal cortex dataset
+lake_DE_DF <- lake_DE_DF[
+  lake_DE_DF$Cluster %in% unique(gsub("_.*", "", colnames(lake_ex_DF)))
+  , ]
 
 ## Nowakowski
 rownames(nowakowski_ex_DF) <- nowakowski_ex_DF$geneId
@@ -486,6 +441,17 @@ for(i in 1:ncol(lake_ex_DF)){
 }
 lake_ex_DF <- (lake_ex_DF*10000)+1
 lake_ex_DF <- log(lake_ex_DF)
+
+# Combine Lake and drop-seq expression matrices
+lake_dropseq_ex_DF <- merge(lake_ex_DF, noCentExM
+  , by = "row.names", all = TRUE)
+
+# Combine Lake and drop-seq expression matrices
+# (centered and scaled separately)
+cent_lake_dropseq_ex_DF <- merge(t(scale(t(lake_ex_DF))), centSO@scale.data
+  , by = "row.names", all = TRUE)
+rownames(cent_lake_dropseq_ex_DF) <- cent_lake_dropseq_ex_DF[ ,1]
+cent_lake_dropseq_ex_DF <- cent_lake_dropseq_ex_DF[ ,-1]
 ################################################################################
 
 ### ASD combined de novo proband LOF iossifov + de Rubeis
@@ -657,10 +623,24 @@ ggsave(paste0(
   , width = 12, height = 5, limitsize = FALSE)
 ################################################################################
 
-### ASD TADA
+### ASD TADA featureplots and heatmaps
 
 # ASD TADA genes
 genes <- tada
+
+# Check expression levels of TADA genes
+subset_ex_M <- lake_ex_DF[
+  rownames(lake_ex_DF) %in% genes
+  , ]
+gg_DF <- subset_ex_M
+gg_DF$Gene <- rownames(gg_DF)
+gg_DF <- melt(gg_DF)
+gg_DF <- gg_DF[! is.na(gg_DF$Gene), ]
+ggplot(gg_DF, aes(x = Gene, y = value)) +
+  geom_jitter(size = 0.01) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
+ggsave(paste0(outGraph, "TADA_Lake_JitterPlot.png")
+  , width = 7, height = 7, dpi = 150)
 
 # Genes DE >0.4 in cluster 4 or cluster 13
 df1 <- rbind(
@@ -770,35 +750,13 @@ plot_grid(title, pg, ncol = 1, rel_heights = c(0.12, 1))
 ggsave(paste0(
   outGraph, "TADA_HeatmapDend_NormalizedCenteredScaled.png")
   , width = 12, height = 14, limitsize = FALSE)
+################################################################################
+
+### ASD TADA sorted by enrichment plots
 
 ## Heatmap of ASD TADA genes with fixed column widths
-genes_DF <- deDF[deDF$Cluster %in% c(0,1,3,4,13,5,6), ]
-genes_DF <- genes_DF[order(-genes_DF$Log2_Fold_Change), ]
-genes <- intersect(genes_DF$Gene, tada)
-genes <- rev(genes)
-geneGroupDF <- data.frame(
-  Gene = genes
-  , Group = NA
-)
-cellID_clusterID <- centSO@ident
-gg <- Plot_Marker_Genes_Heatmap_SetColWidths(
-  geneGroupDF = geneGroupDF
-  , cellID_clusterID = cellID_clusterID)
-gg + ggtitle(paste0(
-  graphCodeTitle
-    , "\n\nExpression of ASD TADA genes"
-    , "\nx-axis: Genes"
-    , "\ny-axis: Cells ordered by cluster"
-    , "\nNormalized expression, mean centered, variance scaled"
-    , "\n")
-)
-ggsave(paste0(outGraph
-    , "TADA_HeatmapSetColWidths_NormalizedCenteredScaled_paper.png"
-  )
-  , width = 12, height = 6
-)
 
-## Heatmap of ASD TADA genes with fixed column widths
+# Drop-seq
 genes_DF <- deDF[! deDF$Cluster %in% 16, ]
 # Take cluster with highest enrichment for each gene
 genes_DF <- genes_DF[order(genes_DF$Gene, -genes_DF$Log2_Fold_Change), ]
@@ -811,8 +769,9 @@ genes_DF <- genes_DF[order(genes_DF$Cluster, -genes_DF$Log2_Fold_Change), ]
 genes_DF <- genes_DF[genes_DF$Gene %in% tada, ]
 genes <- rev(genes_DF$Gene)
 genes <- c(as.character(tada)[! tada %in% genes], as.character(genes))
-# Remove genes not in dataset
-genes <- genes[genes %in% rownames(centSO@scale.data)]
+# # Remove genes not in dataset
+# genes <- genes[genes %in% rownames(centSO@scale.data)]
+genes <- genes[! is.na(genes)]
 # Plot
 geneGroupDF <- data.frame(
   Gene = genes
@@ -835,9 +794,10 @@ gg + ggtitle(paste0(
 ggsave(paste0(outGraph
     , "TADA_EnrichmentSorted_HeatmapSetColWid_NormCenterScale_paper.png"
   )
-  , width = 8, height = 12
+  , width = 7, height = 16
 )
 
+# Lake
 cellID_clusterID <- gsub("_.*", "", colnames(lake_ex_DF))
 names(cellID_clusterID) <- colnames(lake_ex_DF)
 clusterOrder <- c("Ex1", "Ex2", "Ex3e", "Ex4", "Ex5b", "Ex6a","Ex6b"
@@ -852,8 +812,8 @@ gg <- Plot_Marker_Genes_Heatmap_SetColWidths(
 )
 gg + ggtitle(paste0(
   graphCodeTitle
-    , "\n\nExpression of ASD TADA genes in human adult sorted by cluster enrichment"
-    , "\nLake et al. frontal cortex"
+    , "\n\nExpression of ASD TADA genes in adult sorted by cluster enrichment"
+    , "\nLake et al. frontal cortex and drop-seq fetal centered and scaled together"
     , "\nx-axis: Genes"
     , "\ny-axis: Cells ordered by cluster"
     , "\nNormalized expression, mean centered, variance scaled"
@@ -862,8 +822,493 @@ gg + ggtitle(paste0(
 ggsave(paste0(outGraph
     , "TADA_Lake_EnrichmentSorted_HeatmapSetColWid_NormCenterScale_paper.png"
   )
+  , width = 11, height = 16
+)
+
+# Dropseq and Lake
+cellID_clusterID <- c(gsub("_.*", "", colnames(lake_ex_DF))
+  , as.numeric(as.character(centSO@ident)))
+names(cellID_clusterID) <- c(colnames(lake_ex_DF), names(centSO@ident))
+clusterOrder <- c(9,7,8,10,2,0,1,4,3,13,5,6,11,12,14,15
+  , "Ex1", "Ex2", "Ex3e", "Ex4", "Ex5b", "Ex6a","Ex6b"
+  , "Ex8","In1a", "In1b", "In1c", "In3", "In4a", "In4b", "In6a", "In6b"
+  , "In7", "In8", "OPC", "End", "Oli", "Per", "Mic", "Ast")
+gg <- Plot_Marker_Genes_Heatmap_SetColWidths(
+  geneGroupDF = geneGroupDF
+  , exprM = cent_lake_dropseq_ex_DF
+  , cellID_clusterID = cellID_clusterID
+  , clusterOrder = clusterOrder
+  , clusters = clusterOrder
+)
+gg + ggtitle(paste0(
+  graphCodeTitle
+    , "\n\nExpression of ASD TADA genes"
+    , "\nHuman fetal and adult sorted by cluster enrichment"
+    , "\nLake et al. frontal cortex"
+    , "\nx-axis: Genes"
+    , "\ny-axis: Cells ordered by cluster"
+    , "\nNormalized expression, mean centered, variance scaled"
+    , "\n")
+)
+ggsave(paste0(outGraph
+  , "TADA_LakeDropseq_EnrichmentSorted_HeatmapSetColWid_NormCenterScale_paper.png"
+  )
+  , width = 16, height = 18
+)
+
+# Dropseq and Lake centered and scaled together
+cellID_clusterID <- c(gsub("_.*", "", colnames(lake_ex_DF)), centSO@ident)
+names(cellID_clusterID) <- c(colnames(lake_ex_DF), names(centSO@ident))
+clusterOrder <- c(9,7,8,10,2,0,1,4,3,13,5,6,11,12,14,15
+  , "Ex1", "Ex2", "Ex3e", "Ex4", "Ex5b", "Ex6a","Ex6b"
+  , "Ex8","In1a", "In1b", "In1c", "In3", "In4a", "In4b", "In6a", "In6b"
+  , "In7", "In8", "OPC", "End", "Oli", "Per", "Mic", "Ast")
+gg <- Plot_Marker_Genes_Heatmap_SetColWidths(
+  geneGroupDF = geneGroupDF
+  , exprM = t(scale(t(lake_dropseq_ex_DF)))
+  , cellID_clusterID = cellID_clusterID
+  , clusterOrder = clusterOrder
+  , clusters = clusterOrder
+)
+gg + ggtitle(paste0(
+  graphCodeTitle
+    , "\n\nExpression of ASD TADA genes in human adult sorted by cluster enrichment"
+    , "\nLake et al. frontal cortex"
+    , "\nx-axis: Genes"
+    , "\ny-axis: Cells ordered by cluster"
+    , "\nNormalized expression, mean centered, variance scaled"
+    , "\n")
+)
+ggsave(paste0(outGraph
+    , "TADA_LakeDropseq_EnrichmentSorted_HeatmapSetColWid_NormCenterScale_paper.png"
+  )
+  , width = 16, height = 12
+)
+
+## Intersection ASD, epilepsy, ID
+
+# Initialize matrix
+gene_binary_M <- matrix(NA, length(geneGroupDF$Gene), 0)
+rownames(gene_binary_M) <- geneGroupDF$Gene
+# Add genes lists
+epilepsy_genes <- epilepsy_DF$Gene[
+  epilepsy_DF$Classification == "High-confidence"]
+gene_binary_M <- Add_Gene_List_To_Binary_Matrix(
+  gene_binary_M, geneGroupDF$Gene, "ASD")
+gene_binary_M <- Add_Gene_List_To_Binary_Matrix(
+  gene_binary_M, epilepsy_genes, "Epilepsy")
+gene_binary_M <- Add_Gene_List_To_Binary_Matrix(
+  gene_binary_M, id_genes, "ID")
+# Format
+gg_DF <- melt(gene_binary_M)
+gg_DF$Color <- with(gg_DF
+  , ifelse(Var2 == "ASD" & value == 1, "ASD"
+  , ifelse(Var2 == "Epilepsy" & value == 1, "Epilepsy"
+  , ifelse(Var2 == "ID" & value == 1, "ID"
+    , NA)))
+)
+# Plot
+ggplot(gg_DF, aes(x = Var2, y = Var1, fill = Color)) +
+  geom_tile(width=0.7, height=0.7) +
+  scale_fill_discrete(na.value = "lightgrey") +
+  ggplot_set_theme_publication +
+  ggtitle(paste0(
+    graphCodeTitle
+      , "\n\nIntersection of ASD, epilepsy, ID gene lists"
+      , "\n")
+  )
+ggsave(paste0(outGraph, "TADA_EnrichmentSorted_DiseaseIntersection.pdf")
+  , width = 4, height = 8)
+
+## Check characteristics of genes not cluster enriched in dropseq
+
+# CDS length and GC content
+idx <- match(geneGroupDF$Gene, bmDF$hgnc_symbol)
+gg_DF <- bmDF[idx, ]
+gg_DF$Enriched <- gg_DF$hgnc_symbol %in% deDF$Gene
+aggregate(cds_length~Enriched, gg_DF, mean)
+aggregate(percentage_gc_content~Enriched, gg_DF, mean)
+ggplot(gg_DF, aes(x = Enriched, y = cds_length, fill = Enriched)) +
+  geom_boxplot(outlier.shape = NA) +
+  coord_cartesian(ylim = c(0,16000)) +
+  stat_compare_means(cds_length ~ Enriched, data = gg_DF
+    , comparisons = list(c(1,2))
+    , method = "t.test", p.adjust.method = "none", label = "p.signif"
+    # , label.y = c(limits_L$Maximum*c(1.2, 1.4, 1.6))
+  ) +
+  ylab("CDS length") +
+  ggplot_set_theme_publication +
+  ggtitle(paste0(
+    graphCodeTitle
+      , "\n\nCDS length of ASD TADA genes not enriched in dropseq"
+      , "\n")
+  )
+ggsave(paste0(outGraph, "TADA_ClusterEnriched_CDSlength.pdf")
+  , width = 5, height = 5)
+ggplot(gg_DF, aes(x = Enriched, y = percentage_gc_content, fill = Enriched)) +
+  geom_boxplot(outlier.shape = NA) +
+  coord_cartesian(ylim = c(0,100)) +
+  stat_compare_means(cds_length ~ Enriched, data = gg_DF
+    , comparisons = list(c(1,2))
+    , method = "t.test", p.adjust.method = "none", label = "p.signif"
+    # , label.y = c(limits_L$Maximum*c(1.2, 1.4, 1.6))
+  ) +
+  ylab("GC content") +
+  ggplot_set_theme_publication +
+  ggtitle(paste0(
+    graphCodeTitle
+      , "\n\nPercent GC content of ASD TADA genes not enriched in dropseq"
+      , "\n")
+  )
+ggsave(paste0(outGraph, "TADA_ClusterEnriched_percentGC.pdf")
+  , width = 5, height = 5)
+
+# Expression level in brainspan
+ssBsDF <- Calculate_BrainSpan_Expression(gg_DF$hgnc_symbol)
+ssBsDF$Enriched <- gg_DF$Enriched[match(ssBsDF$variable, gg_DF$hgnc_symbol)]
+ssBsDF <- ssBsDF[ssBsDF$value != "-Inf", ]
+ssBsDF <- ssBsDF[! is.na(ssBsDF$Enriched), ]
+ssBsDF <- ssBsDF[! is.na(ssBsDF$value), ]
+ssBsDF$Pre_Vs_Postnatal <- "Postnatal"
+ssBsDF$Pre_Vs_Postnatal[grepl("pcw", ssBsDF$Age)] <- "Prenatal"
+ssBsDF$Pre_Vs_Postnatal <- factor(
+  ssBsDF$Pre_Vs_Postnatal, levels = c("Prenatal", "Postnatal")
+)
+ggplot(ssBsDF, aes(x = Enriched, y = value, fill = Enriched)) +
+  geom_boxplot(outlier.shape = NA) +
+  coord_cartesian(ylim = c(-3,10)) +
+  facet_wrap(~Pre_Vs_Postnatal) +
+  stat_compare_means(value ~ Enriched, data = ssBsDF
+    , comparisons = list(c(1,2))
+    , method = "t.test", p.adjust.method = "none", label = "p.signif"
+    , label.y = c(9)
+  ) +
+  ylab("Normalized expression (log2 FPKM)") +
+  ggplot_set_theme_publication +
+  ggtitle(paste0(
+    graphCodeTitle
+      , "\n\nExpression of ASD TADA genes in brainspan not enriched in dropseq"
+      , "\n")
+  )
+ggsave(paste0(outGraph, "TADA_ClusterEnriched_BrainSpan.pdf")
+  , width = 5, height = 5)
+aggregate(value~Enriched, ssBsDF, mean)
+# Plot as fit line
+# Mean of expression of genes
+ssBsDF <- aggregate(value~Age+Donor+Structure+Enriched, ssBsDF, mean)
+# ggplot fit line
+ggplot(ssBsDF, aes(x = Age, y = value, group = Enriched, color = Enriched)) +
+  # facet_wrap(~Enriched, scales = "free_x", ncol = 2) +
+  geom_jitter(size = 0.1, width = 0.2) +
+  geom_smooth() +
+  ggplot_set_theme_publication +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)) +
+  # ylim(c(0,5)) +
+  xlab("Age") +
+  ylab("Normalized expression (log2 FPKM)") +
+  ggtitle(paste0(
+    graphCodeTitle
+      , "\n\nExpression of ASD TADA genes in brainspan not enriched in dropseq"
+      , "\n")
+  )
+ggsave(paste0(outGraph, "TADA_ClusterEnriched_BrainSpan_Fit.png")
+  , width = 5, height = 5)
+
+## TADA neuron enriched
+
+# Subset to genes enriched in neuron clusters
+genes_DF <- deDF[deDF$Cluster %in% c(0,1,3,4,13,5,6) & deDF$Gene %in% tada, ]
+# Take cluster with highest enrichment for each gene
+genes_DF <- genes_DF[order(genes_DF$Gene, -genes_DF$Log2_Fold_Change), ]
+genes_DF <- genes_DF[! duplicated(genes_DF$Gene), ]
+# Order by cluster and enrichment
+genes_DF$Cluster <- factor(genes_DF$Cluster,
+   levels = c(9,7,8,10,2,0,1,4,3,13,5,6,11,12,14,15))
+genes_DF <- genes_DF[order(genes_DF$Cluster, -genes_DF$Log2_Fold_Change), ]
+genes <- rev(genes_DF$Gene)
+geneGroupDF <- data.frame(
+  Gene = genes
+  , Group = ""
+)
+cellID_clusterID <- centSO@ident
+# Write out gene list to copy paste into illustrator
+write.table(rev(geneGroupDF$Gene)
+  , file = paste0(outTable, "TADA_NeuronEnriched.txt")
+  , quote = FALSE, row.names = FALSE)
+# Plot
+gg <- Plot_Marker_Genes_Heatmap_SetColWidths(
+  geneGroupDF = geneGroupDF
+  , cellID_clusterID = cellID_clusterID)
+gg + ggtitle(paste0(
+  graphCodeTitle
+    , "\n\nExpression of ASD TADA genes"
+    , "\nx-axis: Genes"
+    , "\ny-axis: Cells ordered by cluster"
+    , "\nNormalized expression, mean centered, variance scaled"
+    , "\n")
+)
+ggsave(paste0(outGraph
+    , "TADA_NeuronEnriched_HeatmapSetColWidths_NormalizedCenteredScaled_paper.png"
+  )
+  , width = 12, height = 6
+)
+
+## TADA progenitor, OPC, and pericyte enriched genes
+geneGroupDF <- data.frame(
+  Gene = rev(c("ILF2", "TRIO", "SETD5", "TCF7L2", "KAT2B", "SLC6A1"))
+  , Group = ""
+)
+# Dropseq
+cellID_clusterID <- centSO@ident
+gg <- Plot_Marker_Genes_Heatmap_SetColWidths(
+  geneGroupDF = geneGroupDF
+  , exprM = centSO@scale.data
+  , cellID_clusterID <- centSO@ident
+)
+gg + ggtitle(paste0(
+  graphCodeTitle
+    , "\n\nExpression of ASD TADA progenitor OPC and pericyte enriched genes"
+    , "\nx-axis: Genes"
+    , "\ny-axis: Cells ordered by cluster"
+    , "\nNormalized expression, mean centered, variance scaled"
+    , "\n")
+)
+ggsave(paste0(outGraph
+    , "TADA_ProgenitorOPCandPericyte_HeatmapSetColWid_NormCenterScale_paper.png"
+  )
+  , width = 12, height = 4
+)
+
+## TADA genes of interest
+geneGroupDF <- data.frame(Gene = rev(c("ILF2", "BCL11A", "CTTNBP2", "DIP2A", "CUL3", "SLC6A1", "PTEN", "MBD5A", "DSCAM")), Group = "")
+# Dropseq
+cellID_clusterID <- centSO@ident
+gg <- Plot_Marker_Genes_Heatmap_SetColWidths(
+  geneGroupDF = geneGroupDF
+  , exprM = centSO@scale.data
+  , cellID_clusterID <- centSO@ident
+)
+gg + ggtitle(paste0(
+  graphCodeTitle
+    , "\n\nExpression of ASD TADA genes of interest"
+    , "\nx-axis: Genes"
+    , "\ny-axis: Cells ordered by cluster"
+    , "\nNormalized expression, mean centered, variance scaled"
+    , "\n")
+)
+ggsave(paste0(outGraph
+    , "TADA_GenesOfInterest_HeatmapSetColWid_NormCenterScale_paper.png"
+  )
+  , width = 12, height = 6
+)
+# Lake
+cellID_clusterID <- gsub("_.*", "", colnames(lake_ex_DF))
+names(cellID_clusterID) <- colnames(lake_ex_DF)
+clusterOrder <- c("Ex1", "Ex2", "Ex3e", "Ex4", "Ex5b", "Ex6a","Ex6b"
+  , "Ex8","In1a", "In1b", "In1c", "In3", "In4a", "In4b", "In6a", "In6b"
+  , "In7", "In8", "OPC", "End", "Oli", "Per", "Mic", "Ast")
+gg <- Plot_Marker_Genes_Heatmap_SetColWidths(
+  geneGroupDF = geneGroupDF
+  , exprM = t(scale(t(lake_ex_DF)))
+  , cellID_clusterID = cellID_clusterID
+  , clusterOrder = clusterOrder
+  , clusters = clusterOrder
+)
+gg + ggtitle(paste0(
+  graphCodeTitle
+    , "\n\nExpression of ASD TADA genes of interest in human adult"
+    , "\nLake et al. frontal cortex"
+    , "\nx-axis: Genes"
+    , "\ny-axis: Cells ordered by cluster"
+    , "\nNormalized expression, mean centered, variance scaled"
+    , "\n")
+)
+ggsave(paste0(outGraph
+    , "TADA_Lake_GenesOfInterest_HeatmapSetColWid_NormCenterScale_paper.png"
+  )
+  , width = 12, height = 6
+)
+################################################################################
+
+### ASD TADA unique to dropseq or lake et al
+
+mean_exp <- rowMeans(noCentExM[rownames(noCentExM) %in% tada, ])
+genes_1 <- names(mean_exp)[mean_exp < 0.2]
+genes_2 <- tada[! tada %in% deDF$Gene]
+genes_not_dropseq <- intersect(genes_1, genes_2)
+
+mean_exp <- rowMeans(lake_ex_DF[rownames(lake_ex_DF) %in% tada, ])
+genes_1 <- names(mean_exp)[mean_exp >= 0.5]
+genes_2 <- tada[tada %in% lake_DE_DF$Gene]
+genes_in_lake <- union(genes_1, genes_2)
+
+genes_unique_lake <- intersect(genes_not_dropseq, genes_in_lake)
+
+mean_exp <- rowMeans(noCentExM[rownames(noCentExM) %in% tada, ])
+genes_1 <- names(mean_exp)[mean_exp >= 0.5]
+genes_2 <- tada[tada %in% deDF$Gene]
+genes_in_dropseq <- union(genes_1, genes_2)
+
+mean_exp <- rowMeans(lake_ex_DF[rownames(lake_ex_DF) %in% tada, ])
+genes_1 <- names(mean_exp)[mean_exp < 0.2]
+genes_2 <- tada[! tada %in% lake_DE_DF$Gene]
+genes_not_lake <- intersect(genes_1, genes_2)
+
+genes_unique_dropseq <- intersect(genes_in_dropseq, genes_not_lake)
+
+## TADA genes in dropseq not in Lake et al
+# Plot
+geneGroupDF <- data.frame(
+  Gene = genes_unique_dropseq
+  , Group = ""
+)
+# Dropseq
+cellID_clusterID <- centSO@ident
+gg <- Plot_Marker_Genes_Heatmap_SetColWidths(
+  geneGroupDF = geneGroupDF
+  , exprM = centSO@scale.data
+  , cellID_clusterID <- centSO@ident
+)
+gg + ggtitle(paste0(
+  graphCodeTitle
+    , "\n\nExpression of ASD TADA genes"
+    , "\nGenes detected in fetal drop-seq and not in human adult (Lake et al.)"
+    , "\nx-axis: Genes"
+    , "\ny-axis: Cells ordered by cluster"
+    , "\nNormalized expression, mean centered, variance scaled"
+    , "\n")
+)
+ggsave(paste0(outGraph
+    , "TADA_UniqueDropseq_HeatmapSetColWid_NormCenterScale_paper.png"
+  )
+  , width = 8, height = 12
+)
+# Lake
+cellID_clusterID <- gsub("_.*", "", colnames(lake_ex_DF))
+names(cellID_clusterID) <- colnames(lake_ex_DF)
+clusterOrder <- c("Ex1", "Ex2", "Ex3e", "Ex4", "Ex5b", "Ex6a","Ex6b"
+  , "Ex8","In1a", "In1b", "In1c", "In3", "In4a", "In4b", "In6a", "In6b"
+  , "In7", "In8", "OPC", "End", "Oli", "Per", "Mic", "Ast")
+gg <- Plot_Marker_Genes_Heatmap_SetColWidths(
+  geneGroupDF = geneGroupDF
+  , exprM = t(scale(t(lake_ex_DF)))
+  , cellID_clusterID = cellID_clusterID
+  , clusterOrder = clusterOrder
+  , clusters = clusterOrder
+)
+gg + ggtitle(paste0(
+  graphCodeTitle
+    , "\n\nExpression of ASD TADA genes adult"
+    , "\nGenes detected in fetal drop-seq and not in human adult (Lake et al.)"
+    , "\nx-axis: Genes"
+    , "\ny-axis: Cells ordered by cluster"
+    , "\nNormalized expression, mean centered, variance scaled"
+    , "\n")
+)
+ggsave(paste0(outGraph
+    , "TADA_UniqueDropseq_Lake_HeatmapSetColWid_NormCenterScale_paper.png"
+  )
   , width = 12, height = 12
 )
+
+## TADA genes in Lake et al not in dropseq
+# Plot
+geneGroupDF <- data.frame(
+  Gene = genes_unique_lake
+  , Group = ""
+)
+# Dropseq
+cellID_clusterID <- centSO@ident
+gg <- Plot_Marker_Genes_Heatmap_SetColWidths(
+  geneGroupDF = geneGroupDF
+  , exprM = centSO@scale.data
+  , cellID_clusterID <- centSO@ident
+)
+gg + ggtitle(paste0(
+  graphCodeTitle
+    , "\n\nExpression of ASD TADA genes"
+    , "\nGenes detected in human adult (Lake et al.) not in fetal dropseq"
+    , "\nx-axis: Genes"
+    , "\ny-axis: Cells ordered by cluster"
+    , "\nNormalized expression, mean centered, variance scaled"
+    , "\n")
+)
+ggsave(paste0(outGraph
+    , "TADA_UniqueLake_HeatmapSetColWid_NormCenterScale_paper.png"
+  )
+  , width = 8, height = 12
+)
+# Lake
+cellID_clusterID <- gsub("_.*", "", colnames(lake_ex_DF))
+names(cellID_clusterID) <- colnames(lake_ex_DF)
+clusterOrder <- c("Ex1", "Ex2", "Ex3e", "Ex4", "Ex5b", "Ex6a","Ex6b"
+  , "Ex8","In1a", "In1b", "In1c", "In3", "In4a", "In4b", "In6a", "In6b"
+  , "In7", "In8", "OPC", "End", "Oli", "Per", "Mic", "Ast")
+gg <- Plot_Marker_Genes_Heatmap_SetColWidths(
+  geneGroupDF = geneGroupDF
+  , exprM = t(scale(t(lake_ex_DF)))
+  , cellID_clusterID = cellID_clusterID
+  , clusterOrder = clusterOrder
+  , clusters = clusterOrder
+)
+gg + ggtitle(paste0(
+  graphCodeTitle
+    , "\n\nExpression of ASD TADA genes in adult"
+    , "\nGenes detected in human adult (Lake et al.) not in fetal dropseq"
+    , "\nx-axis: Genes"
+    , "\ny-axis: Cells ordered by cluster"
+    , "\nNormalized expression, mean centered, variance scaled"
+    , "\n")
+)
+ggsave(paste0(outGraph
+    , "TADA_UniqueLake_Lake_HeatmapSetColWid_NormCenterScale_paper.png"
+  )
+  , width = 12, height = 12
+)
+
+ssBsDF <- Calculate_BrainSpan_Expression(genes_unique_lake)
+# Mean of expression of genes
+# ssBsDF <- aggregate(value~Donor+Age+Structure, ssBsDF, mean)
+# ggplot fit line
+ggplot(ssBsDF, aes(x = Age, y = value, group = 1)) +
+  facet_wrap(~variable, scales = "free_x", ncol = 3) +
+  geom_jitter(size = 0.1, width = 0.2) +
+  geom_smooth(color = "red") +
+  ggplot_set_theme_publication +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)) +
+  # ylim(c(0,5)) +
+  xlab("Age") +
+  ylab("Normalized expression")
+ggsave(paste0(outGraph, "TADA_Lake_Unique_BrainSpan_Fit_paper.pdf")
+  , width = 12, height = 12)
+
+ssBsDF <- Calculate_BrainSpan_Expression(genes_unique_dropseq)
+# ggplot fit line
+ggplot(ssBsDF, aes(x = Age, y = value, group = 1)) +
+  facet_wrap(~variable, scales = "free_x", ncol = 3) +
+  geom_jitter(size = 0.1, width = 0.2) +
+  geom_smooth(color = "red") +
+  ggplot_set_theme_publication +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)) +
+  # ylim(c(0,5)) +
+  xlab("Age") +
+  ylab("Normalized expression")
+ggsave(paste0(outGraph, "TADA_Dropseq_Unique_BrainSpan_Fit_paper.pdf")
+  , width = 12, height = 12)
+
+ssBsDF <- Calculate_BrainSpan_Expression(c("ILF2", "BCL11A", "CTTNBP2", "DIP2A", "CUL3", "SLC6A1", "PTEN", "MBD5A", "DSCAM"))
+# ggplot fit line
+ggplot(ssBsDF, aes(x = Age, y = value, group = 1)) +
+  facet_wrap(~variable, scales = "free_x", ncol = 3) +
+  geom_jitter(size = 0.1, width = 0.2) +
+  geom_smooth(color = "red") +
+  ggplot_set_theme_publication +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)) +
+  # ylim(c(0,5)) +
+  xlab("Age") +
+  ylab("Normalized expression")
+ggsave(paste0(outGraph, "TADA_GenesOfInterest_BrainSpan_Fit_paper.pdf")
+  , width = 12, height = 12)
 ################################################################################
 
 ### Human specific or primate specific + TADA

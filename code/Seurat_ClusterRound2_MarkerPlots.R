@@ -1,10 +1,10 @@
 # Damon Polioudakis
-# 2017-05-28
-# 2nd iteration of Seurat clustering
+# 2017-02-21
+# Plot known marker lists as heatmaps, violin plots, feature plots
 
 # Must load modules:
 #  module load gcc/4.9.3
-#  module load R/3.3+
+#  module load R/3.3.0
 ################################################################################
 
 rm(list = ls())
@@ -16,772 +16,947 @@ require(Seurat)
 require(dplyr)
 require(Matrix)
 require(reshape2)
-require(irlba)
 require(gridExtra)
+require(ggplot2)
 require(cowplot)
+require(viridis)
 source("Function_Library.R")
+
+## Command args to input cluster ID
+args <- commandArgs(trailingOnly = TRUE)
+print(args)
 
 ## Inputs
 
-# Seurat clustering object
-load("../analysis/Seurat_Cluster_DS2-11/Seurat_Cluster_DS2-11_FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_PC1to40_seuratO.Robj")
-# Clear parts of object to save memory
-centSO@raw.data <- NULL
-centSO@data <- NULL
+# Seurat
+in_Seurat <- list.files("../analysis/analyzed_data/Seurat_ClusterRound2/DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/VarGenes/RegNumiLibBrain/PC1-40/", full.names = TRUE)
+load(in_Seurat[as.numeric(args[[1]])])
+# load(in_Seurat[9])
+centSO <- so
+rm(so)
 
-# Seurat clustering round 2 object
-# load("../analysis/Seurat_ClusterRound2_DS2-11/Seurat_ClusterRound2_DS2-11_VarGenes_PC1-30_seuratO.Robj")
-# load("../analysis/Seurat_ClusterRound2_DS2-11/Seurat_ClusterRound2_DS2-11_VarGenes_RegNumiLibBrain_PC1-30_seuratO.Robj")
-load("../analysis/Seurat_ClusterRound2_DS2-11/Seurat_ClusterRound2_DS2-11_AllGenes_RegNumiLibBrain_PC1-30_seuratO.Robj")
+# Known cell type markers from Luis
+kmDF <- read.csv("../source/MarkersforSingleCell_2017-10-11_Markers.csv", header = TRUE
+  , fill = TRUE)
 
-# Cell cycle markers from Macosko 2015 Table S2 to remove from variable gene
-# list used for clustering
+# Cell cycle markers from Macosko 2015 Table S2
 ccDF <- read.csv("../source/Macosko_2015_ST2_CellCycle.csv", header = TRUE
   , fill = TRUE)
 
-# Known cell type markers from Luis
-kmDF <- read.csv("../source/MarkersforSingleCell_2017-01-05.csv", header = TRUE
-  , fill = TRUE)
+# Cell cycle markers used for phase determination (Tirosh et al. 2016)
+ccTirosh <- readLines(con = "../source/regev_lab_cell_cycle_genes.txt")
 
 # Molyneaux markers
 mmDF <- read.csv("../source/Molyneaux_LayerMarkers_Format.csv", header = TRUE)
 
-# Markers from Lake 2016
-lmDF <- read.csv("../source/Lake_2016_ST5.csv", skip = 4, header = TRUE, fill = TRUE)
+# Lake 2017 cluster DE tables
+lake_DE_DF <- read.csv(
+  "../source/Lake_2018_TS3_Cluster_DE_Genes.csv"
+  , skip = 4, header = TRUE, fill = TRUE
+)
+
+# Lake 2017 expression matrix
+lake_ex_DF <- read.table(
+  "../lake_2017/GSE97930_FrontalCortex_snDrop-seq_UMI_Count_Matrix_08-01-2017.txt", header = TRUE
+)
+
+# Luis metaMat results
+mmapDF <- read.csv("../source/Gene_Lists/Overlapped-Genes.csv", header = TRUE)
+
+# Nowakowski cluster DE table
+nowakowski_DE_DF <- read.csv(
+  "../nowakowski_2017/Nowakowski_Table_S5_Clustermarkers.csv", header = TRUE
+)
 
 ## Variables
-graphCodeTitle <- "Seurat_ClusterRound2_MarkerPlots.R"
-# outGraph <- "../analysis/graphs/Seurat_ClusterRound2_MarkerPlots_DS2-11/Seurat_ClusterRound2_MarkerPlots_DS2-11_VarGenes_RegNumiLibBrain_PC1-30_"
-# outTable <- "../analysis/tables/Seurat_ClusterRound2_MarkerPlots_DS2-11/Seurat_ClusterRound2_MarkerPlots_DS2-11_VarGenes_RegNumiLibBrain_PC1-30_"
-# outData <- "../analysis/Seurat_ClusterRound2_MarkerPlots_DS2-11/Seurat_ClusterRound2_MarkerPlots_DS2-11_VarGenes_RegNumiLibBrain_PC1-30_"
-outGraph <- "../analysis/graphs/Seurat_ClusterRound2_MarkerPlots_DS2-11/Seurat_ClusterRound2_MarkerPlots_DS2-11_AllGenes_RegNumiLibBrain_PC1-30_"
-outTable <- "../analysis/tables/Seurat_ClusterRound2_MarkerPlots_DS2-11/Seurat_ClusterRound2_MarkerPlots_DS2-11_AllGenes_RegNumiLibBrain_PC1-30_"
-outData <- "../analysis/Seurat_ClusterRound2_MarkerPlots_DS2-11/Seurat_ClusterRound2_MarkerPlots_DS2-11_AllGenes_RegNumiLibBrain_PC1-30_"
+graphCodeTitle <- paste0("MarkerPlots.R\n", centSO@project.name)
+outGraph <- paste0( "../analysis/graphs/Seurat_ClusterRound2/MarkerPlots/DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/VarGenes/RegNumiLibBrain/PC1-40/MarkerPlots_"
+, gsub(" ", "", centSO@project.name), "_")
 
 ## Output Directories
-outDir <- dirname(outGraph)
-dir.create(outDir, recursive = TRUE)
-outTableDir <- dirname(outTable)
-dir.create(outTableDir, recursive = TRUE)
-outRdatDir <- dirname(outData)
-dir.create(outRdatDir, recursive = TRUE)
+dir.create(dirname(outGraph), recursive = TRUE)
 
 ## Set ggplot2 theme
 theme_set(theme_bw())
-theme_set(theme_get() + theme(text = element_text(size = 14)))
-theme_update(plot.title = element_text(size = 14))
+theme_set(theme_get() + theme(text = element_text(size = 10)))
+theme_update(plot.title = element_text(size = 10))
 theme_update(axis.line = element_line(colour = "black")
-  , plot.background = element_blank()
   , panel.border = element_blank()
 )
 ################################################################################
 
-print("### Feature plot of covariates")
+### Functions
 
-# Loop through clusters
-pgL <- lapply(names(lso), function(cl) {
-  
-  so <- lso[[cl]]
-  
-  ## Plot tSNE graph colored by lanes, samples, or GZ CP
-  # Collect tSNE values
-  ggDF <- as.data.frame(so@dr$tsne@cell.embeddings)
-  
-  # Add cluster identity
-  ggDF$CLUSTER <- so@ident
-  # Add metadata
-  ggDF <- data.frame(ggDF, so@meta.data[match(row.names(ggDF), so@meta.data$CELL), ])
-  ggDF$BRAIN <- as.factor(ggDF$BRAIN)
-  
-  # ggplot Donor
-  gg1 <- ggplot(ggDF, aes(x = tSNE_1, y = tSNE_2, col = BRAIN)) +
-    geom_point(size = 0.1, alpha = 0.5) +
-    guides(colour = guide_legend(override.aes = list(size = 7))) +
-    ggtitle(paste0("Donor"
-      , "\nCluster: ", cl))
-  
-  # ggplot GZ/CP
-  gg2 <- ggplot(ggDF, aes(x = tSNE_1, y = tSNE_2, col = REGION)) +
-    geom_point(size = 0.1, alpha = 0.5) +
-    guides(colour = guide_legend(override.aes = list(size = 7))) +
-    ggtitle(paste0("GZ/CP"
-      , "\nCluster: ", cl))
-  
-  # ggplot Lab library
-  gg3 <- ggplot(ggDF, aes(x = tSNE_1, y = tSNE_2, col = LIBRARY)) +
-    geom_point(size = 0.1, alpha = 0.5) +
-    guides(colour = guide_legend(override.aes = list(size = 7))) +
-    ggtitle(paste0("Lab library"
-      , "\nCluster: ", cl))
-  
-  # tSNE colored by clustering
-  ggTsne <- TSNE_Plot(so) + theme(legend.position = "none")
-  
-  # plot grid
-  pg <- plot_grid(ggTsne, gg1, gg2, gg3, align = "v", axis = "l", ncol = 4)
-  return(pg)
-})
-pg <- plot_grid(plotlist = pgL, ncol = 1)
-# now add the title
-title <- ggdraw() + draw_label(paste0(graphCodeTitle
-  , "\n\nSeurat clustering and covariates"
-  , "\n"
-  , "\nRemove genes > 0 counts in < 3 cells"
-  , "\nRemove cells < 200 genes detected"
-  , "\nRemove cells > 3192 (3 SD) genes detected"
-  , "\nRemove genes detected in < 3 cells"
-  , "\nNormalize expression"
-  , "\nRegress out covariates"
-  , "\ntSNE + Seurat cluster PC 1-40, cluster round 2 tSNE PCA 1-30"
-  , "\n"))
-# rel_heights values control title margins
-plot_grid(title, pg, ncol = 1, rel_heights = c(0.1, 1))
-# save
-ggsave(paste0(outGraph, "tSNE_covariates.png")
-  , width = 20, height = 80, limitsize = FALSE)
+Format_Cell_Cycle_Genes_Table <- function(){
+  print("Format_Cell_Cycle_Genes_Table")
+  ccDF <- melt(ccDF, measure.vars = c("G1.S", "S", "G2.M", "M", "M.G1"))
+  colnames(ccDF) <- c("Grouping", "Gene.Symbol")
+  ccDF$Gene.Symbol <- gsub(" *", "", ccDF$Gene.Symbol)
+  ccDF <- ccDF[! ccDF$Gene.Symbol == "", ]
+  ccDF <- ccDF[! is.na(ccDF$Grouping), ]
+  ccDF$Grouping <- gsub(" *", "", ccDF$Grouping)
+  ccDF$Grouping <- factor(ccDF$Grouping, levels = unique(ccDF$Grouping))
+  return(ccDF)
+}
 ################################################################################
 
-print("### Feature plot of top PC scores")
+### Format
 
-# Loop through clusters
-lapply(names(lso), function(cl) {
-  
-  so <- lso[[cl]]
-  
-  # Feature plots of top PC scores
-  ggL <- lapply(c(1:8), function(i) {
-    # Collect tSNE values
-    ggDF <- as.data.frame(so@dr$tsne@cell.embeddings)
-    # Add PC score
-    ggDF$PC <- so@dr$pca@cell.embeddings[ ,i]
-    gg <- ggplot(ggDF, aes(x = tSNE_1, y = tSNE_2, col = PC)) +
-      geom_point(size = 0.05, alpha = 0.5) +
-      # guides(colour = guide_legend(override.aes = list(size = 7))) +
-      scale_color_distiller(name = "PC score", type = "div"
-        , palette = 5, direction = -1) +
-      ggtitle(paste0("PC: ", i, "\n")) +
-      theme(text = element_text(size = 14))
-    return(gg)
-  })
-  # Add tSNE colored by clustering for reference
-  ggTsne <- TSNE_Plot(so) + theme(legend.position = "none")
-  ggL <- append(list(ggTsne), ggL)
-  # plot grid
-  pg <- plot_grid(plotlist = ggL, align = "v", axis = "r", ncol = 3)
+# Luis markers - cleanup marker data frame
+kmDF <- kmDF[! kmDF$Gene.Symbol == "", ]
+kmDF <- kmDF[! is.na(kmDF$Grouping), ]
+kmDF$Grouping <- factor(kmDF$Grouping, levels = unique(kmDF$Grouping))
+
+## Lake
+lake_DE_DF <- lake_DE_DF[ ,1:7]
+# Subset to clusters in frontal cortex dataset
+lake_DE_DF <- lake_DE_DF[
+  lake_DE_DF$Cluster %in% unique(gsub("_.*", "", colnames(lake_ex_DF)))
+  , ]
+# DE filter higher
+lake_DE_DF <- lake_DE_DF[
+  lake_DE_DF$"Average.Difference..log.fold.change." > 0.25
+  , c("Gene", "Average.Difference..log.fold.change.", "Cluster")]
+
+## Nowakowski
+# DE filter higher
+nowakowski_DE_DF <- nowakowski_DE_DF[
+  nowakowski_DE_DF$avg_diff > 0.75, c("gene", "avg_diff", "cluster")]
+################################################################################
+
+### Luis marker genes
+
+Plot_Luis_Markers <- function(){
+
+  # Feature plot
+  # Normalized, no mean centering scaling
+  ggL <- FeaturePlot(
+    genes = kmDF$Gene.Symbol
+    , tsneDF = as.data.frame(centSO@dr$tsne@cell.embeddings)
+    , seuratO = centSO
+    , exM = noCentExM
+    , limLow = -0.5
+    , limHigh = 2
+    , geneGrouping = kmDF$Grouping
+    , centScale = FALSE
+    , size = (400/nrow(centSO@scale.data))^(1/3)
+  )
+  # plot_grid combine tSNE graphs
+  pg <- plot_grid(plotlist = ggL, ncol = 3, align = 'v', axis = 'r')
   # now add the title
   title <- ggdraw() + draw_label(paste0(graphCodeTitle
-    , "\n\nSeurat cluster and tSNE colored by PC scores for cluster: ", cl
-    , "\n"
-    , "\nRemove genes > 0 counts in < 3 cells"
-    , "\nRemove cells < 200 genes detected"
-    , "\nRemove cells > 3192 (3 SD) genes detected"
-    , "\nRemove genes detected in < 3 cells"
-    , "\nNormalize expression"
-    , "\nRegress out covariates"
-    , "\ntSNE + Seurat cluster PC 1-40, cluster round 2 tSNE PCA 1-30"
+    , "\n\nExpression of known marker genes"
+    , "\nNormalized expression"
+    , "\n"))
+  # rel_heights values control title margins
+  plot_grid(title, pg, ncol = 1, rel_heights = c(0.05, 1))
+  ggsave(paste0(outGraph, "KnownMarks_FeaturePlot_Normalized.png")
+    , width = 12, height = length(ggL)*1)
+
+  # Feature plot
+  # Normalized, mean centered scaled
+  # Collect tSNE values for ggplot
+  ggL <- FeaturePlot(
+    genes = kmDF$Gene.Symbol
+    , tsneDF = as.data.frame(centSO@dr$tsne@cell.embeddings)
+    , seuratO = centSO
+    , exM = centSO@scale.data
+    , limLow = -1.5
+    , limHigh = 1.5
+    , geneGrouping = kmDF$Grouping
+    , centScale = TRUE
+    , size = (400/nrow(centSO@scale.data))^(1/3)
+  )
+  # plot_grid combine tSNE graphs
+  pg <- plot_grid(plotlist = ggL, ncol = 3, align = 'v', axis = 'r')
+  # now add the title
+  title <- ggdraw() + draw_label(paste0(graphCodeTitle
+    , "\n\nExpression of known marker genes"
+    , "\nCluster round 2 normalized expression, mean centered and variance scaled"
+    , "\n"))
+  # rel_heights values control title margins
+  plot_grid(title, pg, ncol = 1, rel_heights = c(0.05, 1))
+  ggsave(paste0(outGraph
+    , "KnownMarks_FeaturePlot_Round2NormalizedCenteredScaled.png")
+    , width = 12, height = length(ggL)*1)
+
+  # Feature plot
+  # Cluster round 1 normalized, mean centered scaled
+  # Collect tSNE values for ggplot
+  ggL <- FeaturePlot(
+    genes = kmDF$Gene.Symbol
+    , tsneDF = as.data.frame(centSO@dr$tsne@cell.embeddings)
+    , seuratO = centSO
+    , exM = rd1CentExM
+    , limLow = -1.5
+    , limHigh = 1.5
+    , geneGrouping = kmDF$Grouping
+    , centScale = TRUE
+    , size = (400/nrow(centSO@scale.data))^(1/3)
+  )
+  # plot_grid combine tSNE graphs
+  pg <- plot_grid(plotlist = ggL, ncol = 3, align = 'v', axis = 'r')
+  # now add the title
+  title <- ggdraw() + draw_label(paste0(graphCodeTitle
+    , "\n\nExpression of known marker genes"
+    , "\nCluster round 1 normalized expression, mean centered and variance scaled"
+    , "\n"))
+  # rel_heights values control title margins
+  plot_grid(title, pg, ncol = 1, rel_heights = c(0.05, 1))
+  ggsave(paste0(outGraph, "KnownMarks_FeaturePlot_Round1NormalizedCenteredScaled.png")
+    , width = 12, height = length(ggL)*1)
+
+
+  ## Violin plots of genes by cluster
+
+  # Normalized centered scaled
+  Gene_Expression_By_Cluster_ViolinPlot(
+    genes = kmDF$Gene.Symbol
+    , exprM = as.matrix(centSO@scale.data)
+    , clusterIDs = centSO@ident
+    , grouping = kmDF$Grouping
+  ) +
+    ggtitle(paste0(graphCodeTitle
+      , "\n"
+      , "\nMarker gene expression by cluster"
+      , "\nCluster round 2 normalized mean centered scaled expression"
+      , "\n"))
+  ggsave(paste0(outGraph
+    , "KnownMarks_ViolinPlot_Round2NormalizedCenteredScaled.png")
+    , width = 13, height = 26)
+
+  # Cluster round 1 normalized centered scaled
+  Gene_Expression_By_Cluster_ViolinPlot(
+    genes = kmDF$Gene.Symbol
+    , exprM = rd1CentExM
+    , clusterIDs = centSO@ident
+    , grouping = kmDF$Grouping
+  ) +
+    ggtitle(paste0(graphCodeTitle
+      , "\n"
+      , "\nMarker gene expression by cluster"
+      , "\nCluster round 1 normalized mean centered scaled expression"
+      , "\n"))
+  ggsave(paste0(outGraph, "KnownMarks_ViolinPlot_Round1NormalizedCenteredScaled.png")
+    , width = 13, height = 26)
+
+  # Normalized
+  Gene_Expression_By_Cluster_ViolinPlot(
+    genes = kmDF$Gene.Symbol
+    , exprM = noCentExM
+    , clusterIDs = centSO@ident
+    , grouping = kmDF$Grouping
+  ) +
+    ggtitle(paste0(graphCodeTitle
+      , "\n"
+      , "\nMarker gene expression by cluster"
+      , "\nNormalized expression"
+      , "\n"))
+  ggsave(paste0(outGraph, "KnownMarks_ViolinPlot_Normalized.png")
+    , width = 13, height = 26)
+
+
+  # Heatmap
+  # Normalized, no mean centering scaling
+  geneGroupDF <- data.frame(Gene = kmDF$Gene.Symbol, Group = kmDF$Grouping)
+  geneGroupDF <- geneGroupDF[! duplicated(geneGroupDF), ]
+  cellID_clusterID <- centSO@ident
+  gg <- Plot_Marker_Genes_Heatmap_SetColWidths(
+    geneGroupDF = geneGroupDF
+    , exprM = noCentExM
+    , cellID_clusterID = cellID_clusterID
+    , lowerLimit = -0.5
+    , upperLimit = 2
+    , clusterOrder = sort(unique(centSO@ident))
+  )
+  gg <- gg + ggtitle(
+    paste0(graphCodeTitle
+      , "\n\nExpression of published marker genes by cluster"
+      , "\nx-axis: Marker genes"
+      , "\ny-axis: Cells ordered by cluster"
+      , "\nNormalized expression"
+      , "\n")
+  )
+  ggsave(paste0(outGraph, "KnownMarks_Heatmap_Normalized.png")
+    , width = 16, height = 80, limitsize = FALSE)
+
+  # Clustering round 2 normalized, mean centering scaling
+  geneGroupDF <- data.frame(Gene = kmDF$Gene.Symbol, Group = kmDF$Grouping)
+  geneGroupDF <- geneGroupDF[! duplicated(geneGroupDF), ]
+  cellID_clusterID <- centSO@ident
+  gg <- Plot_Marker_Genes_Heatmap_SetColWidths(
+    geneGroupDF = geneGroupDF
+    , exprM = centSO@scale.data
+    , cellID_clusterID = cellID_clusterID
+    , lowerLimit = -1.5
+    , upperLimit = 1.5
+    , clusterOrder = sort(unique(centSO@ident))
+  )
+  gg <- gg + ggtitle(
+    paste0(graphCodeTitle
+      , "\n\nExpression of published marker genes by cluster"
+      , "\nx-axis: Marker genes"
+      , "\ny-axis: Cells ordered by cluster"
+      , "\nClustering round 2 normalized mean centered scaled expression"
+      , "\n")
+  )
+  ggsave(paste0(outGraph, "KnownMarks_Heatmap_Round2NormalizedCenteredScaled.png")
+    , width = 16, height = 80, limitsize = FALSE)
+
+  # Clustering round 1 normalized, mean centering scaling
+  geneGroupDF <- data.frame(Gene = kmDF$Gene.Symbol, Group = kmDF$Grouping)
+  geneGroupDF <- geneGroupDF[! duplicated(geneGroupDF), ]
+  cellID_clusterID <- centSO@ident
+  gg <- Plot_Marker_Genes_Heatmap_SetColWidths(
+    geneGroupDF = geneGroupDF
+    , exprM = rd1CentExM
+    , cellID_clusterID = cellID_clusterID
+    , lowerLimit = -1.5
+    , upperLimit = 1.5
+    , clusterOrder = sort(unique(centSO@ident))
+  )
+  gg <- gg + ggtitle(
+    paste0(graphCodeTitle
+      , "\n\nExpression of published marker genes by cluster"
+      , "\nx-axis: Marker genes"
+      , "\ny-axis: Cells ordered by cluster"
+      , "\nClustering round 1 normalized mean centered scaled expression"
+      , "\n")
+  )
+  ggsave(paste0(outGraph, "KnownMarks_Heatmap_Round1NormalizedCenteredScaled.png")
+    , width = 16, height = 80, limitsize = FALSE)
+
+}
+################################################################################
+
+### Cell cycle genes
+
+Plot_Cell_Cycle_Genes <- function(){
+
+  print("Plot_Cell_Cycle_Genes")
+
+  # Collect tSNE values for ggplot
+  ggDF <- as.data.frame(centSO@dr$tsne@cell.embeddings)
+
+  # Subset to marker genes of interest for Luis' excel file
+  # Cleanup marker data frame
+  ccDF <- melt(ccDF, measure.vars = c("G1.S", "S", "G2.M", "M", "M.G1"))
+  colnames(ccDF) <- c("Grouping", "Gene.Symbol")
+  ccDF$Gene.Symbol <- gsub(" *", "", ccDF$Gene.Symbol)
+  ccDF <- ccDF[! ccDF$Gene.Symbol == "", ]
+  ccDF <- ccDF[! is.na(ccDF$Grouping), ]
+  ccDF$Grouping <- gsub(" *", "", ccDF$Grouping)
+  ccDF$Grouping <- factor(ccDF$Grouping, levels = unique(ccDF$Grouping))
+  ccDFL <- split(ccDF, ccDF$Grouping)
+
+  # We can segregate this list into markers of G2/M phase and markers of S
+  # phase
+  ccDFL[["S.Tirosh"]] <- data.frame(
+    Grouping = "S.Tirosh", Gene.Symbol = ccTirosh[1:43])
+  ccDFL[["G2M.Trisosh"]] <- data.frame(
+    Grouping = "G2M.Tirosh", Gene.Symbol = ccTirosh[44:98])
+
+  # Feature plot
+  # Normalized, no mean centering scaling
+  ggDF <- as.data.frame(centSO@dr$tsne@cell.embeddings)
+  ggL <- FeaturePlot(
+    genes = ccDF$Gene.Symbol
+    , tsneDF = ggDF
+    , seuratO = centSO
+    , exM = rd1CentExM
+    , limLow = -0.5
+    , limHigh = 2
+    , geneGrouping = ccDF$Grouping
+    , centScale = FALSE
+    , size = (400/nrow(centSO@scale.data))^(1/3)
+  )
+  ggL <- lapply(ggL, function(gg){gg + ggplot_set_theme_publication})
+  # plot_grid combine tSNE graphs
+  pg <- plot_grid(plotlist = ggL, ncol = 3, align = 'v', axis = 'r')
+  # now add the title
+  title <- ggdraw() + draw_label(paste0(graphCodeTitle
+    , "\n\nExpression of cell cycle genes from Macosko"
+    , "\nNormalized expression"
     , "\n"))
   # rel_heights values control title margins
   plot_grid(title, pg, ncol = 1, rel_heights = c(0.2, 1))
-  # save
-  ggsave(paste0(outGraph, "PCscore_FeaturePlot_Cluster", cl, ".png")
-    , width = 15, height = 15)
-})
+  ggsave(paste0(outGraph, "CellCycle_FeaturePlot_Normalized.png")
+    , width = 14, height = length(ggL)*1)
+
+  # Feature plot
+  # Cluster round 2 normalized, mean centered scaled
+  ggDF <- as.data.frame(centSO@dr$tsne@cell.embeddings)
+  ggL <- FeaturePlot(
+    genes = ccDF$Gene.Symbol
+    , tsneDF = ggDF
+    , seuratO = centSO
+    , exM = centSO@scale.data
+    , limLow = -1.5
+    , limHigh = 1.5
+    , geneGrouping = ccDF$Grouping
+    , centScale = TRUE
+    , size = (400/nrow(centSO@scale.data))^(1/3)
+  )
+  ggL <- lapply(ggL, function(gg){gg + ggplot_set_theme_publication})
+  # plot_grid combine tSNE graphs
+  pg <- plot_grid(plotlist = ggL, ncol = 3, align = 'v', axis = 'r')
+  # now add the title
+  title <- ggdraw() + draw_label(paste0(graphCodeTitle
+    , "\n\nExpression of cell cycle genes from Macosko"
+    , "\nNormalized expression, mean centered and variance scaled"
+    , "\n"))
+  # rel_heights values control title margins
+  plot_grid(title, pg, ncol = 1, rel_heights = c(0.2, 1))
+  ggsave(paste0(outGraph
+    , "CellCycle_FeaturePlot_Round2NormalizedCenteredScaled.png")
+    , width = 14, height = length(ggL)*1)
+
+  # Feature plot
+  # Cluster round 1 normalized, mean centered scaled
+  ggDF <- as.data.frame(centSO@dr$tsne@cell.embeddings)
+  ggL <- FeaturePlot(
+    genes = ccDF$Gene.Symbol
+    , tsneDF = ggDF
+    , seuratO = centSO
+    , exM = rd1CentExM
+    , limLow = -1.5
+    , limHigh = 1.5
+    , geneGrouping = ccDF$Grouping
+    , centScale = TRUE
+    , size = (400/nrow(centSO@scale.data))^(1/3)
+  )
+  ggL <- lapply(ggL, function(gg){gg + ggplot_set_theme_publication})
+  # plot_grid combine tSNE graphs
+  pg <- plot_grid(plotlist = ggL, ncol = 3, align = 'v', axis = 'r')
+  # now add the title
+  title <- ggdraw() + draw_label(paste0(graphCodeTitle
+    , "\n\nExpression of cell cycle genes from Macosko"
+    , "\nNormalized expression, mean centered and variance scaled"
+    , "\n"))
+  # rel_heights values control title margins
+  plot_grid(title, pg, ncol = 1, rel_heights = c(0.2, 1))
+  ggsave(paste0(outGraph
+    , "CellCycle_FeaturePlot_Round1NormalizedCenteredScaled.png")
+    , width = 14, height = length(ggL)*1)
+
+  # Heatmap
+  # Normalized, no mean centering scaling
+  # Round 1 normalized, mean centered and scaled
+  geneGroupDF <- data.frame(Gene = ccDF$Gene.Symbol, Group = ccDF$Grouping)
+  geneGroupDF <- geneGroupDF[! duplicated(geneGroupDF), ]
+  cellID_clusterID <- centSO@ident
+  gg <- Plot_Marker_Genes_Heatmap_SetColWidths(
+    geneGroupDF = geneGroupDF
+    , exprM = noCentExM
+    , cellID_clusterID = cellID_clusterID
+    , lowerLimit = -0.5
+    , upperLimit = 2
+    , clusterOrder = sort(unique(centSO@ident))
+  )
+  gg <- gg + ggtitle(
+    paste0(graphCodeTitle
+      , "\n\nExpression of cell cycle genes (Macosko) by cluster"
+      , "\nx-axis: Marker genes"
+      , "\ny-axis: Cells ordered by cluster"
+      , "\nNormalized expression"
+      , "\n")
+  )
+  ggsave(paste0(outGraph, "CellCycle_Heatmap_Normalized.png")
+    , width = 16, height = 44)
+
+  # Round 2 normalized mean centered scaled
+  geneGroupDF <- data.frame(Gene = ccDF$Gene.Symbol, Group = ccDF$Grouping)
+  geneGroupDF <- geneGroupDF[! duplicated(geneGroupDF), ]
+  cellID_clusterID <- centSO@ident
+  gg <- Plot_Marker_Genes_Heatmap_SetColWidths(
+    geneGroupDF = geneGroupDF
+    , exprM = centSO@scale.data
+    , cellID_clusterID = cellID_clusterID
+    , lowerLimit = -1.5
+    , upperLimit = 1.5
+    , clusterOrder = sort(unique(centSO@ident))
+  )
+  gg <- gg + ggtitle(
+    paste0(graphCodeTitle
+      , "\n\nExpression of cell cycle genes (Macosko) by cluster"
+      , "\nx-axis: Marker genes"
+      , "\ny-axis: Cells ordered by cluster"
+      , "\nClustering round 2 normalized mean centered scaled expression"
+      , "\n")
+  )
+  ggsave(paste0(outGraph, "CellCycle_Heatmap_Round2NormalizedCenteredScaled.png")
+    , width = 16, height = 44)
+
+  # Round 1 normalized, mean centered and scaled
+  geneGroupDF <- data.frame(Gene = ccDF$Gene.Symbol, Group = ccDF$Grouping)
+  geneGroupDF <- geneGroupDF[! duplicated(geneGroupDF), ]
+  cellID_clusterID <- centSO@ident
+  gg <- Plot_Marker_Genes_Heatmap_SetColWidths(
+    geneGroupDF = geneGroupDF
+    , exprM = rd1CentExM
+    , cellID_clusterID = cellID_clusterID
+    , lowerLimit = -1.5
+    , upperLimit = 1.5
+    , clusterOrder = sort(unique(centSO@ident))
+  )
+  gg <- gg + ggtitle(
+    paste0(graphCodeTitle
+      , "\n\nExpression of cell cycle genes (Macosko) by cluster"
+      , "\nx-axis: Marker genes"
+      , "\ny-axis: Cells ordered by cluster"
+      , "\nClustering round 1 normalized mean centered scaled expression"
+      , "\n")
+  )
+  ggsave(paste0(outGraph, "CellCycle_Heatmap_Round1NormalizedCenteredScaled.png")
+    , width = 16, height = 44)
+
+}
 ################################################################################
 
-# ### Feature plot genes with high PC loadings
-# 
-# # Genes with highest PC loadings
-# ldf <- lapply(1:4, function(pc) {
-#   data.frame(GENES = names(sort(abs(so@dr$pca@gene.loadings[ ,pc])
-#     , decreasing = TRUE)[1:5]), PC = paste0("PC", pc))
-# })
-# genesDF <- do.call("rbind", ldf)
-# 
-# # Loop through clusters
-# lapply(names(lso), function(cl) {
-#   
-#   so <- lso[[cl]]
-#   
-#   # Collect tSNE values for ggplot
-#   ggDF <- as.data.frame(so@dr$tsne@cell.embeddings)
-#   
-#   ## Feature plot - normalized, mean centered scaled on full dataset
-#   # Loop through and plot each group of genes
-#   ggL <- apply(genesDF, 1, function(v1) {
-#     gene <- v1[["GENES"]]
-#     grouping <- v1[["PC"]]
-#     print(gene)
-#     ggDF <- Mean_Expression(ggDF, gene, centSO@scale.data)
-#     ggDF <- Set_Limits(ggDF, limLow = 0, limHigh = 2)
-#     ggFp <- Feature_Plot(ggDF, limLow = 0, limHigh = 2
-#       , title = paste0(gene, "\n", grouping)
-#     )
-#     return(ggFp)
-#   })
-#   ggTsne <- TSNE_Plot(so)
-#   ggL <- append(list(ggTsne), ggL)
-#   # extract the legend from one of the plots
-#   legend <- get_legend(ggL[[2]])
-#   # Remove legends from plots
-#   ggL <- lapply(ggL, function(gg) {gg + theme(legend.position = "none")})
-#   # plot_grid combine tSNE graphs
-#   pg <- plot_grid(plotlist = ggL, ncol = 4, align = 'v', axis = 'l')
-#   # add the legend to the row we made earlier. Give it one-third of the width
-#   # of one plot (via rel_widths).
-#   pg <- plot_grid(pg, legend, rel_widths = c(3, 0.3))
-#   # now add the title
-#   title <- ggdraw() + draw_label(paste0(graphCodeTitle
-#     , "\n\nGenes (5) that correlate highly to top PCs (4)"
-#     , "\ntSNE plot of reclustered cells, each point is a cell"
-#     , "\nColor indicates mean normalized centered scaled expression"
-#     , "\n"
-#     , "\nNormalized, mean centered, variance scaled across full dataset"
-#     , "\nRemove cells < 200 genes detected in cluster"
-#     , "\nRemove genes detected in < 3 cells in cluster"
-#     , "\nOnly recluster clusters >= 100 cells"
-#     , "\nSeurat variable genes used for clustering"
-#     , "\ntSNE PCA 1-40, cluster round 2 tSNE PCA 1-30"
-#     , "\n"))
-#   # rel_heights values control title margins
-#   plot_grid(title, pg, ncol = 1
-#     , rel_heights = c(length(ggL)*0.2, length(ggL)))
-#   ggsave(paste0(
-#     outGraph, "PChighGenes_FeaturePlot_NormFullCentScale_Cluster", cl, ".png")
-#     , width = 16, height = length(ggL), limitsize = FALSE)
-#   
-#   # ## Feature plot - normalized, mean centered scaled on cluster
-#   # # Loop through and plot each group of genes
-#   # ggL <- apply(df, 1, function(v1) {
-#   #   gene <- v1[["Gene.Symbol"]]
-#   #   grouping <- v1[["Grouping"]]
-#   #   print(gene)
-#   #   ggDF <- Mean_Expression(gene, so@scale.data)
-#   #   ggDF <- Set_Limits(ggDF, limLow = 0, limHigh = 2)
-#   #   ggFp <- Feature_Plot(ggDF
-#   #     , title = paste0(gene, "\n", grouping)
-#   #   )
-#   #   return(ggFp)
-#   # })
-#   # ggTsne <- TSNE_Plot(so)
-#   # ggL <- append(list(ggTsne), ggL)
-#   # # extract the legend from one of the plots
-#   # legend <- get_legend(ggL[[2]])
-#   # # Remove legends from plots
-#   # ggL <- lapply(ggL, function(gg) {gg + theme(legend.position = "none")})
-#   # # plot_grid combine tSNE graphs
-#   # pg <- plot_grid(plotlist = ggL, ncol = 4, align = 'v', axis = 'l')
-#   # # add the legend to the row we made earlier. Give it one-third of the width
-#   # # of one plot (via rel_widths).
-#   # pg <- plot_grid(pg, legend, rel_widths = c(3, 0.3))
-#   # # now add the title
-#   # title <- ggdraw() + draw_label(paste0(graphCodeTitle
-#   #   , "\n\nGenes (5) that correlate highly to top PCs (4)"
-#   #   , "\ntSNE plot of reclustered cells, each point is a cell"
-#   #   , "\nColor indicates mean normalized centered scaled expression"
-#   #   , "\n"
-#   #   , "\nNormalized, mean centered, variance scaled across cluster"
-#   #   , "\nRemove cells < 200 genes detected in cluster"
-#   #   , "\nRemove genes detected in < 3 cells in cluster"
-#   #   , "\nOnly recluster clusters >= 100 cells"
-#   #   , "\nSeurat variable genes used for clustering"
-#   #   , "\ntSNE PCA 1-40, cluster round 2 tSNE PCA 1-30"
-#   #   , "\n"))
-#   # # rel_heights values control title margins
-#   # plot_grid(title, pg, ncol = 1
-#   #   , rel_heights = c(length(ggL)*0.2, length(ggL)))
-#   # ggsave(paste0(
-#   #   outGraph, "KnownMarks_FeaturePlot_NormClusterCentScale_Cluster", cl, ".png")
-#   #   , width = 16, height = length(ggL), limitsize = FALSE)
-#   
-# })
-################################################################################
+### Lake cluster enriched genes
 
-### Feature plot Luis known markers
+Plot_Lake2017_Enriched <- function(){
 
-# Mean expression of marker gene groups for each cluster2
-lapply(names(lso), function(cl) {
-  
-  print(cl)
-  so <- lso[[cl]]
-  print(head(so@dr$tsne@cell.embeddings))
-  
-  # Collect tSNE values for ggplot
-  ggDF <- as.data.frame(so@dr$tsne@cell.embeddings)
-  
-  ## Luis marker genes
-  
-  # Subset to marker genes of interest for Luis' excel file
-  # Cleanup marker data frame
-  kmDF <- kmDF[! kmDF$Gene.Symbol == "", ]
-  kmDF <- kmDF[! is.na(kmDF$Grouping), ]
-  kmDF$Grouping <- factor(kmDF$Grouping, levels = unique(kmDF$Grouping))
-  kmDFL <- split(kmDF, kmDF$Grouping)
-  
+  print("Plot_Lake2017_Enriched")
+
+  ## Feature plots
+
+  # Feature plot
+  # Normalized, no mean centering scaling
+  ggL <- FeaturePlot(
+    genes = lake_DE_DF$Gene
+    , tsneDF = as.data.frame(centSO@dr$tsne@cell.embeddings)
+    , seuratO = centSO
+    , exM = noCentExM
+    , limLow = -0.5
+    , limHigh = 2
+    , geneGrouping = lake_DE_DF$Cluster
+    , centScale = FALSE
+    , size = (400/nrow(centSO@scale.data))^(1/3)
+  )
+  # plot_grid combine tSNE graphs
+  pg <- plot_grid(plotlist = ggL, ncol = 3, align = 'v', axis = 'r')
+  # now add the title
+  title <- ggdraw() + draw_label(paste0(graphCodeTitle
+    , "\n\nExpression of Lake cluster enriched"
+    , "\nNormalized expression"
+    , "\n"))
+  # rel_heights values control title margins
+  plot_grid(title, pg, ncol = 1, rel_heights = c(0.05, 1))
+  ggsave(paste0(outGraph, "LakeEnriched_FeaturePlot_Normalized.png")
+    , width = 12, height = length(ggL)*1)
+
   # Feature plot
   # Normalized, mean centered scaled
-  # Loop through and plot each group of genes
-  ggL <- lapply(names(kmDFL), function(grouping) {
-    print(grouping)
-    genes <- kmDF$Gene.Symbol[kmDF$Grouping == grouping]
-    print("Mean expression")
-    ggDF <- Mean_Expression(ggDF, genes, centSO@scale.data)
-    ggDF <- Set_Limits(ggDF, limLow = -1.5, limHigh = 1.5)
-    print("Feature plot")
-    ggFp <- FeaturePlot_Graph_CentScale(ggDF, limLow = -1.5, limHigh = 1.5
-      , title = paste0("\n", grouping)
-    )
-    return(ggFp)
-  })
-  ggTsne <- TSNE_Plot(so)
-  ggL <- append(list(ggTsne), ggL)
-  
-  # extract the legend from one of the plots
-  legend <- get_legend(ggL[[2]])
-  # Remove legends from plots
-  ggL <- lapply(ggL, function(gg) {gg + theme(legend.position = "none")})
+  ggL <- FeaturePlot(
+    genes = lake_DE_DF$Gene
+    , tsneDF = as.data.frame(centSO@dr$tsne@cell.embeddings)
+    , seuratO = centSO
+    , exM = centSO@scale.data
+    , limLow = -1.5
+    , limHigh = 1.5
+    , geneGrouping = lake_DE_DF$Cluster
+    , centScale = TRUE
+    , size = (400/nrow(centSO@scale.data))^(1/3)
+  )
   # plot_grid combine tSNE graphs
-  pg <- plot_grid(plotlist = ggL, ncol = 4, align = 'v', axis = 'l')
-  # add the legend to the row we made earlier. Give it one-third of the width
-  # of one plot (via rel_widths).
-  pg <- plot_grid(pg, legend, rel_widths = c(3, 0.3))
+  pg <- plot_grid(plotlist = ggL, ncol = 3, align = 'v', axis = 'r')
   # now add the title
   title <- ggdraw() + draw_label(paste0(graphCodeTitle
-    , "\n\nPublished marker genes, cluster round2 for cluster: ", cl
-    , "\ntSNE plot of reclustered cells, each point is a cell"
-    , "\nColor indicates mean normalized centered scaled expression"
-    , "\n"
-    , "\nNormalized, mean centered, variance scaled across full dataset"
-    , "\nRemove cells < 200 genes detected in cluster"
-    , "\nRemove genes detected in < 3 cells in cluster"
-    , "\nOnly recluster clusters >= 100 cells"
-    , "\nSeurat variable genes used for clustering"
-    , "\ntSNE PCA 1-40, cluster round 2 tSNE PCA 1-30"
+    , "\n\nExpression of Lake cluster enriched"
+    , "\nCluster round 2 normalized expression, mean centered and variance scaled"
     , "\n"))
   # rel_heights values control title margins
-  plot_grid(title, pg, ncol = 1
-    , rel_heights = c(length(ggL)*0.1, length(ggL)))
-  
-  ggsave(paste0(
-    outGraph, "KnownMarksGroups_FeaturePlot_NormCentScale_Cluster", cl, ".png")
-    , width = 14, height = length(ggL), limitsize = FALSE)
-  
-})
+  plot_grid(title, pg, ncol = 1, rel_heights = c(0.05, 1))
+  ggsave(paste0(outGraph
+    , "LakeEnriched_FeaturePlot_Round2NormalizedCenteredScaled.png")
+    , width = 12, height = length(ggL)*1)
 
-## Marker genes for each cluster2 of cluster 0-4
-lapply(names(lso)[1:10], function(cl) {
-  
-  print(cl)
-  so <- lso[[cl]]
-  print(head(so@dr$tsne@cell.embeddings))
-  
+  # Feature plot
+  # Cluster round 1 normalized, mean centered scaled
   # Collect tSNE values for ggplot
-  ggDF <- as.data.frame(so@dr$tsne@cell.embeddings)
-  
-  ## Subset to marker genes of interest for Luis' excel file
-  # Cleanup marker data frame
-  df <- kmDF[kmDF$Grouping %in% c("IP", "Neuron", "GABAergic", "Glutamatergic"
-    , "Dopaminergic Neuron", "Cortical Migratin", "Excitatory Deep Layer Cortical"
-    , "Excitatory Upper Layer Cortical", "Subplate"), ]
-  ldf <- split(df, df$Gene.Symbol)
-  
-  ## Feature plot - normalized, mean centered scaled on full dataset
-  # Loop through and plot each group of genes
-  ggL <- apply(df, 1, function(v1) {
-    gene <- v1[["Gene.Symbol"]]
-    grouping <- v1[["Grouping"]]
-    print(gene)
-    ggDF <- Mean_Expression(ggDF, gene, centSO@scale.data)
-    ggDF <- Set_Limits(ggDF, limLow = 0, limHigh = 2)
-    ggFp <- FeaturePlot_Graph_CentScale(ggDF, limLow = -1.5, limHigh = 1.5
-      , title = paste0(gene, "\n", grouping)
-    )
-    return(ggFp)
-  })
-  ggTsne <- TSNE_Plot(so)
-  ggL <- append(list(ggTsne), ggL)
-  # extract the legend from one of the plots
-  legend <- get_legend(ggL[[2]])
-  # Remove legends from plots
-  ggL <- lapply(ggL, function(gg) {gg + theme(legend.position = "none")})
+  ggL <- FeaturePlot(
+    genes = lake_DE_DF$Gene
+    , tsneDF = as.data.frame(centSO@dr$tsne@cell.embeddings)
+    , seuratO = centSO
+    , exM = rd1CentExM
+    , limLow = -1.5
+    , limHigh = 1.5
+    , geneGrouping = lake_DE_DF$Cluster
+    , centScale = TRUE
+    , size = (400/nrow(centSO@scale.data))^(1/3)
+  )
   # plot_grid combine tSNE graphs
-  pg <- plot_grid(plotlist = ggL, ncol = 4, align = 'v', axis = 'l')
-  # add the legend to the row we made earlier. Give it one-third of the width
-  # of one plot (via rel_widths).
-  pg <- plot_grid(pg, legend, rel_widths = c(3, 0.3))
+  pg <- plot_grid(plotlist = ggL, ncol = 3, align = 'v', axis = 'r')
   # now add the title
   title <- ggdraw() + draw_label(paste0(graphCodeTitle
-    , "\n\nPublished marker genes, cluster round2 for cluster: ", cl
-    , "\ntSNE plot of reclustered cells, each point is a cell"
-    , "\nColor indicates mean normalized expression"
-    , "\nNormalized, mean centered, variance scaled across full dataset"
-    , "\nRemove cells < 200 genes detected in cluster"
-    , "\nRemove genes detected in < 3 cells in cluster"
-    , "\nOnly recluster clusters >= 100 cells"
-    , "\nSeurat variable genes used for clustering"
-    , "\ntSNE PCA 1-40, cluster round 2 tSNE PCA 1-30"
+    , "\n\nExpression of Lake cluster enriched"
+    , "\nCluster round 1 normalized expression, mean centered and variance scaled"
     , "\n"))
   # rel_heights values control title margins
-  plot_grid(title, pg, ncol = 1
-    , rel_heights = c(length(ggL)*0.05, length(ggL)))
-  ggsave(paste0(
-    outGraph, "KnownMarks_FeaturePlot_NormFullCentScale_Cluster", cl, ".png")
-    , width = 14, height = length(ggL), limitsize = FALSE)
-  
-  ## Feature plot - normalized, mean centered scaled on cluster
-  # Loop through and plot each group of genes
-  ggL <- apply(df, 1, function(v1) {
-    gene <- v1[["Gene.Symbol"]]
-    grouping <- v1[["Grouping"]]
-    print(gene)
-    ggDF <- Mean_Expression(ggDF, gene, so@scale.data)
-    ggDF <- Set_Limits(ggDF, limLow = 0, limHigh = 2)
-    ggFp <- FeaturePlot_Graph_CentScale(ggDF, limLow = -1.5, limHigh = 1.5
-      , title = paste0(gene, "\n", grouping)
-    )
-    return(ggFp)
-  })
-  ggTsne <- TSNE_Plot(so)
-  ggL <- append(list(ggTsne), ggL)
-  # extract the legend from one of the plots
-  legend <- get_legend(ggL[[2]])
-  # Remove legends from plots
-  ggL <- lapply(ggL, function(gg) {gg + theme(legend.position = "none")})
-  # plot_grid combine tSNE graphs
-  pg <- plot_grid(plotlist = ggL, ncol = 4, align = 'v', axis = 'l')
-  # add the legend to the row we made earlier. Give it one-third of the width
-  # of one plot (via rel_widths).
-  pg <- plot_grid(pg, legend, rel_widths = c(3, 0.3))
-  # now add the title
-  title <- ggdraw() + draw_label(paste0(graphCodeTitle
-    , "\n\nPublished marker genes, cluster round2 for cluster: ", cl
-    , "\ntSNE plot of reclustered cells, each point is a cell"
-    , "\nColor indicates mean normalized expression"
-    , "\nNormalized, mean centered, variance scaled across cluster"
-    , "\nRemove cells < 200 genes detected in cluster"
-    , "\nRemove genes detected in < 3 cells in cluster"
-    , "\nOnly recluster clusters >= 100 cells"
-    , "\nSeurat variable genes used for clustering"
-    , "\ntSNE PCA 1-40, cluster round 2 tSNE PCA 1-30"
-    , "\n"))
-  # rel_heights values control title margins
-  plot_grid(title, pg, ncol = 1
-    , rel_heights = c(length(ggL)*0.05, length(ggL)))
-  ggsave(paste0(
-    outGraph, "KnownMarks_FeaturePlot_NormClusterCentScale_Cluster", cl, ".png")
-    , width = 14, height = length(ggL), limitsize = FALSE)
-  
-})
+  plot_grid(title, pg, ncol = 1, rel_heights = c(0.05, 1))
+  ggsave(paste0(outGraph, "LakeEnriched_FeaturePlot_Round1NormalizedCenteredScaled.png")
+    , width = 12, height = length(ggL)*1)
 
-## Marker genes for each cluster2 of cluster 5-6
-lapply(names(lso)[c(4, 11, 12)], function(cl) {
-  
-  print(cl)
-  so <- lso[[cl]]
-  print(head(so@dr$tsne@cell.embeddings))
-  
-  # Collect tSNE values for ggplot
-  ggDF <- as.data.frame(so@dr$tsne@cell.embeddings)
-  
-  ## Subset to marker genes of interest for Luis' excel file
-  # Cleanup marker data frame
-  df <- kmDF[kmDF$Grouping %in% c("GABAergic interneuron", "GABAergic Neuron"
-    , "Neuron", "Cajal-Retzius", "Cortical Migrating"), ]
-  ldf <- split(df, df$Gene.Symbol)
-  
-  ## Feature plot - normalized, mean centered scaled on full dataset
-  # Loop through and plot each group of genes
-  ggL <- apply(df, 1, function(v1) {
-    gene <- v1[["Gene.Symbol"]]
-    grouping <- v1[["Grouping"]]
-    print(gene)
-    ggDF <- Mean_Expression(ggDF, gene, centSO@scale.data)
-    ggDF <- Set_Limits(ggDF, limLow = 0, limHigh = 2)
-    ggFp <- FeaturePlot_Graph_CentScale(ggDF, limLow = -1.5, limHigh = 1.5
-      , title = paste0(gene, "\n", grouping)
-    )
-    return(ggFp)
-  })
-  ggTsne <- TSNE_Plot(so)
-  ggL <- append(list(ggTsne), ggL)
-  # extract the legend from one of the plots
-  legend <- get_legend(ggL[[2]])
-  # Remove legends from plots
-  ggL <- lapply(ggL, function(gg) {gg + theme(legend.position = "none")})
-  # plot_grid combine tSNE graphs
-  pg <- plot_grid(plotlist = ggL, ncol = 4, align = 'v', axis = 'l')
-  # add the legend to the row we made earlier. Give it one-third of the width
-  # of one plot (via rel_widths).
-  pg <- plot_grid(pg, legend, rel_widths = c(3, 0.3))
-  # now add the title
-  title <- ggdraw() + draw_label(paste0(graphCodeTitle
-    , "\n\nPublished marker genes, cluster round2 for cluster: ", cl
-    , "\ntSNE plot of reclustered cells, each point is a cell"
-    , "\nColor indicates mean normalized expression"
-    , "\nNormalized, mean centered, variance scaled across full dataset"
-    , "\nRemove cells < 200 genes detected in cluster"
-    , "\nRemove genes detected in < 3 cells in cluster"
-    , "\nOnly recluster clusters >= 100 cells"
-    , "\nSeurat variable genes used for clustering"
-    , "\ntSNE PCA 1-40, cluster round 2 tSNE PCA 1-30"
-    , "\n"))
-  # rel_heights values control title margins
-  plot_grid(title, pg, ncol = 1
-    , rel_heights = c(length(ggL)*0.05, length(ggL)))
-  ggsave(paste0(
-    outGraph, "KnownMarks_FeaturePlot_NormFullCentScale_Cluster", cl, ".png")
-    , width = 14, height = length(ggL), limitsize = FALSE)
-  
-  ## Feature plot - normalized, mean centered scaled on cluster
-  # Loop through and plot each group of genes
-  ggL <- apply(df, 1, function(v1) {
-    gene <- v1[["Gene.Symbol"]]
-    grouping <- v1[["Grouping"]]
-    print(gene)
-    ggDF <- Mean_Expression(ggDF, gene, so@scale.data)
-    ggDF <- Set_Limits(ggDF, limLow = 0, limHigh = 2)
-    ggFp <- FeaturePlot_Graph_CentScale(ggDF, limLow = -1.5, limHigh = 1.5
-      , title = paste0(gene, "\n", grouping)
-    )
-    return(ggFp)
-  })
-  ggTsne <- TSNE_Plot(so)
-  ggL <- append(list(ggTsne), ggL)
-  # extract the legend from one of the plots
-  legend <- get_legend(ggL[[2]])
-  # Remove legends from plots
-  ggL <- lapply(ggL, function(gg) {gg + theme(legend.position = "none")})
-  # plot_grid combine tSNE graphs
-  pg <- plot_grid(plotlist = ggL, ncol = 4, align = 'v', axis = 'l')
-  # add the legend to the row we made earlier. Give it one-third of the width
-  # of one plot (via rel_widths).
-  pg <- plot_grid(pg, legend, rel_widths = c(3, 0.3))
-  # now add the title
-  title <- ggdraw() + draw_label(paste0(graphCodeTitle
-    , "\n\nPublished marker genes, cluster round2 for cluster: ", cl
-    , "\ntSNE plot of reclustered cells, each point is a cell"
-    , "\nColor indicates mean normalized expression"
-    , "\nNormalized, mean centered, variance scaled across cluster"
-    , "\nRemove cells < 200 genes detected in cluster"
-    , "\nRemove genes detected in < 3 cells in cluster"
-    , "\nOnly recluster clusters >= 100 cells"
-    , "\nSeurat variable genes used for clustering"
-    , "\ntSNE PCA 1-40, cluster round 2 tSNE PCA 1-30"
-    , "\n"))
-  # rel_heights values control title margins
-  plot_grid(title, pg, ncol = 1
-    , rel_heights = c(length(ggL)*0.05, length(ggL)))
-  ggsave(paste0(
-    outGraph, "KnownMarks_FeaturePlot_NormClusterCentScale_Cluster", cl, ".png")
-    , width = 14, height = length(ggL), limitsize = FALSE)
-  
-})
 
-## Marker genes for each cluster2 of cluster 2, 7, 8, 9, 10
-lapply(names(lso)[c(5, 13, 14, 15, 16)], function(cl) {
-  
-  print(cl)
-  so <- lso[[cl]]
-  print(head(so@dr$tsne@cell.embeddings))
-  
-  # Collect tSNE values for ggplot
-  ggDF <- as.data.frame(so@dr$tsne@cell.embeddings)
-  
-  ## Subset to marker genes of interest for Luis' excel file
-  # Cleanup marker data frame
-  df <- kmDF[kmDF$Grouping %in% c("vRG", "oRG"
-    , "RG", "IP", "Glia", "Neuron"), ]
-  ldf <- split(df, df$Gene.Symbol)
-  
-  ## Feature plot - normalized, mean centered scaled on full dataset
-  # Loop through and plot each group of genes
-  ggL <- apply(df, 1, function(v1) {
-    gene <- v1[["Gene.Symbol"]]
-    grouping <- v1[["Grouping"]]
-    print(gene)
-    ggDF <- Mean_Expression(ggDF, gene, centSO@scale.data)
-    ggDF <- Set_Limits(ggDF, limLow = 0, limHigh = 2)
-    ggFp <- FeaturePlot_Graph_CentScale(ggDF, limLow = -1.5, limHigh = 1.5
-      , title = paste0(gene, "\n", grouping)
-    )
-    return(ggFp)
+  ## Violin plots of genes by cluster
+
+  # Normalized centered scaled
+  Gene_Expression_By_Cluster_ViolinPlot(
+    genes = lake_DE_DF$Gene
+    , exprM = as.matrix(centSO@scale.data)
+    , clusterIDs = centSO@ident
+    , grouping = lake_DE_DF$Cluster
+  ) +
+    ggtitle(paste0(graphCodeTitle
+      , "\n"
+      , "\nExpression of Lake cluster enriched"
+      , "\nCluster round 2 normalized mean centered scaled expression"
+      , "\n"))
+  ggsave(paste0(outGraph
+    , "LakeEnriched_ViolinPlot_Round2NormalizedCenteredScaled.png")
+    , width = 13, height = 26)
+
+  # Cluster round 1 normalized centered scaled
+  Gene_Expression_By_Cluster_ViolinPlot(
+    genes = lake_DE_DF$Gene
+    , exprM = rd1CentExM
+    , clusterIDs = centSO@ident
+    , grouping = lake_DE_DF$Cluster
+  ) +
+    ggtitle(paste0(graphCodeTitle
+      , "\n"
+      , "\nExpression of Lake cluster enriched"
+      , "\nCluster round 1 normalized mean centered scaled expression"
+      , "\n"))
+  ggsave(paste0(outGraph, "LakeEnriched_ViolinPlot_Round1NormalizedCenteredScaled.png")
+    , width = 13, height = 26)
+
+  # Normalized
+  Gene_Expression_By_Cluster_ViolinPlot(
+    genes = lake_DE_DF$Gene
+    , exprM = noCentExM
+    , clusterIDs = centSO@ident
+    , grouping = lake_DE_DF$Cluster
+  ) +
+    ggtitle(paste0(graphCodeTitle
+      , "\n"
+      , "\nExpression of Lake cluster enriched"
+      , "\nNormalized expression"
+      , "\n"))
+  ggsave(paste0(outGraph, "LakeEnriched_ViolinPlot_Normalized.png")
+    , width = 13, height = 26)
+
+
+  # Heatmap
+  # Normalized, no mean centering scaling
+  geneGroupDF <- data.frame(Gene = lake_DE_DF$Gene, Group = lake_DE_DF$Cluster)
+  geneGroup_DFL <- lapply(split(geneGroupDF, geneGroupDF$Group), function(ssGeneGroupDF){
+    return(ssGeneGroupDF[1:10, ])
   })
-  ggTsne <- TSNE_Plot(so)
-  ggL <- append(list(ggTsne), ggL)
-  # extract the legend from one of the plots
-  legend <- get_legend(ggL[[2]])
-  # Remove legends from plots
-  ggL <- lapply(ggL, function(gg) {gg + theme(legend.position = "none")})
-  # plot_grid combine tSNE graphs
-  pg <- plot_grid(plotlist = ggL, ncol = 4, align = 'v', axis = 'l')
-  # add the legend to the row we made earlier. Give it one-third of the width
-  # of one plot (via rel_widths).
-  pg <- plot_grid(pg, legend, rel_widths = c(3, 0.3))
-  # now add the title
-  title <- ggdraw() + draw_label(paste0(graphCodeTitle
-    , "\n\nPublished marker genes, cluster round2 for cluster: ", cl
-    , "\ntSNE plot of reclustered cells, each point is a cell"
-    , "\nColor indicates mean normalized expression"
-    , "\nNormalized, mean centered, variance scaled across full dataset"
-    , "\nRemove cells < 200 genes detected in cluster"
-    , "\nRemove genes detected in < 3 cells in cluster"
-    , "\nOnly recluster clusters >= 100 cells"
-    , "\nSeurat variable genes used for clustering"
-    , "\ntSNE PCA 1-40, cluster round 2 tSNE PCA 1-30"
-    , "\n"))
-  # rel_heights values control title margins
-  plot_grid(title, pg, ncol = 1
-    , rel_heights = c(length(ggL)*0.05, length(ggL)))
-  ggsave(paste0(
-    outGraph, "KnownMarks_FeaturePlot_NormFullCentScale_Cluster", cl, ".png")
-    , width = 14, height = length(ggL), limitsize = FALSE)
-  
-  ## Feature plot - normalized, mean centered scaled on cluster
-  # Loop through and plot each group of genes
-  ggL <- apply(df, 1, function(v1) {
-    gene <- v1[["Gene.Symbol"]]
-    grouping <- v1[["Grouping"]]
-    print(gene)
-    ggDF <- Mean_Expression(ggDF, gene, so@scale.data)
-    ggDF <- Set_Limits(ggDF, limLow = 0, limHigh = 2)
-    ggFp <- FeaturePlot_Graph_CentScale(ggDF, limLow = -1.5, limHigh = 1.5
-      , title = paste0(gene, "\n", grouping)
-    )
-    return(ggFp)
+  geneGroupDF <- do.call("rbind", geneGroup_DFL)
+  geneGroupDF <- geneGroupDF[! is.na(geneGroupDF$Gene), ]
+  cellID_clusterID <- centSO@ident
+  gg <- Plot_Marker_Genes_Heatmap_SetColWidths(
+    geneGroupDF = geneGroupDF
+    , exprM = noCentExM
+    , cellID_clusterID = cellID_clusterID
+    , lowerLimit = -0.5
+    , upperLimit = 2
+    , clusterOrder = sort(unique(centSO@ident))
+  )
+  gg <- gg + ggtitle(
+    paste0(graphCodeTitle
+      , "\n\nExpression of Lake cluster top 10 enriched by cluster"
+      , "\nx-axis: Marker genes"
+      , "\ny-axis: Cells ordered by cluster"
+      , "\nNormalized expression"
+      , "\n")
+  )
+  ggsave(paste0(outGraph, "LakeEnriched_Heatmap_Normalized.png")
+    , width = 16, height = 40, limitsize = FALSE)
+
+  # Clustering round 2 normalized, mean centering scaling
+  geneGroupDF <- data.frame(Gene = lake_DE_DF$Gene, Group = lake_DE_DF$Cluster)
+  geneGroup_DFL <- lapply(split(geneGroupDF, geneGroupDF$Group), function(ssGeneGroupDF){
+    return(ssGeneGroupDF[1:10, ])
   })
-  ggTsne <- TSNE_Plot(so)
-  ggL <- append(list(ggTsne), ggL)
-  # extract the legend from one of the plots
-  legend <- get_legend(ggL[[2]])
-  # Remove legends from plots
-  ggL <- lapply(ggL, function(gg) {gg + theme(legend.position = "none")})
-  # plot_grid combine tSNE graphs
-  pg <- plot_grid(plotlist = ggL, ncol = 4, align = 'v', axis = 'l')
-  # add the legend to the row we made earlier. Give it one-third of the width
-  # of one plot (via rel_widths).
-  pg <- plot_grid(pg, legend, rel_widths = c(3, 0.3))
-  # now add the title
-  title <- ggdraw() + draw_label(paste0(graphCodeTitle
-    , "\n\nPublished marker genes, cluster round2 for cluster: ", cl
-    , "\ntSNE plot of reclustered cells, each point is a cell"
-    , "\nColor indicates mean normalized expression"
-    , "\nNormalized, mean centered, variance scaled across cluster"
-    , "\nRemove cells < 200 genes detected in cluster"
-    , "\nRemove genes detected in < 3 cells in cluster"
-    , "\nOnly recluster clusters >= 100 cells"
-    , "\nSeurat variable genes used for clustering"
-    , "\ntSNE PCA 1-40, cluster round 2 tSNE PCA 1-30"
-    , "\n"))
-  # rel_heights values control title margins
-  plot_grid(title, pg, ncol = 1
-    , rel_heights = c(length(ggL)*0.05, length(ggL)))
-  ggsave(paste0(
-    outGraph, "KnownMarks_FeaturePlot_NormClusterCentScale_Cluster", cl, ".png")
-    , width = 14, height = length(ggL), limitsize = FALSE)
-  
-})
+  geneGroupDF <- do.call("rbind", geneGroup_DFL)
+  geneGroupDF <- geneGroupDF[! is.na(geneGroupDF$Gene), ]
+  cellID_clusterID <- centSO@ident
+  gg <- Plot_Marker_Genes_Heatmap_SetColWidths(
+    geneGroupDF = geneGroupDF
+    , exprM = centSO@scale.data
+    , cellID_clusterID = cellID_clusterID
+    , lowerLimit = -1.5
+    , upperLimit = 1.5
+    , clusterOrder = sort(unique(centSO@ident))
+  )
+  gg <- gg + ggtitle(
+    paste0(graphCodeTitle
+      , "\n\nExpression of Lake cluster top 10 enriched by cluster"
+      , "\nx-axis: Marker genes"
+      , "\ny-axis: Cells ordered by cluster"
+      , "\nClustering round 2 normalized mean centered scaled expression"
+      , "\n")
+  )
+  ggsave(paste0(outGraph, "LakeEnriched_Heatmap_Round2NormalizedCenteredScaled.png")
+    , width = 16, height = 40, limitsize = FALSE)
+
+  # Clustering round 1 normalized, mean centering scaling
+  geneGroupDF <- data.frame(Gene = lake_DE_DF$Gene, Group = lake_DE_DF$Cluster)
+  geneGroup_DFL <- lapply(split(geneGroupDF, geneGroupDF$Group), function(ssGeneGroupDF){
+    return(ssGeneGroupDF[1:10, ])
+  })
+  geneGroupDF <- do.call("rbind", geneGroup_DFL)
+  geneGroupDF <- geneGroupDF[! is.na(geneGroupDF$Gene), ]
+  cellID_clusterID <- centSO@ident
+  gg <- Plot_Marker_Genes_Heatmap_SetColWidths(
+    geneGroupDF = geneGroupDF
+    , exprM = rd1CentExM
+    , cellID_clusterID = cellID_clusterID
+    , lowerLimit = -1.5
+    , upperLimit = 1.5
+    , clusterOrder = sort(unique(centSO@ident))
+  )
+  gg <- gg + ggtitle(
+    paste0(graphCodeTitle
+      , "\n\nExpression of Lake cluster top 10 enriched by cluster"
+      , "\nx-axis: Marker genes"
+      , "\ny-axis: Cells ordered by cluster"
+      , "\nClustering round 1 normalized mean centered scaled expression"
+      , "\n")
+  )
+  ggsave(paste0(outGraph, "LakeEnriched_Heatmap_Round1NormalizedCenteredScaled.png")
+    , width = 16, height = 40, limitsize = FALSE)
+
+}
 ################################################################################
 
-### Feature plot Molyneaux
+### Nowakowski cluster enriched genes
 
-# Loop through cluster Seurat objects
-lapply(names(lso), function(cl) {
-  
-  so <- lso[[cl]]
-  
-  # Collect tSNE values for ggplot
-  ggDF <- as.data.frame(so@dr$tsne@cell.embeddings)
-  
-  # ## Subset to marker genes of interest for Luis' excel file
-  # # Cleanup marker data frame
-  # df <- kmDF[kmDF$Grouping %in% c("IP", "Neuron", "GABAergic", "Glutamatergic"
-  #   , "Dopaminergic Neuron", "Cortical Migratin", "Excitatory Deep Layer Cortical"
-  #   , "Excitatory Upper Layer Cortical", "Subplate"), ]
-  # ldf <- split(df, df$Gene.Symbol)
-  
-  ## Feature plot - normalized, mean centered scaled on full dataset
-  # Loop through and plot each group of genes
-  ggL <- apply(mmDF, 1, function(v1) {
-    gene <- v1[["hgnc_symbol"]]
-    print(gene)
-    ggDF <- Mean_Expression(ggDF, gene, so@scale.data)
-    ggDF <- Set_Limits(ggDF, limLow = -1.5, limHigh = 1.5)
-    ggFp <- FeaturePlot_Graph_CentScale(ggDF, limLow = -1.5, limHigh = 1.5
-      , title = paste0("\n", gene, " - ", v1[["mgi_symbol"]])
-    )
-    return(ggFp)
-  })
-  ggTsne <- TSNE_Plot(so)
-  ggL <- append(list(ggTsne), ggL)
-  # extract the legend from one of the plots
-  legend <- get_legend(ggL[[2]])
-  # Remove legends from plots
-  ggL <- lapply(ggL, function(gg) {gg + theme(legend.position = "none")})
+Plot_Nowakowski_Enriched <- function(){
+
+  print("Plot_Nowakowski_Enriched")
+
+  # Feature plot
+  # Normalized, no mean centering scaling
+  ggL <- FeaturePlot(
+    genes = nowakowski_DE_DF$gene
+    , tsneDF = as.data.frame(centSO@dr$tsne@cell.embeddings)
+    , seuratO = centSO
+    , exM = noCentExM
+    , limLow = -0.5
+    , limHigh = 2
+    , geneGrouping = nowakowski_DE_DF$cluster
+    , centScale = FALSE
+    , size = (400/nrow(centSO@scale.data))^(1/3)
+  )
   # plot_grid combine tSNE graphs
-  pg <- plot_grid(plotlist = ggL, ncol = 4, align = 'v', axis = 'l')
-  # add the legend to the row we made earlier. Give it one-third of the width
-  # of one plot (via rel_widths).
-  pg <- plot_grid(pg, legend, rel_widths = c(3, 0.3))
+  pg <- plot_grid(plotlist = ggL, ncol = 3, align = 'v', axis = 'r')
   # now add the title
   title <- ggdraw() + draw_label(paste0(graphCodeTitle
-    , "\n\nMolyneaux layer genes, cluster round2 for cluster: ", cl
-    , "\n\ntSNE plot of reclustered cells, each point is a cell"
-    , "\nColor indicates mean of normalized expression, mean centered, variance scaled across full dataset"
-    , "\n"
-    , "\nRemove cells < 200 genes detected in cluster"
-    , "\nRemove genes detected in < 3 cells in cluster"
-    , "\nOnly recluster clusters >= 100 cells"
-    , "\nSeurat variable genes used for clustering"
-    , "\ntSNE PCA 1-40, cluster round 2 tSNE PCA 1-30"
+    , "\n\nExpression of Nowakowski cluster enriched"
+    , "\nNormalized expression"
     , "\n"))
   # rel_heights values control title margins
-  plot_grid(title, pg, ncol = 1
-    , rel_heights = c(length(ggL)*0.05, length(ggL)))
-  ggsave(paste0(
-    outGraph, "MolyneauxMarks_FeaturePlot_NormFullCentScale_Cluster", cl, ".png")
-    , width = 14, height = length(ggL), limitsize = FALSE)
-  
-  ## Feature plot - normalized, not mean centered scaled on cluster
-  # Loop through and plot each group of genes
-  ggL <- apply(mmDF, 1, function(v1) {
-    gene <- v1[["hgnc_symbol"]]
-    print(gene)
-    exDF <- noCentExM[row.names(noCentExM) %in% row.names(so@scale.data)
-      , colnames(noCentExM) %in% colnames(so@scale.data)]
-    ggDF <- Mean_Expression(ggDF, gene, exDF)
-    ggDF <- Set_Limits(ggDF, limLow = -1, limHigh = 3)
-    ggFp <- FeaturePlot_Graph(ggDF, limLow = -1, limHigh = 3
-      , title = paste0("\n", gene, " - ", v1[["mgi_symbol"]])
-    )
-    return(ggFp)
-  })
-  ggTsne <- TSNE_Plot(so)
-  ggL <- append(list(ggTsne), ggL)
-  # extract the legend from one of the plots
-  legend <- get_legend(ggL[[2]])
-  # Remove legends from plots
-  ggL <- lapply(ggL, function(gg) {gg + theme(legend.position = "none")})
+  plot_grid(title, pg, ncol = 1, rel_heights = c(0.05, 1))
+  ggsave(paste0(outGraph, "NowakowskiEnriched_FeaturePlot_Normalized.png")
+    , width = 12, height = length(ggL)*1)
+
+  # Feature plot
+  # Normalized, mean centered scaled
+  ggL <- FeaturePlot(
+    genes = nowakowski_DE_DF$gene
+    , tsneDF = as.data.frame(centSO@dr$tsne@cell.embeddings)
+    , seuratO = centSO
+    , exM = centSO@scale.data
+    , limLow = -1.5
+    , limHigh = 1.5
+    , geneGrouping = nowakowski_DE_DF$cluster
+    , centScale = TRUE
+    , size = (400/nrow(centSO@scale.data))^(1/3)
+  )
   # plot_grid combine tSNE graphs
-  pg <- plot_grid(plotlist = ggL, ncol = 4, align = 'v', axis = 'l')
-  # add the legend to the row we made earlier. Give it one-third of the width
-  # of one plot (via rel_widths).
-  pg <- plot_grid(pg, legend, rel_widths = c(3, 0.3))
+  pg <- plot_grid(plotlist = ggL, ncol = 3, align = 'v', axis = 'r')
   # now add the title
   title <- ggdraw() + draw_label(paste0(graphCodeTitle
-    , "\n\nMolyneaux layer genes, cluster round2 for cluster: ", cl
-    , "\nColor indicates mean normalized expression"
-    , "\n"
-    , "\nRemove cells < 200 genes detected in cluster"
-    , "\nRemove genes detected in < 3 cells in cluster"
-    , "\nOnly recluster clusters >= 100 cells"
-    , "\nSeurat variable genes used for clustering"
-    , "\ntSNE PCA 1-40, cluster round 2 tSNE PCA 1-30"
+    , "\n\nExpression of Nowakowski cluster enriched"
+    , "\nCluster round 2 normalized expression, mean centered and variance scaled"
     , "\n"))
   # rel_heights values control title margins
-  plot_grid(title, pg, ncol = 1
-    , rel_heights = c(length(ggL)*0.05, length(ggL)))
-  ggsave(paste0(
-    outGraph, "Molyneaux_FeaturePlot_NormClusterCentScale_Cluster", cl, ".png")
-    , width = 14, height = length(ggL), limitsize = FALSE)
-  
-})
+  plot_grid(title, pg, ncol = 1, rel_heights = c(0.05, 1))
+  ggsave(paste0(outGraph
+    , "NowakowskiEnriched_FeaturePlot_Round2NormalizedCenteredScaled.png")
+    , width = 12, height = length(ggL)*1)
+
+  # Feature plot
+  # Cluster round 1 normalized, mean centered scaled
+  ggL <- FeaturePlot(
+    genes = nowakowski_DE_DF$gene
+    , tsneDF = as.data.frame(centSO@dr$tsne@cell.embeddings)
+    , seuratO = centSO
+    , exM = rd1CentExM
+    , limLow = -1.5
+    , limHigh = 1.5
+    , geneGrouping = nowakowski_DE_DF$cluster
+    , centScale = TRUE
+    , size = (400/nrow(centSO@scale.data))^(1/3)
+  )
+  # plot_grid combine tSNE graphs
+  pg <- plot_grid(plotlist = ggL, ncol = 3, align = 'v', axis = 'r')
+  # now add the title
+  title <- ggdraw() + draw_label(paste0(graphCodeTitle
+    , "\n\nExpression of Nowakowski cluster enriched"
+    , "\nCluster round 1 normalized expression, mean centered and variance scaled"
+    , "\n"))
+  # rel_heights values control title margins
+  plot_grid(title, pg, ncol = 1, rel_heights = c(0.05, 1))
+  ggsave(paste0(outGraph, "NowakowskiEnriched_FeaturePlot_Round1NormalizedCenteredScaled.png")
+    , width = 12, height = length(ggL)*1)
+
+
+  ## Violin plots of genes by cluster
+
+  # Normalized centered scaled
+  Gene_Expression_By_Cluster_ViolinPlot(
+    genes = nowakowski_DE_DF$gene
+    , exprM = as.matrix(centSO@scale.data)
+    , clusterIDs = centSO@ident
+    , grouping = nowakowski_DE_DF$cluster
+  ) +
+    ggtitle(paste0(graphCodeTitle
+      , "\n"
+      , "\nExpression of Nowakowski cluster enriched"
+      , "\nCluster round 2 normalized mean centered scaled expression"
+      , "\n"))
+  ggsave(paste0(outGraph
+    , "NowakowskiEnriched_ViolinPlot_Round2NormalizedCenteredScaled.png")
+    , width = 13, height = 26)
+
+  # Cluster round 1 normalized centered scaled
+  Gene_Expression_By_Cluster_ViolinPlot(
+    genes = nowakowski_DE_DF$gene
+    , exprM = rd1CentExM
+    , clusterIDs = centSO@ident
+    , grouping = nowakowski_DE_DF$cluster
+  ) +
+    ggtitle(paste0(graphCodeTitle
+      , "\n"
+      , "\nExpression of Nowakowski cluster enriched"
+      , "\nCluster round 1 normalized mean centered scaled expression"
+      , "\n"))
+  ggsave(paste0(outGraph, "NowakowskiEnriched_ViolinPlot_Round1NormalizedCenteredScaled.png")
+    , width = 13, height = 26)
+
+  # Normalized
+  Gene_Expression_By_Cluster_ViolinPlot(
+    genes = nowakowski_DE_DF$gene
+    , exprM = noCentExM
+    , clusterIDs = centSO@ident
+    , grouping = nowakowski_DE_DF$cluster
+  ) +
+    ggtitle(paste0(graphCodeTitle
+      , "\n"
+      , "\nExpression of Nowakowski cluster enriched"
+      , "\nNormalized expression"
+      , "\n"))
+  ggsave(paste0(outGraph, "NowakowskiEnriched_ViolinPlot_Normalized.png")
+    , width = 13, height = 26)
+
+
+  # Heatmap
+  # Normalized, no mean centering scaling
+  geneGroupDF <- data.frame(Gene = nowakowski_DE_DF$gene, Group = nowakowski_DE_DF$cluster)
+  geneGroup_DFL <- lapply(split(geneGroupDF, geneGroupDF$Group), function(ssGeneGroupDF){
+    return(ssGeneGroupDF[1:10, ])
+  })
+  geneGroupDF <- do.call("rbind", geneGroup_DFL)
+  geneGroupDF <- geneGroupDF[! is.na(geneGroupDF$Gene), ]
+  cellID_clusterID <- centSO@ident
+  gg <- Plot_Marker_Genes_Heatmap_SetColWidths(
+    geneGroupDF = geneGroupDF
+    , exprM = noCentExM
+    , cellID_clusterID = cellID_clusterID
+    , lowerLimit = -0.5
+    , upperLimit = 2
+    , clusterOrder = sort(unique(centSO@ident))
+  )
+  gg <- gg + ggtitle(
+    paste0(graphCodeTitle
+      , "\n\nExpression of Nowakowski cluster top 10 enriched by cluster"
+      , "\nx-axis: Marker genes"
+      , "\ny-axis: Cells ordered by cluster"
+      , "\nNormalized expression"
+      , "\n")
+  )
+  ggsave(paste0(outGraph, "NowakowskiEnriched_Heatmap_Normalized.png")
+    , width = 16, height = 40, limitsize = FALSE)
+
+  # Clustering round 2 normalized, mean centering scaling
+  geneGroupDF <- data.frame(Gene = nowakowski_DE_DF$gene, Group = nowakowski_DE_DF$cluster)
+  geneGroup_DFL <- lapply(split(geneGroupDF, geneGroupDF$Group), function(ssGeneGroupDF){
+    return(ssGeneGroupDF[1:10, ])
+  })
+  geneGroupDF <- do.call("rbind", geneGroup_DFL)
+  geneGroupDF <- geneGroupDF[! is.na(geneGroupDF$Gene), ]
+  cellID_clusterID <- centSO@ident
+  gg <- Plot_Marker_Genes_Heatmap_SetColWidths(
+    geneGroupDF = geneGroupDF
+    , exprM = centSO@scale.data
+    , cellID_clusterID = cellID_clusterID
+    , lowerLimit = -1.5
+    , upperLimit = 1.5
+    , clusterOrder = sort(unique(centSO@ident))
+  )
+  gg <- gg + ggtitle(
+    paste0(graphCodeTitle
+      , "\n\nExpression of Nowakowski cluster top 10 enriched by cluster"
+      , "\nx-axis: Marker genes"
+      , "\ny-axis: Cells ordered by cluster"
+      , "\nClustering round 2 normalized mean centered scaled expression"
+      , "\n")
+  )
+  ggsave(paste0(outGraph, "NowakowskiEnriched_Heatmap_Round2NormalizedCenteredScaled.png")
+    , width = 16, height = 40, limitsize = FALSE)
+
+  # Clustering round 1 normalized, mean centering scaling
+  geneGroupDF <- data.frame(Gene = nowakowski_DE_DF$gene, Group = nowakowski_DE_DF$cluster)
+  geneGroup_DFL <- lapply(split(geneGroupDF, geneGroupDF$Group), function(ssGeneGroupDF){
+    return(ssGeneGroupDF[1:10, ])
+  })
+  geneGroupDF <- do.call("rbind", geneGroup_DFL)
+  geneGroupDF <- geneGroupDF[! is.na(geneGroupDF$Gene), ]
+  cellID_clusterID <- centSO@ident
+  gg <- Plot_Marker_Genes_Heatmap_SetColWidths(
+    geneGroupDF = geneGroupDF
+    , exprM = rd1CentExM
+    , cellID_clusterID = cellID_clusterID
+    , lowerLimit = -1.5
+    , upperLimit = 1.5
+    , clusterOrder = sort(unique(centSO@ident))
+  )
+  gg <- gg + ggtitle(
+    paste0(graphCodeTitle
+      , "\n\nExpression of Nowakowski cluster top 10 enriched by cluster"
+      , "\nx-axis: Marker genes"
+      , "\ny-axis: Cells ordered by cluster"
+      , "\nClustering round 1 normalized mean centered scaled expression"
+      , "\n")
+  )
+  ggsave(paste0(outGraph, "NowakowskiEnriched_Heatmap_Round1NormalizedCenteredScaled.png")
+    , width = 16, height = 40, limitsize = FALSE)
+}
+################################################################################
+
+### Run
+
+Main_Function <- function(){
+  Plot_Luis_Markers()
+  Plot_Cell_Cycle_Genes()
+  Plot_Lake2017_Enriched()
+  Plot_Nowakowski_Enriched()
+}
+
+Main_Function()
 ################################################################################

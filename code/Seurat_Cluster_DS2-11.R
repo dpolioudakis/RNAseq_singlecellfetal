@@ -47,7 +47,7 @@ bmDF <- read.csv("../source/BiomaRt_Compile_GeneInfo_GRCh38_Ensembl87.csv"
   , header = TRUE)
 
 # Seurat clustering of DS-002-003 to compare cluster identities
-load("../analysis/analyzed_data/Cluster_Seurat/Cluster_Seurat_exon_FtMm250_fetb_seurat.Robj")
+load("../analysis/analyzed_data/Cluster_Seurat/DS2-3/Cluster_Seurat_exon_FtMm250_fetb_seurat.Robj")
 
 # Cell cycle markers from Macosko 2015 Table S2 to remove from variable gene
 # list used for clustering
@@ -67,15 +67,9 @@ graphCodeTitle <- "Seurat_Cluster_DS2-11.R"
 outGraph <- "../analysis/graphs/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC/Seurat_Cluster_DS2-11_"
 outTable <- "../analysis/tables/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC/Seurat_Cluster_DS2-11_"
 outData <- "../analysis/analyzed_data/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_"
-# outGraph <- "../analysis/graphs/Seurat_Cluster_DS2-11/Seurat_Cluster_DS2-11_FtMm250_Magic_200-3sdgd_Mt5_RegNumiLibBrain_"
-# outTable <- "../analysis/tables/Seurat_Cluster_DS2-11/Seurat_Cluster_DS2-11_FtMm250_Magic_200-3sdgd_Mt5_RegNumiLibBrain_"
-# outData <- "../analysis/analyzed_data/Seurat_Cluster_DS2-11/Seurat_Cluster_DS2-11_FtMm250_Magic_200-3sdgd_Mt5_RegNumiLibBrain_PC1to20_"
-# outGraph <- "../analysis/graphs/Seurat_Cluster_DS2-11/Seurat_Cluster_DS2-11_FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_"
-# outTable <- "../analysis/tables/Seurat_Cluster_DS2-11/Seurat_Cluster_DS2-11_FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_"
-# outData <- "../analysis/analyzed_data/Seurat_Cluster_DS2-11/Seurat_Cluster_DS2-11_FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_PC1to40_"
-# outGraph <- "../analysis/graphs/Seurat_Cluster_DS2-11/Seurat_Cluster_DS2-11_FtMm250_200-3sdgd_Mt5_RegNumi_"
-# outTable <- "../analysis/tables/Seurat_Cluster_DS2-11/Seurat_Cluster_DS2-11_FtMm250_200-3sdgd_Mt5_RegNumi_"
-# outData <- "../analysis/analyzed_data/Seurat_Cluster_DS2-11/Seurat_Cluster_DS2-11_FtMm250_200-3sdgd_Mt5_RegNumi_PC1to40_"
+# outGraph <- "../analysis/graphs/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_RemCC/Seurat_Cluster_DS2-11_"
+# outTable <- "../analysis/tables/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_RemCC/Seurat_Cluster_DS2-11_"
+# outData <- "../analysis/analyzed_data/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_RemCC_PC1to40/Seurat_Cluster_DS2-11_"
 
 ## Output Directories
 outDir <- dirname(outGraph)
@@ -658,17 +652,17 @@ dev.off()
 print("Number of variable genes used for clustering:")
 length(centSO@var.genes)
 
-# ## Remove CC genes from variable genes
-#
-# # Cleanup CC marker data frame
-# ccDF <- data.frame(lapply(ccDF, as.character), stringsAsFactors=FALSE)
-# cc <- c(unlist(ccDF))
-# cc <- gsub(" *", "", cc)
-# idx <- centSO@var.genes %in% cc
-# centSO@var.genes <- centSO@var.genes[! idx]
-#
-# print("Number of variable genes used for clustering after removing CC genes:")
-# length(centSO@var.genes)
+## Remove CC genes from variable genes
+
+# Cleanup CC marker data frame
+ccDF <- data.frame(lapply(ccDF, as.character), stringsAsFactors=FALSE)
+cc <- c(unlist(ccDF))
+cc <- gsub(" *", "", cc)
+idx <- centSO@var.genes %in% cc
+centSO@var.genes <- centSO@var.genes[! idx]
+
+print("Number of variable genes used for clustering after removing CC genes:")
+length(centSO@var.genes)
 
 save(centSO, noCentExM, metDF, high.thresholds, file = paste0(outData, "seuratO.Robj"))
 ################################################################################
@@ -959,9 +953,9 @@ ggsave(paste0(outGraph, "tSNE_ResolutionTest0506.png")
   , width = 12, height = 22)
 
 ## Clustering parameters to save
-centSO <- RunTSNE(centSO, dims.use = 1:40, do.fast = TRUE)
+centSO <- RunTSNE(centSO, dims.use = 1:40, do.fast = TRUE, force.recalc = TRUE)
 centSO <- FindClusters(centSO, dims.use = 1:40, resolution = 0.54
-  , print.output = 0, save.SNN = TRUE)
+  , print.output = 0, save.SNN = TRUE, force.recalc = TRUE)
 
 PrintFindClustersParams(object = centSO)
 
@@ -1102,6 +1096,58 @@ gg2 <- ggplot(ggDF, aes(x = tSNE_1, y = tSNE_2, col = REGION)) +
 plot_grid(gg1, gg2, ncol = 2)
 ggsave(paste0(outGraph, "tSNE_PC1-40_paper.png")
   , dpi = 150, width = 8, height = 3)
+
+## Cell metadata as csv for paper
+mdat_paper_DF <- centSO@meta.data
+mdat_paper_DF <- mdat_paper_DF[ ,c("CELL", "res.0.54", "BRAIN", "REGION"
+  , "NEXTERA", "LIBRARY", "nGene", "nUMI", "percent.mito"
+  , "S.Score", "G2M.Score", "Phase")]
+mdat_paper_DF$Cluster_number <- mdat_paper_DF$"res.0.54"
+# Cluster annotations
+cluster_annot <- c(
+  "9" = "vRG"
+  , "7" = "oRG"
+  , "8" = "Cycling progenitor S phase"
+  , "10" = "Cycling progenitor G2/M phase"
+  , "2" = "IPC"
+  , "0" = "Excitatory neuron new born migrating"
+  , "1" = "Excitatory neuron"
+  , "4" = "Excitatory neuron (collosal)"
+  , "3" = "Deep layer excitatory neuron 1"
+  , "13" = "Deep layer excitatory neuron 2"
+  , "5" = "Interneuron (SST)"
+  , "6" = "Interneuron (CALB2)"
+  , "11" = "Oligodendrocyte precursor"
+  , "12" = "Endothelial"
+  , "14" = "Pericyte"
+  , "15" = "Microglia"
+  , "16" = "NA"
+)
+idx <- match(mdat_paper_DF$Cluster_number, names(cluster_annot))
+mdat_paper_DF$Cluster <- cluster_annot[idx]
+# Donor IDs
+donor_annot <- c("2" = "368", "3" = "370", "4" = "371", "5" = "372")
+idx <- match(mdat_paper_DF$BRAIN, names(donor_annot))
+mdat_paper_DF$BRAIN <- donor_annot[idx]
+mdat_paper_DF <- mdat_paper_DF[ ,c(1, 14:13, 3:12)]
+# Gestation week
+gw_annot <- c("368" = "17", "370" = "18", "371" = "17", "372" = "18")
+idx <- match(mdat_paper_DF$BRAIN, names(gw_annot))
+mdat_paper_DF$GW <- gw_annot[idx]
+# Convert to percentage
+mdat_paper_DF$percent.mito <- round(mdat_paper_DF$percent.mito * 100, 2)
+# Order by cluster
+mdat_paper_DF$Cluster_number <- factor(mdat_paper_DF$Cluster_number
+  , levels = c(9,7,8,10,2,0,1,4,3,13,5,6,11,12,14,15,16))
+mdat_paper_DF <- mdat_paper_DF[order(mdat_paper_DF$Cluster_number), ]
+colnames(mdat_paper_DF) <- c("Cell", "Cluster", "Cluster_number", "Donor"
+  , "Region", "Index", "Library", "Number_genes_detected", "Number_UMI"
+  , "Percentage_mitochondrial", "S_phase_score", "G2M_phase_score", "Phase"
+  , "Gestation_week")
+mdat_paper_DF <- mdat_paper_DF[ ,c(1:5,14,6:13)]
+write.csv(mdat_paper_DF, file = paste0(outTable, "Cell_Metadata_paper.csv")
+  , quote = FALSE, row.names = FALSE)
+
 
 # You can save the object at this point so that it can easily be loaded back in
 # without having to rerun the computationally intensive steps performed above,
@@ -1344,6 +1390,47 @@ df <- data.frame(
     sum(as.vector(table(centSO@ident)))) * 100
 )
 write.csv(df, paste0(outTable, "PC1-40_Cluster_Metrics.csv")
+  , quote = FALSE, row.names = FALSE)
+
+# Format for paper
+cluster_metrics_DF <- df
+cluster_metrics_DF$Cluster_number <- df$CLUSTER
+cluster_annot <- c(
+  "9" = "vRG"
+  , "7" = "oRG"
+  , "8" = "Cycling progenitor S phase"
+  , "10" = "Cycling progenitor G2/M phase"
+  , "2" = "IPC"
+  , "0" = "Excitatory neuron new born migrating"
+  , "1" = "Excitatory neuron"
+  , "4" = "Excitatory neuron (collosal)"
+  , "3" = "Deep layer excitatory neuron 1"
+  , "13" = "Deep layer excitatory neuron 2"
+  , "5" = "Interneuron (SST)"
+  , "6" = "Interneuron (CALB2)"
+  , "11" = "Oligodendrocyte precursor"
+  , "12" = "Endothelial"
+  , "14" = "Pericyte"
+  , "15" = "Microglia"
+  , "16" = "NA"
+)
+idx <- match(cluster_metrics_DF$Cluster_number, names(cluster_annot))
+cluster_metrics_DF$Cluster <- cluster_annot[idx]
+# Order by cluster
+cluster_metrics_DF$Cluster_number <- factor(cluster_metrics_DF$Cluster_number
+  , levels = c(9,7,8,10,2,0,1,4,3,13,5,6,11,12,14,15,16))
+cluster_metrics_DF <- cluster_metrics_DF[
+  order(cluster_metrics_DF$Cluster_number), ]
+# Order columns
+cluster_metrics_DF <- cluster_metrics_DF[ ,c(9,8,2:7)]
+# Round
+cluster_metrics_DF[ ,6:8] <- round(cluster_metrics_DF[ ,6:8], 1)
+colnames(cluster_metrics_DF) <- c("Cluster", "Cluster number"
+  , "Number of cells", "Number of cells from CP", "Number of cells from GZ"
+  , "Mean number UMI per cell", "Mean genes detected per cell"
+  , "Percent of total cells")
+write.csv(cluster_metrics_DF
+  , file = paste0(outTable, "Cluster_metrics_paper.csv")
   , quote = FALSE, row.names = FALSE)
 
 # Dot plot of percent of cell classes
@@ -1631,6 +1718,57 @@ Hclust_Cluster_Mean_Expression <- function(){
 }
 Hclust_Cluster_Mean_Expression()
 ggsave(paste0(outGraph, "PC1-40_hclust.pdf"))
+################################################################################
+
+### Output for sharing with highest compression
+
+# Raw counts
+raw_counts_mat <- centSO@raw.data[
+  ,colnames(centSO@raw.data) %in% names(centSO@ident)]
+raw_counts_mat <- as(as.matrix(raw_counts_mat), "sparseMatrix")
+
+# Normalized expression values
+norm_mat <- as(as.matrix(noCentExM), "sparseMatrix")
+
+# Metadata
+metadata <- centSO@meta.data
+metadata <- metadata[ ,colnames(metadata) %in% c("nGene", "nUMI"
+  , "CELL", "NEXTERA", "SEQ_RUN", "BRAIN", "REGION", "LIBRARY"
+  , "percent.mito", "res.0.54")]
+colnames(metadata) <- c("Number_of_Genes_Detected", "Number_of_UMI", "Cell"
+  , "Nextera_Index", "Sequencing_Run", "Donor", "Anatomical_Region"
+  , "Library_Lab_Batch", "Percentage_Mitochondrial", "Cluster")
+# Convert donor to database donor ID
+idx <- list("2" = "368", "3" = "370", "4" = "371", "5" = "372")
+metadata$Donor <- idx[match(metadata$Donor, names(idx))]
+
+# Cluster annotations
+cluster_annot <- c(
+  "9" = "vRG"
+  , "7" = "oRG"
+  , "8" = "Cycling progenitor S phase"
+  , "10" = "Cycling progenitor G2/M phase"
+  , "2" = "IPC"
+  , "0" = "Excitatory Neuron new born migrating"
+  , "1" = "Excitatory Neuron"
+  , "4" = "Excitatory Neuron (collosal)"
+  , "3" = "Deep layer excitatory neuron 1"
+  , "13" = "Deep layer excitatory neuron 2"
+  , "5" = "Interneuron (SST)"
+  , "6" = "Interneuron (CALB2)"
+  , "11" = "Oligodendrocyte precursor"
+  , "12" = "Endothelial"
+  , "14" = "Pericyte"
+  , "15" = "Microglia"
+)
+cluster_annot <- data.frame(
+  Cluster = names(cluster_annot), Annotation = cluster_annot
+)
+
+save(raw_counts_mat, norm_mat, metadata, cluster_annot
+  , file = "/u/flashscratch/d/dpolioud/RNAseq-singleCell-Fetal.Rdata"
+  , compression_level = 9
+)
 ################################################################################
 
 # ### Finding differentially expressed genes (cluster biomarkers)

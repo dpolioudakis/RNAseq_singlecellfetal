@@ -168,44 +168,44 @@ Format_DE <- function (deLM, so, clusterID) {
 
 # Format data for expression heatmap, cells ordered by cluster
 Heatmap_By_Cluster_Format_Data <- function(
-  geneGroupDF, exprM, seuratO, clusters, lowerLimit, upperLimit
+  geneGroupDF, exprM, cellID_clusterID, clusters, lowerLimit, upperLimit
   , geneOrder = FALSE, clusterOrder = NULL) {
 
   print("Heatmap_By_Cluster_Format_Data")
 
   # Subset expression matrix to genes of interest by merging
-  ggDF <- merge(geneGroupDF[c("GENE", "GROUP")], exprM
+  ggDF <- merge(geneGroupDF[c("Gene", "Group")], exprM
     , by.x = 1, by.y = "row.names", all.x = TRUE)
 
   if (geneOrder == TRUE) {
-    # levels <- expand.grid(geneOrder, unique(ggDF$GROUP))
+    # levels <- expand.grid(geneOrder, unique(ggDF$Group))
     # levels <- paste0(levels$Var1, "   ", levels$Var2)
-    levels <- paste0(geneGroupDF$GENE, "   ", geneGroupDF$GROUP)
+    gene_levels <- paste0(geneGroupDF$Gene, "   ", geneGroupDF$Group)
   }
 
   # Set group factor levels
-  ggDF$GROUP <- factor(ggDF$GROUP
-    , levels = unique(as.character(geneGroupDF$GROUP))[unique(as.character(geneGroupDF$GROUP)) %in% as.character(ggDF$GROUP)])
-  # colnames(ggDF)[1:2] <- c("GENE", "GROUP")
+  ggDF$Group <- factor(ggDF$Group
+    , levels = unique(as.character(geneGroupDF$Group))[unique(as.character(geneGroupDF$Group)) %in% as.character(ggDF$Group)])
+  # colnames(ggDF)[1:2] <- c("Gene", "Group")
   # Remove blanks
-  ggDF <- ggDF[! ggDF$GENE == "", ]
+  ggDF <- ggDF[! ggDF$Gene == "", ]
   # Format for ggplot
   ggDF <- melt(ggDF)
   # Add seurat clusters
-  idx <- match(as.character(ggDF$variable), names(seuratO@ident))
-  ggDF$SEURAT_CLUSTERS <- seuratO@ident[idx]
+  idx <- match(as.character(ggDF$variable), names(cellID_clusterID))
+  ggDF$Cluster <- cellID_clusterID[idx]
   # Set cluster levels
   if (! is.null(clusterOrder)) {
-    ggDF$SEURAT_CLUSTERS <- factor(ggDF$SEURAT_CLUSTERS, levels = clusterOrder)
+    ggDF$Cluster <- factor(ggDF$Cluster, levels = clusterOrder)
   }
   # Subset clusters
-  ggDF <- ggDF[ggDF$SEURAT_CLUSTERS %in% clusters, ]
+  ggDF <- ggDF[as.character(ggDF$Cluster) %in% as.character(clusters), ]
   # Add group to gene name
-  ggDF$GENE_GROUP <- paste0(ggDF$GENE, "   ", ggDF$GROUP)
+  ggDF$Gene_Group <- paste0(ggDF$Gene, "   ", ggDF$Group)
 
   # Order genes by setting levels
   if (! geneOrder == FALSE) {
-    ggDF$GENE_GROUP <- factor(ggDF$GENE_GROUP, levels = levels)
+    ggDF$Gene_Group <- factor(ggDF$Gene_Group, levels = gene_levels)
   }
   # Set limits
   ggDF$value[ggDF$value < lowerLimit] <- lowerLimit
@@ -216,7 +216,7 @@ Heatmap_By_Cluster_Format_Data <- function(
 
 # Expression heatmap, cells ordered by cluster
 Heatmap_By_Cluster <- function(
-  geneGroupDF, exprM, seuratO, clusters, lowerLimit, upperLimit
+  geneGroupDF, exprM, cellID_clusterID, clusters, lowerLimit, upperLimit
   , geneOrder = FALSE, clusterOrder = NULL) {
 
   print("Heatmap_By_Cluster")
@@ -224,7 +224,7 @@ Heatmap_By_Cluster <- function(
   ggDF <- Heatmap_By_Cluster_Format_Data(
     geneGroupDF = geneGroupDF
     , exprM = exprM
-    , seuratO = seuratO
+    , cellID_clusterID = cellID_clusterID
     , clusters = clusters
     , lowerLimit = lowerLimit
     , upperLimit = upperLimit
@@ -234,9 +234,9 @@ Heatmap_By_Cluster <- function(
 
   print("Heatmap_By_Cluster: plotting...")
   # ggplot
-  gg <- ggplot(ggDF, aes(x = variable, y = GENE_GROUP, fill = value)) +
+  gg <- ggplot(ggDF, aes(x = variable, y = Gene_Group, fill = value)) +
     geom_tile() +
-    facet_grid(GROUP~SEURAT_CLUSTERS, space = "free", scales = "free") +
+    facet_grid(Group~Cluster, space = "free", scales = "free") +
     # scale_fill_gradient2(high = "#d7191c", low = "#2c7bb6")
     scale_fill_distiller(name = "Normalized\nexpression", type = "div"
       , palette = 5, direction = -1, limits = c(lowerLimit, upperLimit)) +
@@ -256,11 +256,11 @@ Heatmap_By_Cluster <- function(
 
 # Wrapper function for Heatmap_By_Cluster
 # Uses plot_grid to combine 3 heatmaps to deal with cell number scaling
-Heatmaps_By_Cluster_Combined <- function(geneGroupDF, exprM, seuratO
+Heatmaps_By_Cluster_Combined <- function(geneGroupDF, exprM, cellID_clusterID
   , clusters1, clusters2, clusters3, lowerLimit, upperLimit, geneOrder = NULL) {
 
   p1 <- Heatmap_By_Cluster(geneGroupDF = geneGroupDF, exprM = exprM
-    , seuratO = seuratO, clusters = clusters1
+    , cellID_clusterID = cellID_clusterID, clusters = clusters1
     , lowerLimit = lowerLimit, upperLimit = upperLimit
     , geneOrder = geneOrder
   )
@@ -270,7 +270,7 @@ Heatmaps_By_Cluster_Combined <- function(geneGroupDF, exprM, seuratO
     , legend.position = "none"
     )
   p2 <- Heatmap_By_Cluster(geneGroupDF = geneGroupDF, exprM = exprM
-    , seuratO = seuratO, clusters = clusters2
+    , cellID_clusterID = cellID_clusterID, clusters = clusters2
     , lowerLimit = lowerLimit, upperLimit = upperLimit
     , geneOrder = geneOrder
   )
@@ -282,7 +282,7 @@ Heatmaps_By_Cluster_Combined <- function(geneGroupDF, exprM, seuratO
     , axis.ticks.y = element_blank()
   )
   p3 <- Heatmap_By_Cluster(geneGroupDF = geneGroupDF, exprM = exprM
-    , seuratO = seuratO, clusters = clusters3
+    , cellID_clusterID = cellID_clusterID, clusters = clusters3
     , lowerLimit = lowerLimit, upperLimit = upperLimit
     , geneOrder = geneOrder
   )
@@ -315,7 +315,7 @@ Heatmap_By_Gene_Expression <- function (genes, exprM, limLow, limHigh) {
   # ggplot
   gg <- ggplot(ggDF, aes(x = variable, y = x, fill = value)) +
     geom_tile() +
-    # facet_grid(GROUP~SEURAT_CLUSTERS, space = "free", scales = "free") +
+    # facet_grid(Group~Cluster, space = "free", scales = "free") +
     scale_fill_distiller(name = "Normalized\nexpression", type = "div"
       , palette = 5, direction = -1, limits = c(limLow, limHigh)) +
     theme_bw() +
@@ -325,6 +325,58 @@ Heatmap_By_Gene_Expression <- function (genes, exprM, limLow, limHigh) {
     theme(axis.ticks = element_blank()) +
     theme(text = element_text(size = 12)) +
     theme(axis.text.y = element_text(size = 10))
+  return(gg)
+}
+
+# Expression heatmap, cells ordered by cluster
+Plot_Marker_Genes_Heatmap_SetColWidths <- function(
+  geneGroupDF
+  , exprM
+  , cellID_clusterID
+  , clusters = c(0:15)
+  , lowerLimit = -1.5
+  , upperLimit = 1.5
+  , geneOrder = TRUE
+  , clusterOrder = c(9,7,8,10,2,0,1,4,3,13,5,6,11,12,14,15)
+  ) {
+
+  print("Plot_Marker_Genes_Heatmap_SetColWidths")
+  print(str(exprM))
+
+  # Heatmap plot
+  # Normalized, mean centered and scaled
+  ggDF <- Heatmap_By_Cluster_Format_Data(
+    geneGroupDF = geneGroupDF
+    , exprM = exprM
+    , cellID_clusterID = cellID_clusterID
+    , clusters = clusters
+    , lowerLimit = lowerLimit
+    , upperLimit = upperLimit
+    , geneOrder = geneOrder
+    , clusterOrder = clusterOrder
+  )
+
+  print("Heatmap_By_Cluster: plotting...")
+  # ggplot
+  gg <- ggplot(ggDF, aes(x = variable, y = Gene_Group, fill = value)) +
+    geom_tile() +
+    facet_grid(Group~Cluster, space = "free_y", scales = "free"
+      , drop = TRUE) +
+    # scale_fill_gradient2(high = "#d7191c", low = "#2c7bb6")
+    scale_fill_distiller(name = "Normalized\nexpression", type = "div"
+      , palette = 5, direction = -1, limits = c(lowerLimit, upperLimit)
+      , na.value = "grey90") +
+    theme_bw() +
+    theme(strip.text.x = element_text(angle = 90)) +
+    theme(strip.text.y = element_text(angle = 0)) +
+    theme(strip.background = element_blank()) +
+    theme(axis.text.x = element_blank()) +
+    theme(axis.ticks = element_blank()) +
+    theme(text = element_text(size = 12)) +
+    theme(axis.text.y = element_text(size = 10)) +
+    ylab("Genes") +
+    xlab("Cells ordered by cluster")
+  # gg <- gg + ...
   return(gg)
 }
 
@@ -387,52 +439,47 @@ Set_Limits <- function(tsneDF, limHigh, limLow) {
 }
 
 # Color tSNE plot by expression from Mean_Expression()
-FeaturePlot_Graph <- function(tsneDF, title, limLow, limHigh) {
+FeaturePlot_Graph <- function(tsneDF, title, limLow, limHigh
+  , alpha = 0.5, size = 0.05) {
   ggFp <- ggplot(tsneDF, aes(x = tSNE_1, y = tSNE_2, col = EXPRESSION)) +
-    geom_point(size = 0.02) +
-    # scale_colour_gradient(name = "Normalized\nExpression", low = "#a6cee3"
-    #   , high = "#e31a1c", limits = c(0, 2)) +
-    scale_color_distiller(name = "Normalized\nexpression", type = "div"
-      , palette = 5, direction = -1) +
-    # scale_colour_gradient(name = "Normalized\nExpression", low = "#a6cee3"
-    #   , high = "red", limits = c(limLow, limHigh)) +
+    # geom_point(size = size, alpha = alpha) +
+    geom_point(size = size, alpha = alpha, stroke = 0.5, shape = 21) +
+    # scale_color_distiller(name = "Normalized\nexpression", type = "div"
+    #   , palette = 5, direction = -1, limits = c(limLow, limHigh)) +
+    scale_color_distiller(name = "Normalized\nexpression", type = "seq"
+      , palette = "BuPu", direction = 1, limits = c(limLow, limHigh)) +
+    # scale_color_viridis(option = "magma", limits = c(limLow, limHigh)) +
     ggtitle(title)
   return(ggFp)
 }
 
 # Color tSNE plot by expression from Mean_Expression()
-FeaturePlot_Graph_CentScale <- function(tsneDF, title, limLow, limHigh) {
+FeaturePlot_Graph_CentScale <- function(tsneDF, title, limLow, limHigh
+  , alpha = 0.5, size = 0.02) {
   ggFp <- ggplot(tsneDF, aes(x = tSNE_1, y = tSNE_2, col = EXPRESSION)) +
-    geom_point(size = 0.02) +
-    # scale_colour_gradient(name = "Normalized\nExpression", low = "#a6cee3"
-    #   , high = "#e31a1c", limits = c(0, 2)) +
+    geom_point(size = size, alpha = alpha, stroke = 0.5, shape = 21) +
     scale_color_distiller(name = "Normalized\nexpression\nz-score", type = "div"
       , palette = 5, direction = -1, limits = c(limLow, limHigh)) +
-    # scale_colour_gradient(name = "Normalized\nExpression", low = "#a6cee3"
-    #   , high = "red", limits = c(limLow, limHigh)) +
     ggtitle(title)
   return(ggFp)
 }
 
 # tSNE plot colored by Seurat clustering
-TSNE_Plot <- function(seuratO) {
+TSNE_Plot <- function(seuratO, do.label = TRUE) {
   # tSNE graph colored by cluster
-  ggTsne <- TSNEPlot(seuratO, do.label = TRUE, pt.size = 0.02, do.return = TRUE
-    , no.legend = FALSE)
-  ggTsne <- ggTsne + ggtitle(paste0(
-    "tSNE plot, each point is a cell"
-    , "\nColor indicates cluster assignment"
-  ))
-  ggTsne <- ggTsne + theme_set(theme_bw()) +
+  gg_tsne <- TSNEPlot(seuratO, do.label = do.label, pt.size = 0.02
+    , do.return = TRUE, no.legend = FALSE)
+  gg_tsne <- gg_tsne + ggtitle(paste0("Color indicates cluster assignment"))
+  gg_tsne <- gg_tsne + theme_set(theme_bw()) +
     theme_set(theme_get() + theme(text = element_text(size = 16))) +
     theme_update(plot.title = element_text(size = 12)) +
     theme_update(axis.line = element_line(colour = "black")
       , plot.background = element_blank()
       , panel.border = element_blank()
     )
-  return(ggTsne)
+  return(gg_tsne)
 }
-# ggL <- append(list(ggTsne), ggL)
+# ggL <- append(list(gg_tsne), ggL)
 
 # Wrapper function for feature plots
 FeaturePlot_CentScale <- function(genes, tsneDF, seuratO, limLow, limHigh) {
@@ -448,13 +495,19 @@ FeaturePlot_CentScale <- function(genes, tsneDF, seuratO, limLow, limHigh) {
       , limLow = limLow, limHigh = limHigh)
     return(ggFp)
   })
-  ggTsne <- TSNE_Plot(seuratO) + theme(legend.position = "none")
-  ggL <- append(list(ggTsne), ggL)
+  gg_tsne <- TSNE_Plot(seuratO) +
+    guides(color = guide_legend(title = "Cluster")) +
+    theme(legend.position = "none")
+  gg_tsne_nolabel <- TSNE_Plot(seuratO, do.label = FALSE) +
+    guides(color = guide_legend(title = "Cluster")) +
+    theme(legend.position = "none")
+  ggL <- append(list(gg_tsne_nolabel), ggL)
+  ggL <- append(list(gg_tsne), ggL)
   return(ggL)
 }
 # Wrapper function for feature plots
 FeaturePlot <- function(genes, tsneDF, seuratO, exM, limLow, limHigh
-  , geneGrouping = NULL, centScale = FALSE) {
+  , size = 0.02, alpha = 0.5, geneGrouping = NULL, centScale = FALSE) {
   # Collect tSNE values for ggplot
   # tsneDF <- as.data.frame(seuratO@dr$tsne@cell.embeddings)
   # tSNE_1    tSNE_2
@@ -476,11 +529,11 @@ FeaturePlot <- function(genes, tsneDF, seuratO, exM, limLow, limHigh
       tsneDF <- Set_Limits(tsneDF, limLow = limLow, limHigh = limHigh)
       if (centScale == FALSE) {
         ggFp <- FeaturePlot_Graph(tsneDF, title = paste0("\n", grouping)
-          , limLow = limLow, limHigh = limHigh)
+          , limLow = limLow, limHigh = limHigh, size = size, alpha = alpha)
       }
       if (centScale == TRUE) {
         ggFp <- FeaturePlot_Graph_CentScale(tsneDF, title = paste0("\n", grouping)
-          , limLow = limLow, limHigh = limHigh)
+          , limLow = limLow, limHigh = limHigh, size = size, alpha = alpha)
       }
       return(ggFp)
     })
@@ -494,18 +547,28 @@ FeaturePlot <- function(genes, tsneDF, seuratO, exM, limLow, limHigh
       tsneDF <- Set_Limits(tsneDF, limLow = limLow, limHigh = limHigh)
       if (centScale == FALSE) {
         ggFp <- FeaturePlot_Graph(tsneDF, title = paste0("\n", gene)
-          , limLow = limLow, limHigh = limHigh)
+          , limLow = limLow, limHigh = limHigh, size = size, alpha = alpha)
       }
       if (centScale == TRUE) {
         ggFp <- FeaturePlot_Graph_CentScale(tsneDF, title = paste0("\n", gene)
-          , limLow = limLow, limHigh = limHigh)
+          , limLow = limLow, limHigh = limHigh, size = size, alpha = alpha)
       }
       return(ggFp)
     })
   }
 
-  ggTsne <- TSNE_Plot(seuratO) + theme(legend.position = "none")
-  ggL <- append(list(ggTsne), ggL)
+  gg_tsne <- TSNE_Plot(seuratO) + theme(legend.position = "none")
+  gg_tsne_nolabel <- TSNE_Plot(seuratO, do.label = FALSE) +
+    theme(legend.position = "none")
+  ggL <- append(list(gg_tsne_nolabel), ggL)
+  ggL <- append(list(gg_tsne), ggL)
+  # Format
+  ggL <- lapply(ggL, function(gg){gg + ggplot_set_theme_publication})
+  ggL[1:2] <- lapply(ggL[1:2], function(gg){
+      gg + guides(color = guide_legend(
+        ncol = 2, title = "Cluster", override.aes = list(size = 3)))
+  })
+  # Output
   return(ggL)
 }
 
@@ -547,7 +610,7 @@ Convert_Mixed_GeneSym_EnsID_To_EnsID <- function(ids){
 }
 
 # Cowplot plot_grid and add title
-Plot_Grid <- function(ggPlotsL, ncol, title, rel_height = 0.1, ...) {
+Plot_Grid <- function(ggPlotsL, ncol = 2, title = "", rel_height = 0.1, ...) {
   # cowplot plot_grid ...: align = 'v', axis = 'l'
   # Plot grid
   pg <- plot_grid(plotlist = ggPlotsL, ncol = ncol, ...)
@@ -564,6 +627,16 @@ Remove_Outliers_By_SD <- function(x, nStdev, na.rm = TRUE, ...) {
   x[x > (mn + nStdev*stdev) | x < (mn - nStdev*stdev)] <- NA
   # x <- as.numeric(x)
   return(x)
+}
+
+# Add gene list as column to 0 1 matrix with genes as row names
+Add_Gene_List_To_Binary_Matrix <- function(
+  gene_binary_M, gene_list, gene_list_name){
+  print("Add_Gene_List_To_Binary_Matrix")
+  binary_gene_list <- as.numeric(rownames(gene_binary_M) %in% gene_list)
+  gene_binary_M <- cbind(gene_binary_M, binary_gene_list)
+  colnames(gene_binary_M)[dim(gene_binary_M)[2]] <- gene_list_name
+  return(gene_binary_M)
 }
 ################################################################################
 
@@ -650,25 +723,25 @@ Heatmap_By_State <- function(
   , geneOrder = NULL, centScale = NULL) {
 
   # Subset expression matrix to genes of interest by merging
-  ggDF <- merge(geneGroupDF[c("GENE", "GROUP")], exprM
+  ggDF <- merge(geneGroupDF[c("Gene", "Group")], exprM
     , by.x = 1, by.y = "row.names", all.x = TRUE)
   # Set group factor levels
-  ggDF$GROUP <- as.factor(ggDF$GROUP)
-  # colnames(ggDF)[1:2] <- c("GENE", "GROUP")
+  ggDF$Group <- as.factor(ggDF$Group)
+  # colnames(ggDF)[1:2] <- c("Gene", "Group")
   # Remove blanks
-  ggDF <- ggDF[! ggDF$GENE == "", ]
+  ggDF <- ggDF[! ggDF$Gene == "", ]
   # Save order to set levels later
   if (is.null(geneOrder)) {
-    levels <- paste0(ggDF$GENE, "   ", ggDF$GROUP)
+    levels <- paste0(ggDF$Gene, "   ", ggDF$Group)
   } else {
-    levels <- rev(paste0(geneOrder, "   ", ggDF$GROUP))
+    levels <- rev(paste0(geneOrder, "   ", ggDF$Group))
   }
   if (centScale == TRUE) {
-    GENE <- ggDF$GENE
-    GROUP <- ggDF$GROUP
+    Gene <- ggDF$Gene
+    Group <- ggDF$Group
     ggDF <- as.data.frame(t(scale(t(ggDF[ ,-c(1:2)]))))
-    ggDF$GENE <- GENE
-    ggDF$GROUP <- GROUP
+    ggDF$Gene <- Gene
+    ggDF$Group <- Group
   }
   ggDF <- melt(ggDF)
   # Add seurat clusters
@@ -677,15 +750,15 @@ Heatmap_By_State <- function(
   # Subset clusters
   ggDF <- ggDF[ggDF$MONOCLE_STATE %in% clusters, ]
   # Add group to gene name and order by levels
-  ggDF$GENE_GROUP <- paste0(ggDF$GENE, "   ", ggDF$GROUP)
-  ggDF$GENE_GROUP <- factor(ggDF$GENE_GROUP, levels = levels)
+  ggDF$Gene_Group <- paste0(ggDF$Gene, "   ", ggDF$Group)
+  ggDF$Gene_Group <- factor(ggDF$Gene_Group, levels = levels)
   # Set limits
   ggDF$value[ggDF$value < lowerLimit] <- lowerLimit
   ggDF$value[ggDF$value > upperLimit] <- upperLimit
   # ggplot
-  gg <- ggplot(ggDF, aes(x = variable, y = GENE_GROUP, fill = value)) +
+  gg <- ggplot(ggDF, aes(x = variable, y = Gene_Group, fill = value)) +
     geom_tile() +
-    facet_grid(GROUP~MONOCLE_STATE, space = "free", scales = "free") +
+    facet_grid(Group~MONOCLE_STATE, space = "free", scales = "free") +
     # scale_fill_gradient2(high = "#d7191c", low = "#2c7bb6")
     scale_fill_distiller(name = "Normalized\nexpression", type = "div"
       , palette = 5, direction = -1, limits = c(lowerLimit, upperLimit)) +

@@ -26,7 +26,7 @@ source("Function_Library.R")
 options(stringsAsFactors = FALSE)
 
 # Regress CC score
-load("../analysis/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrainCC_PC1to40/Seurat_Cluster_DS2-11_seuratO.Robj")
+load("../analysis/analyzed_data/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrainCC/Seurat_Cluster_DS2-11_FtMm250_200-3sdgd_Mt5_RegNumiLibBrainCC_PC1to40_seuratO.Robj")
 regCcSO <- centSO
 regCcExM <- noCentExM
 rm(noCentExM)
@@ -36,7 +36,7 @@ rm(centSO)
 # regCcExM <- ssNoCentExM
 
 # Remove CC genes from variable gene list used for clustering
-load("../analysis/Seurat_Cluster_DS2-11/Seurat_Cluster_DS2-11_FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_PC1to40_seuratO.Robj")
+load("../analysis/analyzed_data/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_RemCC_PC1to40/Seurat_Cluster_DS2-11_seuratO.Robj")
 rmCcSO <- centSO
 rmCcExM <- noCentExM
 rm(noCentExM)
@@ -46,7 +46,7 @@ rm(centSO)
 # rmCcExM <- ssNoCentExM
 
 # Keep CC genes from variable gene list used for clustering
-load("../analysis/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_seuratO.Robj")
+load("../analysis/analyzed_data/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_seuratO.Robj")
 keepCcSO <- centSO
 keepCcExM <- noCentExM
 rm(noCentExM)
@@ -128,16 +128,16 @@ Seurat_Cluster_Compare_Jaccard_Index <- function (
   seuratO1, seuratO2, label1, label2) {
   clids1 <- as.numeric(as.character(sort(unique(seuratO1@ident))))
   clids2 <- as.numeric(as.character(sort(unique(seuratO2@ident))))
-  
+
   # Empty matrix
   jiM <- matrix(NA
     , length(clids1)
     , length(clids2))
-  
+
   # Column and row names are cluster IDs
   row.names(jiM) <- paste(clids1, label1)
   colnames(jiM) <- paste(clids2, label2)
-  
+
   # Fill with Jaccard index
   for (i in 1:length(clids1)){
     for (j in 1:length(clids2)){
@@ -148,17 +148,17 @@ Seurat_Cluster_Compare_Jaccard_Index <- function (
       jiM[i,j] <- Jaccard_Index(v1, v2)
     }
   }
-  
+
   return(jiM)
 }
 
 Seurat_Cluster_Compare_Jaccard_Index_Heatmap <- function (
   jiM, xlab, ylab, title = NULL) {
-  
+
   # Format
   df <- melt(jiM)
   df$value <- round(df$value, 3)
-  
+
   # Plot
   ggplot(df, aes(x = Var2, y = Var1, fill = value)) +
     geom_tile() +
@@ -179,16 +179,16 @@ Seurat_Cluster_Compare_Percent_Overlap <- function (
   seuratO1, seuratO2, label1, label2) {
   clids1 <- as.numeric(as.character(sort(unique(seuratO1@ident))))
   clids2 <- as.numeric(as.character(sort(unique(seuratO2@ident))))
-  
+
   # Empty matrix
   jiM <- matrix(NA
     , length(clids1)
     , length(clids2))
-  
+
   # Column and row names are cluster IDs
   row.names(jiM) <- paste(clids1, label1)
   colnames(jiM) <- paste(clids2, label2)
-  
+
   # Fill with Jaccard index
   for (i in 1:length(clids1)){
     for (j in 1:length(clids2)){
@@ -199,17 +199,17 @@ Seurat_Cluster_Compare_Percent_Overlap <- function (
       jiM[i,j] <- (sum(v1 %in% v2) / length(v1)) * 100
     }
   }
-  
+
   return(jiM)
 }
 
 Seurat_Cluster_Compare_Percent_Overlap_Heatmap <- function (
   olM, xlab, ylab, title) {
-  
+
   # Format
   df <- melt(olM)
   df$value <- round(df$value, 1)
-  
+
   # Plot
   ggplot(df, aes(x = Var2, y = Var1, fill = value)) +
     geom_tile() +
@@ -246,7 +246,7 @@ Expression_Subset <- function (mnExM, threshold) {
 }
 
 Format_Number_Cell_Types_Cluster_Dataframe <- function (exM, seuratO) {
-  
+
   mnExDF <- data.frame(
     vRG = Mean_Gene_Group_Expression(exM = exM, grouping = "vRG")
     , oRG = Mean_Gene_Group_Expression(exM = exM, grouping = "oRG")
@@ -255,33 +255,33 @@ Format_Number_Cell_Types_Cluster_Dataframe <- function (exM, seuratO) {
     , Endothelial = Mean_Gene_Group_Expression(exM = exM, grouping = "Endothelial Cell")
     , Neuron = Mean_Gene_Group_Expression(exM = exM, grouping = "Neuron")
   )
-  
+
   idx <- match(row.names(mnExDF), row.names(seuratO@meta.data))
   mnExDF$PHASE <- seuratO@meta.data$Phase[idx]
   mnExDF$CLUSTER <- seuratO@meta.data$res.0.6[idx]
   mnExDF$nUMI <- seuratO@meta.data$nUMI[idx]
-  
+
   return(mnExDF)
 }
 
 Number_Cell_Types_Cluster_Barplot <- function(
   exM, seuratO, threshold, title) {
-  
+
   df <- Format_Number_Cell_Types_Cluster_Dataframe(exM, seuratO)
   df <- Expression_Subset(df, threshold = threshold)
-  
+
   gg <- ggplot(df, aes(x = Group.2, y = x, fill = Group.1)) +
     geom_bar(stat = "identity", position = position_dodge()) +
     xlab("Cluster") +
     ylab("Number of cells") +
     ggtitle(title)
-  
+
   return(gg)
 }
 
 Positive_Negative_Expression_Flag <- function(
   exDF, highThreshold, lowThreshold) {
-  
+
   # Expected input data frame format
   # (from Format_Number_Cell_Types_Cluster_Dataframe)
   # vRG         oRG          RG          IP Endothelial
@@ -290,7 +290,7 @@ Positive_Negative_Expression_Flag <- function(
   # Neuron PHASE CLUSTER nUMI
   # ACCAGCTAGCCT  0.8625643    G1       3 6165
   # GGAAGGACTGCA -0.9443603   G2M      11 4166
-  
+
   df <- exDF
   df$TYPE <- NA
   df$TYPE[df[ ,c("IP")] > highThreshold] <- "IP+"
@@ -308,28 +308,30 @@ Positive_Negative_Expression_Flag <- function(
       df[ ,c("IP")] > highThreshold] <- "Endothelial+ IP+"
   df$TYPE[df[ ,c("Neuron")] > highThreshold &
       df[ ,c("IP")] > highThreshold] <- "Neuron+ IP+"
-  
+  df$TYPE[df[ ,c("Neuron")] > highThreshold &
+      df[ ,c("RG")] > highThreshold] <- "Neuron+ RG+"
+
   df$TYPE <- factor(df$TYPE, levels = c("IP+", "RG+ vRG- oRG- IP-", "vRG+ IP-"
-    , "oRG+ IP-", "IP+ vRG- oRG- RG-", "IP+ RG+", "Endothelial+ IP+", 
-    "Neuron+ IP+"))
+    , "oRG+ IP-", "IP+ vRG- oRG- RG-", "IP+ RG+", "Endothelial+ IP+",
+    "Neuron+ IP+", "Neuron+ RG+"))
   df$CLUSTER <- factor(df$CLUSTER, levels = sort(unique(as.numeric(df$CLUSTER))))
-  
+
   return(df)
 }
 
 Number_RgIp_Cluster_Barplot <- function(
   exM, seuratO, highThreshold, lowThreshold, title) {
-  
+
   df <- Format_Number_Cell_Types_Cluster_Dataframe(exM, seuratO)
   df <- Positive_Negative_Expression_Flag(
     exDF = df, highThreshold = 0.5, lowThreshold = 0.5)
-  
+
   gg <- ggplot(df, aes(x = CLUSTER, fill = TYPE)) +
     geom_bar(stat = "count") +
-    xlab("Cluster") + 
+    xlab("Cluster") +
     ylab("Number of cells") +
     ggtitle(title)
-  
+
   return(gg)
 }
 
@@ -341,7 +343,7 @@ Percent_Of_Table <- function (tableArg) {
 
 Percent_RgIpCluster_Barplot <- function(
   exM, seuratO, highThreshold, lowThreshold, title) {
-  
+
   df <- Format_Number_Cell_Types_Cluster_Dataframe(exM, seuratO)
   df <- Positive_Negative_Expression_Flag(
     exDF = df, highThreshold = highThreshold, lowThreshold = lowThreshold)
@@ -350,21 +352,21 @@ Percent_RgIpCluster_Barplot <- function(
   df2$CLUSTER <- df[ ,1]
   print(df2)
   df <- melt(df2)
-  
+
   gg <- ggplot(df, aes(x = CLUSTER, y = value, fill = variable)) +
     geom_bar(stat = "identity") +
     scale_y_continuous(expand = c(0, 0), limits = c(0, 101)) +
-    xlab("Cluster") + 
+    xlab("Cluster") +
     ylab("Percent of cells") +
     ggtitle(title)
-  
+
   return(gg)
 }
 
 
 Positive_Negative_Expression_Subset <- function(
   exDF, highThreshold, lowThreshold) {
-  
+
   # Expected input data frame format
   # vRG         oRG          RG          IP Endothelial
   # ACCAGCTAGCCT -0.12961098 -0.04274303 -0.16390677 -0.05747777  0.08723860
@@ -372,74 +374,74 @@ Positive_Negative_Expression_Subset <- function(
   # Neuron PHASE CLUSTER nUMI
   # ACCAGCTAGCCT  0.8625643    G1       3 6165
   # GGAAGGACTGCA -0.9443603   G2M      11 4166
-  
+
   df <- exDF
-  
+
   Threshold_High <- function(groupings, highThreshold, anyOrAll) {
     passFilter <- apply((data.frame(df[ ,groupings] > highThreshold))
       , 1, anyOrAll)
     return(passFilter)
   }
-  
+
   Threshold_Low <- function(groupings, lowThreshold, anyOrAll) {
     passFilter <- apply((data.frame(df[ ,groupings] < lowThreshold))
       , 1, anyOrAll)
     return(passFilter)
   }
-  
+
   ldf <- list(
     data.frame(
       nUMI = df$nUMI[df[ ,c("IP")] > highThreshold]
       , SUBSET = "IP+")
-    
+
     , data.frame(
       nUMI = df$nUMI[
         Threshold_High(groupings = c("RG"), highThreshold, all) &
           Threshold_Low(groupings = c("vRG", "oRG", "IP"), lowThreshold, all)]
       , SUBSET = "RG+ vRG- oRG- IP-")
-    
+
     , data.frame(
       nUMI = df$nUMI[
         Threshold_High(groupings = c("vRG"), highThreshold, all) &
           Threshold_Low(groupings = c("IP"), lowThreshold, all)]
       , SUBSET = "vRG+ IP-")
-    
+
     , data.frame(
       nUMI = df$nUMI[
         Threshold_High(groupings = c("oRG"), highThreshold, all) &
           Threshold_Low(groupings = c("IP"), lowThreshold, all)]
       , SUBSET = "oRG+ IP-")
-    
+
     , data.frame(
       nUMI = df$nUMI[
         Threshold_High(groupings = c("IP"), highThreshold, all) &
           Threshold_Low(groupings = c("vRG", "oRG", "RG"), lowThreshold, all)]
       , SUBSET = "IP+ vRG- oRG- RG-")
-    
+
     , data.frame(
       nUMI = df$nUMI[
         Threshold_High(groupings = c("IP", "RG"), highThreshold, all)]
       , SUBSET = "IP+ RG+")
-    
+
     , data.frame(
       nUMI = df$nUMI[
         Threshold_High(groupings = c("IP", "Neuron"), highThreshold, all)]
       , SUBSET = "Neuron+ IP+")
-    
+
     , data.frame(
       nUMI = df$nUMI
       , SUBSET = "All cells")
-    
+
     # , data.frame(
     #   nUMI = df$nUMI[
     #     Threshold_High(groupings = c("IP", "Endothelial"), highThreshold, all)]
     #   , SUBSET = "Endothelial+ IP+")
   )
-  
+
   # df$TYPE <- factor(df$TYPE, levels = c("IP+", "RG+ vRG- oRG- IP-", "vRG+ IP-"
   #   , "oRG+ IP-", "IP+ vRG- oRG- RG-", "IP+ RG+", "Endothelial+ IP+",
   #   "Neuron+ IP+"))
-  
+
   df <- do.call("rbind", ldf)
   return(df)
 }
@@ -463,7 +465,7 @@ MeanExprRank_Stdev_Variance_ScatterPlot <- function (exM, title) {
   sdev <- apply(exM, 1, sd)
   variance <- apply(exM, 1, var)
   df <- data.frame(Mean = mns, StdDev = sdev)
-  df$CoefficentOfVariation = Coefficent_Of_Variation(df$Mean, df$StdDev)
+  # df$CoefficentOfVariation = Coefficent_Of_Variation(df$Mean, df$StdDev)
   df$Variance <- variance
   df$MeanRank <- rank(df$Mean)
   gg1 <- ggplot(df, aes(x = MeanRank, y = Mean)) +
@@ -478,10 +480,10 @@ MeanExprRank_Stdev_Variance_ScatterPlot <- function (exM, title) {
 }
 
 Prcomp_Loadings_Plot <- function(pca, nGenes, nPCs, title) {
-  
+
   # Example function call:
   # Prcomp_Loadings_Plot(pca = pca, nGenes = 1:20, nPCs = 1:8)
-  
+
   # Plot highest loading genes
   ggL <- lapply(nPCs, function(pc) {
     df <- rbind(data.frame(PC = sort(pca$rotation[ ,pc])[nGenes])
@@ -503,49 +505,41 @@ Prcomp_Loadings_Plot <- function(pca, nGenes, nPCs, title) {
     , title = title
   )
 }
-# Plot PCA loadings
-lapply(names(pcaL), function(name){
-  pca <- pcaL[[name]]
-  Prcomp_Loadings_Plot(pca = pca, nGenes = c(1:20), nPCs = c(1:8)
-    , title = paste0(graphCodeTitle, "\n\n", name, "\nGenes with highest PC loadings"))
-  ggsave(paste0(outGraph, name, "_PCAloadings.pdf"), width = 13
-    , height = 20, limitsize = FALSE)
-})
 
 PCA_Format_For_GGplot <- function(pca) {
-  
+
   df <- as.data.frame(pca$x)
-  
+
   df1 <- Format_Number_Cell_Types_Cluster_Dataframe(
     exM = keepCcExM, seuratO = keepCcSO)
-  
+
   # Flag RG+, IP+, and RG+ IP+
   df$Cell_Subset <- NA
   df$Cell_Subset[rownames(df) %in% row.names(df1)[df1$RG > 0.5]] <- "RG"
   df$Cell_Subset[rownames(df) %in% row.names(df1)[df1$IP > 0.5]] <- "IP"
   df$Cell_Subset[rownames(df) %in% row.names(df1)[df1$RG > 0.5 & df1$IP > 0.5]] <- "RG IP"
-  
+
   # Flag vRG+, oRG+, and vRG+ oRG+
   df$vRG_oRG_Subset <- NA
   df$vRG_oRG_Subset[rownames(df) %in% row.names(df1)[df1$vRG > 0.5]] <- "vRG"
   df$vRG_oRG_Subset[rownames(df) %in% row.names(df1)[df1$oRG > 0.5]] <- "oRG"
   df$vRG_oRG_Subset[rownames(df) %in% row.names(df1)[df1$vRG > 0.5 & df1$oRG > 0.5]] <- "vRG oRG"
-  
+
   # vRG and oRG marker expression
   idx <- match(rownames(df), row.names(df1))
   df$vRG <- df1$vRG[idx]
   df$oRG <- df1$oRG[idx]
-  
+
   # Seurat S phase and G2M scores
   idx <- match(rownames(df), row.names(keepCcSO@meta.data))
   df$G2M_Score <- keepCcSO@meta.data$G2M.Score[idx]
   df$S_Score <- keepCcSO@meta.data$S.Score[idx]
-  
+
   return(df)
 }
 
 PCA_Plot_PC1to8 <- function (pcaDF, colorBy, limLow = NULL, limHigh = NULL) {
-  
+
   # Column to color by
   ggDF <- pcaDF
   # Color by
@@ -555,7 +549,7 @@ PCA_Plot_PC1to8 <- function (pcaDF, colorBy, limLow = NULL, limHigh = NULL) {
     ggDF$colorBy[ggDF$colorBy < limLow] <- limLow
     ggDF$colorBy[ggDF$colorBy > limHigh] <- limHigh
   }
-  
+
   # Plot
   ggL <- list(
     ggplot(ggDF, aes(x = PC1, y = PC2, color = colorBy)) +
@@ -591,6 +585,7 @@ PCA_Plot_PC1to8 <- function (pcaDF, colorBy, limLow = NULL, limHigh = NULL) {
 ################################################################################
 
 ### Cell Cycle phase plots
+print("### Cell Cycle phase plots")
 
 # Add phase info to remove CC genes Seurat object
 # (have not rerun calculating CC phase for this clustering yet)
@@ -677,7 +672,7 @@ ggplot(df, aes(x = Var1, y = Freq)) +
   geom_text(aes(label = Freq, x = Var1, y = Freq+300)) +
   ylab("Number of cells in CC phase") +
   xlab("Cell cycle phase") +
-  ggtitle(paste0(graphCodeTitle, 
+  ggtitle(paste0(graphCodeTitle,
     "\n\nNumber of cells assigned to each cell cycle phase"))
 ggsave(paste0(outGraph, "CCphase_Barplot.pdf"), width = 5, height = 6)
 
@@ -711,7 +706,7 @@ ldf <- lapply(ldf, function(df) {
   df$PHASE <- keepCcSO@meta.data$Phase
   return(df)})
 names(ldf) <- c("Keep CC genes", "Remove CC genes", "Regress out CC")
-# Plot tSNE from each cell cycle correction tested colored by CC phase 
+# Plot tSNE from each cell cycle correction tested colored by CC phase
 ggL <- lapply(names(ldf), function(name) {
   df <- ldf[[name]]
   # Plot
@@ -736,6 +731,7 @@ ggsave(paste0(outGraph, "tSNE_CCphase.png"), width = 16, height = 7)
 ################################################################################
 
 ### Compare clustering
+print("### Compare clustering")
 
 ## tSNE colored by clustering
 
@@ -773,54 +769,63 @@ gg3DF$KEEP_CC_CLUSTER <- keepCcSO@ident[idx]
 gg1 <- ggplot(ggDF, aes(x = tSNE_1, y = tSNE_2, col = RM_CC_CLUSTER)) +
   geom_point(size = 0.1, alpha = 0.5) +
   guides(colour = guide_legend(override.aes = list(size = 7))) +
+  ggplot_set_theme_publication +
   theme(legend.title = element_blank()) +
   ggtitle("Remove CC genes tSNE, Remove CC genes clustering")
 
 gg2 <- ggplot(ggDF, aes(x = tSNE_1, y = tSNE_2, col = KEEP_CC_CLUSTER)) +
   geom_point(size = 0.1, alpha = 0.5) +
   guides(colour = guide_legend(override.aes = list(size = 7))) +
+  ggplot_set_theme_publication +
   theme(legend.title = element_blank()) +
   ggtitle("Remove CC genes tSNE, Keep CC genes clustering")
 
 gg3 <- ggplot(ggDF, aes(x = tSNE_1, y = tSNE_2, col = REG_CC_CLUSTER)) +
   geom_point(size = 0.1, alpha = 0.5) +
   guides(colour = guide_legend(override.aes = list(size = 7))) +
+  ggplot_set_theme_publication +
   theme(legend.title = element_blank()) +
   ggtitle("Remove CC genes tSNE, Regress CC clustering")
 
 gg4 <- ggplot(gg2DF, aes(x = tSNE_1, y = tSNE_2, col = RM_CC_CLUSTER)) +
   geom_point(size = 0.1, alpha = 0.5) +
   guides(colour = guide_legend(override.aes = list(size = 7))) +
+  ggplot_set_theme_publication +
   theme(legend.title = element_blank()) +
   ggtitle("Keep CC genes tSNE, Remove CC genes clustering")
 
 gg5 <- ggplot(gg2DF, aes(x = tSNE_1, y = tSNE_2, col = KEEP_CC_CLUSTER)) +
   geom_point(size = 0.1, alpha = 0.5) +
   guides(colour = guide_legend(override.aes = list(size = 7))) +
+  ggplot_set_theme_publication +
   theme(legend.title = element_blank()) +
   ggtitle("Keep CC genes tSNE, Keep CC genes clustering")
 
 gg6 <- ggplot(gg2DF, aes(x = tSNE_1, y = tSNE_2, col = REG_CC_CLUSTER)) +
   geom_point(size = 0.1, alpha = 0.5) +
   guides(colour = guide_legend(override.aes = list(size = 7))) +
+  ggplot_set_theme_publication +
   theme(legend.title = element_blank()) +
   ggtitle("Keep CC genes tSNE, Regress CC clustering")
 
 gg7 <- ggplot(gg3DF, aes(x = tSNE_1, y = tSNE_2, col = RM_CC_CLUSTER)) +
   geom_point(size = 0.1, alpha = 0.5) +
   guides(colour = guide_legend(override.aes = list(size = 7))) +
+  ggplot_set_theme_publication +
   theme(legend.title = element_blank()) +
   ggtitle("Reg CC genes tSNE, Remove CC genes clustering")
 
 gg8 <- ggplot(gg3DF, aes(x = tSNE_1, y = tSNE_2, col = KEEP_CC_CLUSTER)) +
   geom_point(size = 0.1, alpha = 0.5) +
   guides(colour = guide_legend(override.aes = list(size = 7))) +
+  ggplot_set_theme_publication +
   theme(legend.title = element_blank()) +
   ggtitle("Reg CC genes tSNE, Keep CC genes clustering")
 
 gg9 <- ggplot(gg3DF, aes(x = tSNE_1, y = tSNE_2, col = REG_CC_CLUSTER)) +
   geom_point(size = 0.1, alpha = 0.5) +
   guides(colour = guide_legend(override.aes = list(size = 7))) +
+  ggplot_set_theme_publication +
   theme(legend.title = element_blank()) +
   ggtitle("Reg CC genes tSNE, Regress CC clustering")
 
@@ -840,14 +845,13 @@ ggsave(paste0(outGraph, "tSNE_RemCC_RegCC.png"), width = 21, height = 20)
 
 ## Jacard index
 
-
 # Keep CC and Remove CC
 m1 <- Seurat_Cluster_Compare_Jaccard_Index(
-  rmCcSO, keepCcSO, "RemoveCC", "KeepCC")
+  keepCcSO, rmCcSO, "KeepCC", "RemoveCC")
 gg1 <- Seurat_Cluster_Compare_Jaccard_Index_Heatmap(
   jiM = m1
-  , xlab = "Keep CC"
-  , ylab = "Remove CC"
+  , xlab = "Remove CC"
+  , ylab = "Keep CC"
 )
 
 # Remove CC and Regress CC
@@ -855,7 +859,7 @@ m2 <- Seurat_Cluster_Compare_Jaccard_Index(
   rmCcSO, regCcSO, "RemoveCC", "RegCC")
 gg2 <- Seurat_Cluster_Compare_Jaccard_Index_Heatmap(
   jiM = m2
-  , xlab = "RegCC"
+  , xlab = "Reg CC"
   , ylab = "Remove CC"
 )
 
@@ -864,8 +868,8 @@ m3 <- Seurat_Cluster_Compare_Jaccard_Index(
   keepCcSO, regCcSO, "KeepCC", "RegCC")
 gg3 <- Seurat_Cluster_Compare_Jaccard_Index_Heatmap(
   jiM = m3
-  , xlab = "RegCC"
-  , ylab = "KeepCC"
+  , xlab = "Reg CC"
+  , ylab = "Keep CC"
 )
 
 # Plot grid
@@ -883,6 +887,39 @@ plot_grid(title, pg, ncol = 1, rel_heights = c(0.1, 1))
 # Save
 ggsave(paste0(outGraph, "Jaccard_Heatmap_RemoveVsKeepCC.pdf")
   , height = 38, width = 12)
+
+# Reorder for paper
+idx <- c(9,7,8,10,2,0,1,4,3,13,5,6,11,12,14,15)+1
+m1 <- m1[idx,idx]
+m2 <- m2[idx,idx]
+m3 <- m3[idx,idx]
+gg1 <- Seurat_Cluster_Compare_Jaccard_Index_Heatmap(
+  jiM = m1
+  , xlab = "Remove CC"
+  , ylab = "Keep CC"
+)
+gg2 <- Seurat_Cluster_Compare_Jaccard_Index_Heatmap(
+  jiM = m2
+  , xlab = "RegCC"
+  , ylab = "Remove CC"
+)
+gg3 <- Seurat_Cluster_Compare_Jaccard_Index_Heatmap(
+  jiM = m3
+  , xlab = "RegCC"
+  , ylab = "KeepCC"
+)
+Plot_Grid(list(gg1, gg2, gg3), ncol = 1
+  , title = paste0(graphCodeTitle
+    , "\n\nJaccard index cluster overlap after different cell cycle corrections"
+    , "\nCell cycle corrections tested:"
+    , "\nUse cell cycle genes for clustering"
+    , "\nRemove cell cycle genes from genes used for clustering"
+    , "\nRegress out cell cycle scores"
+    , "\n")
+)
+# Save
+ggsave(paste0(outGraph, "Jaccard_Heatmap_RemoveVsKeepCC_paper.pdf")
+  , height = 32, width = 12)
 
 
 ## Percent overlap of cells in cluster A versus cluster B
@@ -933,6 +970,7 @@ ggsave(paste0(outGraph, "PercentOverlap_Heatmap_RemoveVsKeepCC.pdf")
 ################################################################################
 
 ### Number of cell types in CC phase by cluster
+print("### Number of cell types in CC phase by cluster")
 
 ## Number cell types per cluster barplot
 
@@ -1112,7 +1150,8 @@ ggsave(paste0(outGraph, "nUMI_Cluster_Boxplot.png")
   , width = 15, height = 7)
 ################################################################################
 
-## nUMI per expression filter box plots
+### nUMI per expression filter box plots
+print("### nUMI per expression filter box plots")
 
 # Remove CC genes
 gg1 <- nUMI_RgIP_Boxplot(
@@ -1140,6 +1179,7 @@ ggsave(paste0(outGraph, "nUMI_RgIP_Boxplot.png")
 ################################################################################
 
 ### Number / Percent of cells in CC phase subset by markers
+print("### Number / Percent of cells in CC phase subset by markers")
 
 ## Percent of cells in CC phase
 df1 <- Format_Number_Cell_Types_Cluster_Dataframe(
@@ -1161,7 +1201,7 @@ ggplot(df, aes(x = SUBSET, y = Freq, fill = tableArg)) +
   geom_bar(stat = "identity") +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
   scale_y_continuous(expand = c(0, 0), limits = c(0, 101)) +
-  scale_fill_discrete(name = "CC phase") + 
+  scale_fill_discrete(name = "CC phase") +
   xlab("Cell subset") +
   ylab("Percent of cells") +
   ggtitle(paste0(graphCodeTitle
@@ -1194,7 +1234,7 @@ ggplot(df, aes(x = SUBSET, y = Freq, fill = Var1)) +
   geom_bar(stat = "identity") +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
   # scale_y_continuous(expand = c(0, 0), limits = c(0, 101)) +
-  scale_fill_discrete(name = "CC phase") + 
+  scale_fill_discrete(name = "CC phase") +
   xlab("Cell subset") +
   ylab("Number of cells") +
   ggtitle(paste0(graphCodeTitle
@@ -1207,45 +1247,47 @@ ggsave(paste0(outGraph, "NumberCCphase_RG_IP_Subset_Barplot.pdf")
 ################################################################################
 
 ### Correlation of cluster EG and RG IP cells
+print("### Correlation of cluster EG and RG IP cells")
 
 df1 <- Format_Number_Cell_Types_Cluster_Dataframe(
   exM = keepCcExM, seuratO = keepCcSO)
 
-# ME_By_Markers_And_Phase <- function(markerGroup, phase)
-
-
 cellSubsetsL <- list(
   IP_G2M = df1$IP > 0.5 & df1$PHASE %in% "G2M"
   , RG_G2M = df1$RG > 0.5 & df1$PHASE %in% "G2M"
-  
+
   , IP_S = df1$IP > 0.5 & df1$PHASE %in% "S"
   , RG_S = df1$RG > 0.5 & df1$PHASE %in% "S"
-  
+
   , IP_G1 = df1$IP > 0.5 & df1$PHASE %in% "G1"
   , RG_G1 = df1$RG > 0.5 & df1$PHASE %in% "G1"
-  
+
   , IP = df1$IP > 0.5
   , RG = df1$RG > 0.5
-  
+
   , RG_IP_G2M = df1$RG > 0.5 & df1$IP > 0.5 & df1$PHASE %in% "G2M"
   , RG_IPn_G2M = df1$RG > 0.5 & df1$IP < 0.5 & df1$PHASE %in% "G2M"
   , RGn_IP_G2M = df1$RG < 0.5 & df1$IP > 0.5 & df1$PHASE %in% "G2M"
-  
+
   , RG_IP_S = df1$RG > 0.5 & df1$IP > 0.5 & df1$PHASE %in% "S"
   , RG_IPn_S = df1$RG > 0.5 & df1$IP < 0.5 & df1$PHASE %in% "S"
   , RGn_IP_S = df1$RG < 0.5 & df1$IP > 0.5 & df1$PHASE %in% "S"
-  
+
   , RG_IP_G1 = df1$RG > 0.5 & df1$IP > 0.5 & df1$PHASE %in% "G1"
   , RG_IPn_G1 = df1$RG > 0.5 & df1$IP < 0.5 & df1$PHASE %in% "G1"
   , RGn_IP_G1 = df1$RG < 0.5 & df1$IP > 0.5 & df1$PHASE %in% "G1"
-  
+
   , RG_IP = df1$RG > 0.5 & df1$IP > 0.5
   , RG_IPn = df1$RG > 0.5 & df1$IP < 0.5
   , RGn_IP = df1$RG < 0.5 & df1$IP > 0.5
 )
 egL <- lapply(names(cellSubsetsL), function(name) {
-  cellSubsetL <- cellSubsetsL[[name]]
-  eg <- moduleEigengenes(exM, cellSubsetL)$eigengenes
+  cellSubset <- cellSubsetsL[[name]]
+  exM <- keepCcExM
+  mns <- rowMeans(exM)
+  genes <- names(sort(mns, decreasing = TRUE))[1:2500]
+  exM <- exM[row.names(exM) %in% genes, ]
+  eg <- moduleEigengenes(exM, cellSubset)$eigengenes
   eg <- eg["METRUE"]
   colnames(eg) <- name
   return(eg)
@@ -1254,7 +1296,7 @@ names(egL) <- names(cellSubsetsL)
 corM <- round(cor(data.frame(egL)), 2)
 
 write.csv(corM
-  , file = paste0(outTable, "RG_IP_subsets_EG_correlation_matrix.csv")
+  , file = paste0(outTable, "RG_IP_subsets_EG_correlation_matrix1.csv")
   , quote = FALSE)
 
 # randomIDs <- sample(colnames(keepCcExM), size = length(cellIDs), replace = FALSE)
@@ -1264,6 +1306,7 @@ write.csv(corM
 ################################################################################
 
 ### vRG and oRG gene expression by cluster
+print("### vRG and oRG gene expression by cluster")
 
 ggL <- lapply(c("vRG", "oRG", "RG"), function(grouping) {
   genes <- kmDF$Gene.Symbol[kmDF$Grouping %in% grouping]
@@ -1288,6 +1331,7 @@ ggsave(paste0(outGraph, "vRG_oRG_RG_Expression_ViolinPlot.png")
 ################################################################################
 
 ### Heatmap and heirarchical clustering of RG and IP G2M cells
+print("### Heatmap and heirarchical clustering of RG and IP G2M cells")
 
 df1 <- Format_Number_Cell_Types_Cluster_Dataframe(
   exM = keepCcExM, seuratO = keepCcSO)
@@ -1319,7 +1363,7 @@ exM[exM < -2] <- 2
 breaks <- seq(-2, 2, by = 0.1)
 
 png(paste0(outGraph, "pheatmap.png"), width = 9, height = 9, units = "in", res = 300)
-pheatmap(exM, 
+pheatmap(exM,
   cluster_row = TRUE
   , cluster_cols = TRUE
   , annotation_col = annotation_col
@@ -1332,6 +1376,7 @@ dev.off()
 ################################################################################
 
 ### PCA of RG+ and / or IP+ cells
+print("### PCA of RG+ and / or IP+ cells")
 
 exLM <- list()
 
@@ -1394,6 +1439,15 @@ pcaL <- lapply(exLM, function(exM){
 
 # Plot PCA
 
+# Plot PCA loadings
+lapply(names(pcaL), function(name){
+  pca <- pcaL[[name]]
+  Prcomp_Loadings_Plot(pca = pca, nGenes = c(1:20), nPCs = c(1:8)
+    , title = paste0(graphCodeTitle, "\n\n", name, "\nGenes with highest PC loadings"))
+  ggsave(paste0(outGraph, name, "_PCAloadings.pdf"), width = 13
+    , height = 20, limitsize = FALSE)
+})
+
 # Format for ggplot
 ldf <- lapply(pcaL, function(pca){
   PCA_Format_For_GGplot(pca)
@@ -1401,9 +1455,9 @@ ldf <- lapply(pcaL, function(pca){
 
 # PCA plots
 lapply(names(ldf), function(name){
-  
+
   df <- ldf[[name]]
-  
+
   ggL <- PCA_Plot_PC1to8(pcaDF = df, colorBy = "Cell_Subset")
   Plot_Grid(ggPlotsL = ggL
     , ncol = 3
@@ -1414,7 +1468,7 @@ lapply(names(ldf), function(name){
       , "\n+ = > 0.5 log normalized expression")
   )
   ggsave(paste0(outGraph, name, "_PCA_RgIp.png"), width = 14, height = 14)
-  
+
   ggL <- PCA_Plot_PC1to8(pcaDF = df, colorBy = "vRG_oRG_Subset")
   Plot_Grid(ggPlotsL = ggL
     , ncol = 3
@@ -1425,7 +1479,7 @@ lapply(names(ldf), function(name){
       , "\n+ = > 0.5 log normalized expression")
   )
   ggsave(paste0(outGraph, name, "_PCA_vRGoRG.png"), width = 14, height = 14)
-  
+
   ggL <- PCA_Plot_PC1to8(pcaDF = df, colorBy = "S_Score")
   Plot_Grid(ggPlotsL = ggL
     , ncol = 3
@@ -1436,7 +1490,7 @@ lapply(names(ldf), function(name){
       , "\n+ = > 0.5 log normalized expression")
   )
   ggsave(paste0(outGraph, name, "_PCA_Sscore.png"), width = 14, height = 14)
-  
+
   ggL <- PCA_Plot_PC1to8(pcaDF = df, colorBy = "G2M_Score")
   Plot_Grid(ggPlotsL = ggL
     , ncol = 3
@@ -1447,7 +1501,7 @@ lapply(names(ldf), function(name){
       , "\n+ = > 0.5 log normalized expression")
   )
   ggsave(paste0(outGraph, name, "_PCA_G2Mscore.png"), width = 14, height = 14)
-  
+
   ggL <- PCA_Plot_PC1to8(pcaDF = df, colorBy = "vRG", limLow = 0, limHigh = 1)
   Plot_Grid(ggPlotsL = ggL
     , ncol = 3
@@ -1458,7 +1512,7 @@ lapply(names(ldf), function(name){
       , "\n+ = > 0.5 log normalized expression")
   )
   ggsave(paste0(outGraph, name, "_PCA_vRG.png"), width = 14, height = 14)
-  
+
   ggL <- PCA_Plot_PC1to8(pcaDF = df, colorBy = "oRG", limLow = 0, limHigh = 1)
   Plot_Grid(ggPlotsL = ggL
     , ncol = 3
@@ -1471,4 +1525,65 @@ lapply(names(ldf), function(name){
   ggsave(paste0(outGraph, name, "_PCA_oRG.png"), width = 14, height = 14)
 
 })
+################################################################################
+
+### Expression of vRG, oRG, RG markers versus cell cycle score
+print("### Expression of vRG, oRG, RG markers versus cell cycle score")
+
+df <- data.frame(Sphase = keepCcSO@meta.data$S.Score
+  , G2M = keepCcSO@meta.data$G2M.Score)
+
+genes <- kmDF$Gene.Symbol[kmDF$Grouping %in% "RG"]
+exM <- keepCcExM[row.names(keepCcExM) %in% genes, ]
+mnEx <- colMeans(exM)
+df$Expression_RG <- mnEx
+
+genes <- kmDF$Gene.Symbol[kmDF$Grouping %in% "vRG"]
+exM <- keepCcExM[row.names(keepCcExM) %in% genes, ]
+mnEx <- colMeans(exM)
+df$Expression_vRG <- mnEx
+
+genes <- kmDF$Gene.Symbol[kmDF$Grouping %in% "oRG"]
+exM <- keepCcExM[row.names(keepCcExM) %in% genes, ]
+mnEx <- colMeans(exM)
+df$Expression_oRG <- mnEx
+
+df1 <- df[df$Expression_RG > 0.5, ]
+gg1 <- ggplot(df1, aes(x = Sphase, y = Expression_RG)) +
+  geom_point(size = 0.1) +
+  geom_smooth(method = 'lm') +
+  ggtitle("RG S phase")
+gg2 <- ggplot(df1, aes(x = G2M, y = Expression_RG)) +
+  geom_point(size = 0.1) +
+  geom_smooth(method = 'lm') +
+  ggtitle("RG G2M")
+
+df1 <- df[df$Expression_vRG > 0.5, ]
+gg3 <- ggplot(df1, aes(x = Sphase, y = Expression_vRG)) +
+  geom_point(size = 0.1) +
+  geom_smooth(method = 'lm') +
+ggtitle("vRG S phase")
+gg4 <- ggplot(df1, aes(x = G2M, y = Expression_vRG)) +
+  geom_point(size = 0.1) +
+  geom_smooth(method = 'lm') +
+  ggtitle("vRG G2M")
+
+df1 <- df[df$Expression_oRG > 0.5, ]
+gg5 <- ggplot(df1, aes(x = Sphase, y = Expression_oRG)) +
+  geom_point(size = 0.1) +
+  geom_smooth(method = 'lm') +
+ggtitle("oRG S phase")
+gg6 <- ggplot(df1, aes(x = G2M, y = Expression_oRG)) +
+  geom_point(size = 0.1) +
+  geom_smooth(method = 'lm') +
+  ggtitle("oRG G2M")
+
+Plot_Grid(ggPlotsL = list(gg1, gg3, gg5, gg2, gg4, gg6)
+  , ncol = 3
+  , rel_height = 0.3
+  , title = paste0(graphCodeTitle
+    , "\n\nMean expression of vRG, oRG, or RG markers versus cell cycle score"
+    , "\nSubset to > 0.5 mean log normalized expression of marker gene group")
+)
+ggsave(paste0(outGraph, "RGexpr_Vs_CCscore.png"), width = 13, height = 9)
 ################################################################################

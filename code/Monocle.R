@@ -11,9 +11,13 @@ require(cowplot)
 require(ggplot2)
 require(viridis)
 require(scales)
+require(RColorBrewer)
+require(reshape2)
 source("Function_Library.R")
 
 # load("../analysis/analyzed_data/Monocle/Monocle_monocleO.Robj")
+load("../analysis/analyzed_data/Monocle/Monocle_PC1-40_monocleO.Robj")
+# load("../analysis/analyzed_data/Monocle/Monocle_PC1-30_monocleO.Robj")
 # load("../analysis/analyzed_data/Monocle/Monocle_PC1-40_RG_IPC_Neuron_monocleO.Robj")
 
 ## Inputs
@@ -33,9 +37,9 @@ mmDF <- read.csv("../source/Molyneaux_LayerMarkers_Format.csv", header = TRUE)
 
 ## Variables
 graphCodeTitle <- "Monocle.R"
-outGraph <- "../analysis/graphs/Monocle/Monocle_PC1-40_RG_IPC_Neuron_"
-outTable <- "../analysis/tables/Monocle/Monocle_PC1-40_RG_IPC_Neuron_"
-outRdat <- "../analysis/analyzed_data/Monocle/Monocle_PC1-40_RG_IPC_Neuron_"
+outGraph <- "../analysis/graphs/Monocle/Monocle_PC1-40_"
+outTable <- "../analysis/tables/Monocle/Monocle_PC1-40_"
+outRdat <- "../analysis/analyzed_data/Monocle/Monocle_PC1-40_"
 
 ## Output Directories
 dir.create(dirname(outGraph), recursive = TRUE)
@@ -60,10 +64,10 @@ theme_update(axis.line = element_line(colour = "black")
 # The size factor is the median ratio of the sample over a "pseudosample": for
 # each gene, the geometric mean of all samples.
 
-# Subset Seurat object to specifc columns
-ids <- c(0, 1, 2, 3, 4, 7, 8, 9, 10, 13)
-cellIDs <- names(centSO@ident)[centSO@ident %in% ids]
-centSO <- FilterCells(object = centSO, subset.names = NULL, cells.use = cellIDs)
+# # Subset Seurat object to specifc columns
+# ids <- c(0, 1, 2, 3, 4, 7, 8, 9, 10, 13)
+# cellIDs <- names(centSO@ident)[centSO@ident %in% ids]
+# centSO <- FilterCells(object = centSO, subset.names = NULL, cells.use = cellIDs)
 
 # Add clustering to metadata
 v1 <- centSO@ident
@@ -133,7 +137,7 @@ mo_filtered <- setOrderingFilter(mo, ordering_genes)
 print("Reduce data dimensionality")
 # Reduce data dimensionality
 # Use number of genes expressed or total mRNAs?
-mo_filtered <- reduceDimension(mo_filtered, max_components = 40,
+mo_filtered <- reduceDimension(mo_filtered, max_components = 30,
   residualModelFormulaStr = "~individual + librarylab + Total_mRNAs"
   , verbose = TRUE)
 
@@ -154,11 +158,26 @@ diff_test_res <- differentialGeneTest(mo_filtered
 save(mo, mo_filtered, diff_test_res, file = paste0(outRdat, "monocleO.Robj"))
 ################################################################################
 
+### Cluster cells (Monocel uses t-SNE to cluster)
+
+# mo_filtered_tsne <- reduceDimension(
+#   mo
+#   , max_components = 2
+#   , residualModelFormulaStr = "~individual + librarylab + Total_mRNAs"
+#   , num_dim = 40
+#   , reduction_method = 'tSNE'
+#   , verbose = TRUE
+# )
+# mo_filtered_tsne <- clusterCells(mo_filtered_tsne)
+# plot_cell_clusters(mo_filtered, 1, 2, color = "CellType")
+################################################################################
+
 ### Plots paper
 
 ## Trajectory colored by Monocle state
 plot_cell_trajectory(mo_filtered, 1, 2, color_by = "State"
   , cell_size = 0.01, show_branch_points = FALSE) +
+  # scale_colour_manual(values = colorRampPalette(brewer.pal(8, "Set1"))(13)) +
   ggplot_set_theme_publication_nolabels +
   theme(legend.position = "right") +
   # Change legend size
@@ -187,7 +206,7 @@ plot_cell_trajectory(mo_filtered, 1, 2, color_by = "Pseudotime"
 ggsave(paste0(outGraph, "Trajectory_Pseudotime_paper.png")
   , width = 5.5, height = 5)
 
-## Plot Seurat clusters faceted by cluster
+## Plot trajectory colored by Seurat clusters faceted by cluster
 Plot_Trajectory_Faceted_By_Seurat_Clusters <- function(){
   # browser()
   print("Plot_Trajectory_Faceted_By_Seurat_Clusters")
@@ -206,11 +225,11 @@ Plot_Trajectory_Faceted_By_Seurat_Clusters <- function(){
   pData(mo_filtered)$Cluster_Reorder <- factor(pData(mo_filtered)$cluster
     , levels = cluster_reorder)
 
-  # Subset to RG, IPC, excitatory Seurat clusters
-  mo_filtered <- mo_filtered[ ,
-    pData(mo_filtered)$cluster %in% c(0, 1, 2, 3, 4, 7, 8, 9, 10, 13)]
-  pData(mo_filtered)$Cluster_Reorder <-
-    droplevels(pData(mo_filtered)$Cluster_Reorder)
+  # # Subset to RG, IPC, excitatory Seurat clusters
+  # mo_filtered <- mo_filtered[ ,
+  #   pData(mo_filtered)$cluster %in% c(0, 1, 2, 3, 4, 7, 8, 9, 10, 13)]
+  # pData(mo_filtered)$Cluster_Reorder <-
+  #   droplevels(pData(mo_filtered)$Cluster_Reorder)
 
   # Loop through Seurat clusters and plot monocle trajectory for each
   ggL <- lapply(levels(pData(mo_filtered)$Cluster_Reorder)
@@ -257,7 +276,7 @@ Plot_Grid(ggL, ncol = 5, rel_height = 0.2
   , "\nColored by Seurat clusters"
   , "\n"))
 ggsave(paste0(outGraph, "Trajectory_SeuratCluster_Facet_paper.png")
-  , width = 13, height = 6)
+  , width = 26, height = 12)
 ################################################################################
 
 ### Plots
@@ -272,6 +291,38 @@ dev.off()
 png(paste0(outGraph, "OrderingGenesDispersion.png"))
 plot_ordering_genes(mo_filtered)
 dev.off()
+
+## Comparsion to Seurat clustering (Jaccard Index)
+jaccard_M <- matrix(NA
+  , length(unique(pData(mo_filtered)$State))
+  , length(unique(centSO@ident))
+)
+cells_cluster_L <- split(names(centSO@ident), centSO@ident)
+colnames(jaccard_M) <- names(cells_cluster_L)
+cells_state_L <- split(rownames(pData(mo_filtered)), pData(mo_filtered)$State)
+for (i in 1:length(unique(centSO@ident))){
+  for (j in 1:length(unique(pData(mo_filtered)$State))){
+    seurat_cell_IDs <- cells_cluster_L[[i]]
+    monocle_cell_IDs <- cells_state_L[[j]]
+    jaccard_idx <- length(intersect(seurat_cell_IDs, monocle_cell_IDs)) / length(union(seurat_cell_IDs, monocle_cell_IDs))
+    jaccard_M[j, i] <- signif(jaccard_idx, 2)
+  }
+}
+jaccard_M <- melt(jaccard_M)
+ggplot(jaccard_M, aes(x = Var2, y = Var1, fill = value)) +
+  geom_tile() +
+  scale_fill_gradient(low = "white", high = "red", limits = c(0,1)
+    , name = "Jaccard index") +
+  geom_text(aes(label = round(value, 2)), color = "black") +
+  scale_x_continuous(breaks = unique(jaccard_M$Var2)
+    , labels = unique(jaccard_M$Var2)) +
+  scale_y_continuous(breaks = unique(jaccard_M$Var1)
+    , labels = unique(jaccard_M$Var1)) +
+  ggtitle(paste0(graphCodeTitle
+    , "\n\nSeurat Monocle Comparison (Jaccard Index)"))
+ggsave(paste0(outGraph, "Seurat_Comparison_Jaccard_Matrix.pdf")
+  , width = 9, height = 9
+)
 
 ## Trajectory colored by state or covariates
 

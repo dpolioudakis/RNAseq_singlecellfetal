@@ -100,7 +100,6 @@ deDF <- Format_DE(deLM, centSO, clusterID)
 deDF$Ensembl <- Convert_Mixed_GeneSym_EnsID_To_EnsID(as.character(deDF$Gene))
 
 # FDR correct
-# NOTE: p-values are so low that FDR tool is returning FDR of 1 for everything
 deDF$FDR <- p.adjust(deDF$Pvalue, method = "BH")
 # Check
 table(deDF$Pvalue < 0.05)

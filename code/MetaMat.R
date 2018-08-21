@@ -14,6 +14,78 @@ require(ggplot2)
 library(biomaRt) ## First, construct a matrix containing all possible protein coding genes. We will use human gene symbols. Although other identifiers, such as ENSG IDs are preferred, many studies only report human gene symbols, so we will use this as the common identifier.
 library(WGCNA) ## For plotting heatmaps
 source("Function_Library.R")
+################################################################################
+
+### Functions
+
+Subset_OR_And_Log2_Odds_Ratio_Matrix <- function(
+  target_list_cols, interpretation_list_cols, ORmat){
+  print("Subset_OR_And_Log2_Odds_Ratio_Matrix")
+  subORmat <- ORmat[target_list_cols, interpretation_list_cols]
+  # Tranform to log2 odds ratio
+  dispMat <- log2(exp(subORmat))
+  rownames(dispMat) <- rownames(subORmat)
+  return(dispMat)
+}
+
+Subset_OR_Pval_And_FDR_Correct_Matrix <- function(
+  target_list_cols, interpretation_list_cols, Pmat){
+  print("Subset_OR_Pval_And_FDR_Correct_Matrix")
+  subPmat <- Pmat[target_list_cols, interpretation_list_cols]
+  # FDR correction
+  # Correcting for all columns and rows
+  subPmat <- p.adjust(subPmat, method="BH")
+  return(subPmat)
+}
+
+Format_OR_Pval_Matrices_For_Barplot <- function(
+  dispMat, subPmat, cluster_order){
+  print("Format_OR_Pval_Matrices_For_Barplot")
+  # Order clusters
+  new_cluster_order <- cluster_order
+  gg_DF <- melt(dispMat)
+  gg_DF$Cluster <- gsub("DS2-11 ", "", gg_DF$Var2)
+  gg_DF$Cluster <- factor(gg_DF$Cluster, levels = c(0:15))
+  gg_DF$Cluster2 <- factor(gg_DF$Cluster, levels = new_cluster_order)
+  # Add p-values
+  gg_DF$Pvalue_FDR <- subPmat
+  pvals_DF <- melt(Pmat[target_list_cols, interpretation_list_cols, drop=FALSE])
+  pvals_DF$Index <- paste0(pvals_DF$Var1, "_", pvals_DF$Var2)
+  gg_DF$Index <- paste0(gg_DF$Var1, "_", gg_DF$Var2)
+  idx <- match(gg_DF$Index, pvals_DF$Index)
+  gg_DF$Pvalue <- pvals_DF$value[idx]
+  # Remove clusters not in list
+  gg_DF <- gg_DF[gg_DF$Cluster %in% cluster_order, ]
+  # Label for coloring bars
+  gg_DF <- gg_DF[order(gg_DF$Cluster2), ]
+  class_cluster_idx <- c(
+    "Radial glia" = 7
+    , "Radial glia" = 9
+    , "Cycling progenitor" = 8
+    , "Cycling progenitor" = 10
+    , "Intermediate progenitor" = 2
+    , "Excitatory Neuron" = 0
+    , "Excitatory Neuron" = 1
+    , "Excitatory Neuron" = 4
+    , "Excitatory Neuron" = 3
+    , "Excitatory Neuron" = 13
+    , "Interneuron" = 5
+    , "Interneuron" = 6
+    , "Oligodendrocyte precursor" = 11
+    , "Endothelial" = 12
+    , "Pericyte" = 14
+    , "Microglia" = 15
+  )
+  gg_DF$Class <- names(class_cluster_idx)[match(gg_DF$Cluster, class_cluster_idx)]
+  gg_DF$Class <- factor(gg_DF$Class
+    , levels = c("Radial glia", "Cycling progenitor", "Intermediate progenitor"
+      , "Excitatory Neuron", "Interneuron", "Oligodendrocyte precursor"
+      , "Endothelial", "Pericyte", "Microglia")
+  )
+  # Remove NAs
+  gg_DF <- gg_DF[! is.na(gg_DF$Cluster), ]
+}
+################################################################################
 
 ## First, we get all the genes from Gencode v19
 getinfo <- c("ensembl_gene_id","hgnc_symbol","chromosome_name","start_position","end_position","strand","band","gene_biotype")
@@ -30,10 +102,11 @@ names(geneLength) <- geneAnno1[,"hgnc_symbol"] ## For use later in making the co
 metaX = geneAnno1[match(rownames(metaMat), geneAnno1$hgnc_symbol),"chromosome_name"]
 
 ################################################
-## b) Single-cell RNA-seq Datasets
+## Single-cell RNA-seq Datasets
 ################################################
+
 ## Cell types in fetal brain (Pollen et al S3)
-load(file="../source/metaMat/PollenS3GenesENSG.Rda");
+load(file="../source/Gene_Lists/PollenS3GenesENSG.Rda");
 for(i in 1:length(PollenS3GenesENSG)){
   thislist = PollenS3GenesENSG[[i]]
   gename = geneAnno1[geneAnno1$ensembl_gene_id %in% thislist, 2]
@@ -45,7 +118,7 @@ for(i in 1:length(PollenS3GenesENSG)){
 }
 
 ## Cell types in fetal brain (Pollen et al S4)
-load(file="../source/metaMat/PollenCellTypesGenes.R");
+load(file="../source/Gene_Lists/PollenCellTypesGenes.R");
 for(i in 1:length(CellTypesGenes)){
   thislist = CellTypesGenes[[i]]
   gename = geneAnno1[geneAnno1$ensembl_gene_id %in% thislist, 2]
@@ -57,7 +130,7 @@ for(i in 1:length(CellTypesGenes)){
 }
 
 ## Cell types in fetal brain (Pollen et al S4) Genes exclusive to each Cell Type
-load(file="../source/metaMat/PollenCellTypesGenes-Unique.R")
+load(file="../source/Gene_Lists/PollenCellTypesGenes-Unique.R")
 names(CellTypesGenes) = c("IPC-Uniq", "Neuron-Uniq","Interneuron-Uniq", "vRG-Uniq", "oRG-Uniq");
 for(i in 1:length(CellTypesGenes)){
   thislist = CellTypesGenes[[i]]
@@ -69,8 +142,85 @@ for(i in 1:length(CellTypesGenes)){
   colnames(metaMat)[dim(metaMat)[2]] = names(CellTypesGenes)[i]
 }
 
+## Nowakowski 2017
+Classify_Cells_By_Type <- function(
+  cluster_DE_DF, class_cluster_idx, cluster_col_name){
+  print("Classify_Cells_By_Type")
+  # Example class_cluster_idx input
+  # $`Glia or support cells`
+  # [1] "End"     "Per"     "Ast"     "Ast_Cer" "Oli"     "OPC"     "OPC_Cer"
+  # [8] "Mic"
+  # $`NA`
+  # [1] "Gran"
+  class_cluster_idx <- melt(class_cluster_idx)
+  cluster_DE_DF$Class <- class_cluster_idx$L1[
+    match(cluster_DE_DF[[cluster_col_name]], class_cluster_idx$value)]
+  return(cluster_DE_DF)
+}
+# Nowakowski cluster DE table
+nowakowski_DE_DF <- read.csv(
+  "../nowakowski_2017/Nowakowski_Table_S5_Clustermarkers.csv", header = TRUE
+)
+# Nowakowski DE not very cell type specifc, set DE filter higher
+nowakowski_DE_DF <- nowakowski_DE_DF[nowakowski_DE_DF$avg_diff > 0.75, ]
+# Classify cells by type
+class_cluster_idx <- list(
+  "Astrocyte" = "Astrocyte"
+  , "Choroid" = "Choroid"
+  , "Mitotic progenitor" = c("IPC-div1", "RG-div1", "RG-div2", "IPC-div2")
+  , "RG" = "RG-early"
+  , "Endothelial" = "Endothelial"
+  , "IP" = c("IPC-nEN1", "IPC-nEN2", "IPC-nEN3")
+  , "Microglia" = "Microglia"
+  , "OPC" = "OPC"
+  , "oRG" = "oRG"
+  , "tRG" = "tRG"
+  , "vRG" = "vRG"
+  , "MGE IPC" = c("MGE-IPC1", "MGE-IPC2")
+  , "MGE mitotic progentior" = "MGE-div"
+  , "MGE RG" = c("MGE-RG1", "MGE-RG2")
+  , "MGE newborn neurons" = c("nIN1", "nIN2", "nIN3", "nIN4", "nIN5")
+  , "Mural" = "Mural"
+  , "NA" = c("Glyc", "U1", "U2", "U3", "U4")
+  , "Excitatory" = c("EN-PFC2", "EN-PFC3", "EN-V1-2", "EN-PFC1", "EN-V1-1", "EN-V1-3")
+  , "Excitatory Early" = c("nEN-early2", "nEN-early1")
+  , "Excitatory Late" = "nEN-late"
+  , "Interneuron" = c("IN-CTX-CGE", "IN-CTX-CGE2", "IN-CTX-MGE2", "IN-CTX-MGE1")
+  , "Striatal neurons" = "IN-STR"
+)
+nowakowski_DE_DF <- Classify_Cells_By_Type(
+  cluster_DE_DF = nowakowski_DE_DF
+  , class_cluster_idx = class_cluster_idx
+  , cluster_col_name = "cluster"
+)
+Add_Cluster_DE_Data_To_MetaMat <- function(
+  cluster_DE_DF, gene_col_name, cluster_col_name, metaMat){
+  cluster_DE_DFL <- split(cluster_DE_DF[[gene_col_name]]
+    , f = cluster_DE_DF[[cluster_col_name]])
+  for(i in 1:length(cluster_DE_DFL)){
+    thislist = cluster_DE_DFL[[i]]
+    gename = geneAnno1[geneAnno1$hgnc_symbol %in% thislist, 2]
+    gename = gename[gename!=""]
+    matchlist = match(rownames(metaMat), gename)
+    matchlist = ifelse(is.na(matchlist),0,1)
+    metaMat = cbind(metaMat, matchlist)
+    colnames(metaMat)[dim(metaMat)[2]] = names(cluster_DE_DFL)[i]
+  }
+  return(metaMat)
+}
+metaMat <- Add_Cluster_DE_Data_To_MetaMat(
+  cluster_DE_DF = nowakowski_DE_DF
+  , gene_col_name = "gene"
+  , cluster_col_name = "Class"
+  , metaMat = metaMat
+)
+
+################################################
+## Disease gene datasets
+################################################
+
 ## Sanders et al., 2015, PIMD 26402605
-listMat <- read.csv("../source/metaMat/Gene_Lists/geschwindlabshares/Hi-C/traitsenrichment/data/Lists/Sanders_2015_TADA.csv")
+listMat <- read.csv("../source/Gene_Lists/geschwindlabshares/Hi-C/traitsenrichment/data/Lists/Sanders_2015_TADA.csv")
 listMat <- listMat[,1:21]
 
 thisgene = unique(listMat[listMat$tadaFdrAscSscExomeSscAgpSmallDel<0.1, "RefSeqGeneName"])
@@ -86,14 +236,14 @@ metaMat = cbind(metaMat, matchlist)
 colnames(metaMat)[ncol(metaMat)] <- "Sanders_TADA0.1_exome"
 
 ## Iossifov ASD - load for exomeLength
-listMat <- read.csv("../source/metaMat/AllDeNovoByGene.csv") ## From the supplmental tables of Iossifov et al., 2014 - note that some gene symbols have the excel conversion error in this data, but it will get removed when we overlap things
+listMat <- read.csv("../source/Gene_Lists/geschwindlabshares/Hi-C/traitsenrichment/data/Lists/AllDeNovoByGene.csv") ## From the supplmental tables of Iossifov et al., 2014 - note that some gene symbols have the excel conversion error in this data, but it will get removed when we overlap things
 listMat <- listMat[!duplicated(listMat[,1]),]
 rownames(listMat) <- listMat[,"gene"]
 exomeLength <- listMat[,"codingLenInTarget"] ## For later use in making the covariate matrix
 names(exomeLength) <- rownames(listMat)
 
 ## iHART
-listMat <- read.csv("../source/metaMat/Gene_Lists/ASD.risk-genes.ForDamon.SingleCellExp_2018-04-18.csv")
+listMat <- read.csv("../source/Gene_Lists/ASD.risk-genes.ForDamon.SingleCellExp_2018-04-18.csv")
 listMat$HGNC.gene.symbol <- gsub("\"", "", listMat$HGNC.gene.symbol)
 idx <- match(row.names(metaMat), listMat$HGNC.gene.symbol)
 for(i in 4:ncol(listMat)){
@@ -103,11 +253,76 @@ for(i in 4:ncol(listMat)){
   colnames(metaMat)[dim(metaMat)[2]] <- colnames(listMat)[i]
 }
 
+## Epilepsy Ruzzo
+listMat <- read.table(
+  "../source/Gene_Lists/High-Confidence_Epilepsy_Risk_Genes_Ruzzo_2018-05-11.txt", fill = TRUE, header = TRUE, sep = "\t"
+)
+listMat$Epilepsy_All <- 1
+listMat$Epilepsy_High_Conf <- 0
+listMat$Epilepsy_High_Conf[listMat$Classification == "High-confidence"] <- 1
+listMat$Epilepsy_High_Conf_Early <- 0
+listMat$Epilepsy_High_Conf_Early[
+  listMat$Classification == "High-confidence" &
+  listMat$Early.Infantile == "Yes"] <- 1
+listMat$Epilepsy_High_Conf_Late <- 0
+listMat$Epilepsy_High_Conf_Late[
+  listMat$Classification == "High-confidence" &
+  listMat$Early.Infantile == "No"] <- 1
+idx <- match(row.names(metaMat), listMat$Gene)
+for(i in 4:ncol(listMat)){
+  thislist <- listMat[,i][idx]
+  thislist[is.na(thislist)] <- 0
+  metaMat <- cbind(metaMat, thislist)
+  colnames(metaMat)[dim(metaMat)[2]] <- colnames(listMat)[i]
+}
+
+## de novo ID: NEJM + Lancet
+listMat <- read.table("../source/Gene_Lists/geschwindlabshares/Hi-C/traitsenrichment/data/Lists/ID_denovo_deLigt_NEJM.txt", header=T, sep="\t", fill=T)
+nejmmat = listMat[listMat$nature_of_mutation=="D",1]
+listMat <- read.table("../source/Gene_Lists/geschwindlabshares/Hi-C/traitsenrichment/data/Lists/ID_denovo_Rauch_Lancet.txt", header=T, sep="\t", fill=T)
+lancetmat = listMat[listMat$Type %in% c("frameshift", "nonsense", "splice"),1]
+thislist = unique(c(lancetmat, nejmmat))
+listname <- "DeNovoLGDsInID"
+metaMat <- cbind(metaMat,rep(NA,nrow(metaMat)))
+colnames(metaMat)[ncol(metaMat)] <- listname
+matchlist <- match(rownames(metaMat), thislist)
+metaMat[!is.na(matchlist), listname] <- 1
+metaMat[is.na(matchlist), listname] <- 0
+
+## Biological Processes Gene lists from Luis (subset to ID)
+Add_Gene_List_To_Binary_Matrix <- function(
+  gene_binary_M, gene_list, gene_list_name){
+  binary_gene_list <- as.numeric(rownames(gene_binary_M) %in% gene_list)
+  gene_binary_M <- cbind(gene_binary_M, binary_gene_list)
+  colnames(gene_binary_M)[dim(gene_binary_M)[2]] <- gene_list_name
+  return(gene_binary_M)
+}
+Add_Gene_Lists_To_Binary_Matrix <- function(gene_binary_M, gene_lists_LL){
+  for(i in 1:length(gene_lists_LL)){
+    gene_binary_M <- Add_Gene_List_To_Binary_Matrix(
+      gene_binary_M = gene_binary_M
+      , gene_list = gene_lists_LL[[i]]
+      , gene_list_name = names(gene_lists_LL)[i]
+    )
+  }
+  return(gene_binary_M)
+}
+ORAgenelist <- read.csv("../source/Gene_Lists/geschwindlabshares/Hi-C/traitsenrichment/data/Lists/GO_ORAGeneLists.csv", fill=T, header=T)
+cluster_genes_LL <- split(
+  ORAgenelist$hgnc_symbol
+  , f = ORAgenelist$Category
+)
+cluster_genes_LL <- cluster_genes_LL[
+  names(cluster_genes_LL) %in% c("ID.All", "ID.only")]
+metaMat <- Add_Gene_Lists_To_Binary_Matrix(
+  metaMat, gene_lists_LL = cluster_genes_LL
+)
+
 ############
 #Allen Human-Macaque-Specific Gene Expression Trajectories
 ############
 
-inputdir = "../source/metaMat/Gene_Lists/geschwindlabshares/atacseq/Enrichment_Lists/Bakken-AllenMacaque-Nature/";
+inputdir = "../source/Gene_Lists/geschwindlabshares/atacseq/Enrichment_Lists/Bakken-AllenMacaque-Nature/";
 files = dir(inputdir)
 category = c("Primate-specific","Conserved","Human-specific","Rhesus-specific", "Not Conserved");
 
@@ -123,9 +338,13 @@ for(i in 1:length(files)){
   }
 }
 
+################################################
+## Regulatory region datasets
+################################################
+
 ## Luis ATAC enhancers
 # All enhancers
-listMat <- read.csv("../source/metaMat/Gene_Lists/TorreUbieta_2018_TS2.csv"
+listMat <- read.csv("../source/Gene_Lists/TorreUbieta_2018_TS2.csv"
   , header = TRUE)
 thisgene = unique(listMat$hgnc_symbol)
 matchlist = match(rownames(metaMat), thisgene)
@@ -133,7 +352,7 @@ matchlist = ifelse(is.na(matchlist),0,1)
 metaMat = cbind(metaMat, matchlist)
 colnames(metaMat)[ncol(metaMat)] <- "ATAC_enhancers"
 # Enhancers CP>GZ
-listMat <- read.csv("../source/metaMat/Gene_Lists/TorreUbieta_2018_TS2.csv"
+listMat <- read.csv("../source/Gene_Lists/TorreUbieta_2018_TS2.csv"
   , header = TRUE)
 listMat <- listMat[listMat$log2FoldChange < 0 & listMat$padj.diffacc < 0.05, ]
 thisgene = unique(listMat$hgnc_symbol)
@@ -142,7 +361,7 @@ matchlist = ifelse(is.na(matchlist),0,1)
 metaMat = cbind(metaMat, matchlist)
 colnames(metaMat)[ncol(metaMat)] <- "ATAC_enhancers_CP"
 # Enhancers GZ>CP
-listMat <- read.csv("../source/metaMat/Gene_Lists/TorreUbieta_2018_TS2.csv"
+listMat <- read.csv("../source/Gene_Lists/TorreUbieta_2018_TS2.csv"
   , header = TRUE)
 listMat <- listMat[listMat$log2FoldChange > 0 & listMat$padj.diffacc < 0.05, ]
 thisgene = unique(listMat$hgnc_symbol)
@@ -153,7 +372,7 @@ colnames(metaMat)[ncol(metaMat)] <- "ATAC_enhancers_GZ"
 
 ## Human gained enhancers
 # All enhancers
-listMat <- read.csv("../source/metaMat/Gene_Lists/HGEs_Genes.csv"
+listMat <- read.csv("../source/Gene_Lists/HGEs_Genes.csv"
   , header = TRUE)
 thisgene = unique(listMat$HGNC)
 matchlist = match(rownames(metaMat), thisgene)
@@ -161,7 +380,7 @@ matchlist = ifelse(is.na(matchlist),0,1)
 metaMat = cbind(metaMat, matchlist)
 colnames(metaMat)[ncol(metaMat)] <- "Human_Gained_Enhancers"
 # Enhancers CP>GZ
-listMat <- read.csv("../source/metaMat/Gene_Lists/HGEs_Genes.csv"
+listMat <- read.csv("../source/Gene_Lists/HGEs_Genes.csv"
   , header = TRUE)
 listMat <- listMat[listMat$GZ.or.CP == "CP>GZ", ]
 thisgene = unique(listMat$HGNC)
@@ -170,7 +389,7 @@ matchlist = ifelse(is.na(matchlist),0,1)
 metaMat = cbind(metaMat, matchlist)
 colnames(metaMat)[ncol(metaMat)] <- "Human_Gained_Enhancers_CP"
 # Enhancers GZ>CP
-listMat <- read.csv("../source/metaMat/Gene_Lists/HGEs_Genes.csv"
+listMat <- read.csv("../source/Gene_Lists/HGEs_Genes.csv"
   , header = TRUE)
 listMat <- listMat[listMat$GZ.or.CP == "GZ>CP", ]
 thisgene = unique(listMat$HGNC)
@@ -179,8 +398,12 @@ matchlist = ifelse(is.na(matchlist),0,1)
 metaMat = cbind(metaMat, matchlist)
 colnames(metaMat)[ncol(metaMat)] <- "Human_Gained_Enhancers_GZ"
 
-## Drop-seq Seurat cluster marker genes
-Load_Dropseq <- function (inDropseq, alignmentName) {
+################################################
+## Fetal drop-seq
+################################################
+
+## Drop-seq Seurat cluster enriched genes
+Load_Dropseq <- function(inDropseq, alignmentName) {
   ds2DF <- read.table(inDropseq, header = TRUE)
   ds2L <- split(ds2DF$Gene, f = ds2DF$Cluster)
   for(i in 1:length(ds2L)){
@@ -219,8 +442,8 @@ table(as.numeric(data.matrix(metaMat))) ## Confirm all values are 1s and 0s
 enrichOR <- enrichP <- matrix(NA,nrow=ncol(metaMat),ncol=ncol(metaMat))
 colnames(enrichOR) <- colnames(enrichP) <- rownames(enrichOR) <- rownames(enrichP) <- colnames(metaMat)
 
-for (i in 31:44) { ## Query Lists; Loop through columns of the data
-  for (j in 2:30) { ## Biology/Interpretation Lists
+for (i in 2:ncol(metaMat)) { ## Query Lists; Loop through columns of the data
+  for (j in 2:ncol(metaMat)) { ## Biology/Interpretation Lists
     if (!is.na(match(j,dnvcols))) { ## if using de novo gene sets, use exome length
       thiscovar <- exomeLength
       print(paste(colnames(metaMat)[i],"vs",colnames(metaMat)[j]))
@@ -253,7 +476,9 @@ for (i in 31:44) { ## Query Lists; Loop through columns of the data
 
 ## Save the output in case you don't want to run all of the above again
 dir.create("../analysis/analyzed_data/MetaMat", recursive = TRUE)
-save(enrichP, enrichOR, metaMat, file="../analysis/analyzed_data/MetaMat/MetaMat.Rdata")
+save(enrichP, enrichOR, metaMat
+  , file="../analysis/analyzed_data/MetaMat/MetaMat.Rdata"
+)
 # load("../analysis/analyzed_data/MetaMat/MetaMat.Rdata")
 
 Pmat <- enrichP
@@ -630,74 +855,6 @@ interpretation_list_cols = c(31:47)
 # Target Lists
 target_list_cols = c(25:27)
 
-Subset_OR_And_Log2_Odds_Ratio_Matrix <- function(
-  target_list_cols, interpretation_list_cols, ORmat){
-  print("Subset_OR_And_Log2_Odds_Ratio_Matrix")
-  subORmat <- ORmat[target_list_cols, interpretation_list_cols]
-  # Tranform to log2 odds ratio
-  dispMat <- log2(exp(subORmat))
-  rownames(dispMat) <- rownames(subORmat)
-  return(dispMat)
-}
-
-Subset_OR_Pval_And_FDR_Correct_Matrix <- function(
-  target_list_cols, interpretation_list_cols, Pmat){
-  print("Subset_OR_Pval_And_FDR_Correct_Matrix")
-  subPmat <- Pmat[target_list_cols, interpretation_list_cols]
-  # FDR correction
-  # Correcting for all columns and rows
-  subPmat <- p.adjust(subPmat, method="BH")
-  return(subPmat)
-}
-
-Format_OR_Pval_Matrices_For_Barplot <- function(
-  dispMat, subPmat, cluster_order){
-  print("Format_OR_Pval_Matrices_For_Barplot")
-  # Order clusters
-  new_cluster_order <- cluster_order
-  gg_DF <- melt(dispMat)
-  gg_DF$Cluster <- gsub("DS2-11 ", "", gg_DF$Var2)
-  gg_DF$Cluster <- factor(gg_DF$Cluster, levels = c(0:15))
-  gg_DF$Cluster2 <- factor(gg_DF$Cluster, levels = new_cluster_order)
-  # Add p-values
-  gg_DF$Pvalue_FDR <- subPmat
-  pvals_DF <- melt(Pmat[target_list_cols, interpretation_list_cols, drop=FALSE])
-  pvals_DF$Index <- paste0(pvals_DF$Var1, "_", pvals_DF$Var2)
-  gg_DF$Index <- paste0(gg_DF$Var1, "_", gg_DF$Var2)
-  idx <- match(gg_DF$Index, pvals_DF$Index)
-  gg_DF$Pvalue <- pvals_DF$value[idx]
-  # Remove clusters not in list
-  gg_DF <- gg_DF[gg_DF$Cluster %in% cluster_order, ]
-  # Label for coloring bars
-  gg_DF <- gg_DF[order(gg_DF$Cluster2), ]
-  class_cluster_idx <- c(
-    "Radial glia" = 7
-    , "Radial glia" = 9
-    , "Cycling progenitor" = 8
-    , "Cycling progenitor" = 10
-    , "Intermediate progenitor" = 2
-    , "Excitatory Neuron" = 0
-    , "Excitatory Neuron" = 1
-    , "Excitatory Neuron" = 4
-    , "Excitatory Neuron" = 3
-    , "Excitatory Neuron" = 13
-    , "Interneuron" = 5
-    , "Interneuron" = 6
-    , "Oligodendrocyte precursor" = 11
-    , "Endothelial" = 12
-    , "Pericyte" = 14
-    , "Microglia" = 15
-  )
-  gg_DF$Class <- names(class_cluster_idx)[match(gg_DF$Cluster, class_cluster_idx)]
-  gg_DF$Class <- factor(gg_DF$Class
-    , levels = c("Radial glia", "Cycling progenitor", "Intermediate progenitor"
-      , "Excitatory Neuron", "Interneuron", "Oligodendrocyte precursor"
-      , "Endothelial", "Pericyte", "Microglia")
-  )
-  # Remove NAs
-  gg_DF <- gg_DF[! is.na(gg_DF$Cluster), ]
-}
-
 # Set ggplot2 theme
 theme_set(theme_bw())
 theme_set(theme_get() + theme(text = element_text(size = 12)))
@@ -729,7 +886,7 @@ ggplot(gg_DF, aes(x = Cluster2, y = -log(Pvalue, 10), fill = Class)) +
   ylab("-Log10 p-value") +
   xlab("Reordered clusters") +
   ggplot_set_theme_publication
-ggsave("../analysis/graphs/MetaMat/MetaMat_HumanGainedEnhancers_BarPlot_ReorderClusters.png"
+ggsave("../analysis/graphs/MetaMat/MetaMat_ATACenhancers_BarPlot_ReorderClusters.png"
   , width = 10, height = 4)
 
 
@@ -748,7 +905,6 @@ subPmat <- Subset_OR_Pval_And_FDR_Correct_Matrix(
 gg_DF <- Format_OR_Pval_Matrices_For_Barplot(
   dispMat, subPmat, cluster_order = c(9,7,8,10,2,0,1,4,3,13,5,6,11,12,14,15)
 )
-
 ggplot(gg_DF, aes(x = Cluster2, y = -log(Pvalue, 10), fill = Class)) +
   facet_wrap(~Var1) +
   geom_bar(stat = "identity", position = position_dodge()) +
@@ -763,4 +919,173 @@ ggplot(gg_DF, aes(x = Cluster2, y = -log(Pvalue, 10), fill = Class)) +
   ggplot_set_theme_publication
 ggsave("../analysis/graphs/MetaMat/MetaMat_HumanGainedEnhancers_BarPlot_ReorderClusters.png"
   , width = 10, height = 4)
+
+# Interpretation Lists
+interpretation_list_cols = c(18:39)
+# Target Lists
+target_list_cols = c(50:52)
+dispMat <- Subset_OR_And_Log2_Odds_Ratio_Matrix(
+  target_list_cols, interpretation_list_cols, ORmat
+)
+subPmat <- Subset_OR_Pval_And_FDR_Correct_Matrix(
+  target_list_cols, interpretation_list_cols, Pmat
+)
+gg_DF <- melt(dispMat)
+gg_DF$Cluster <- gg_DF$Var2
+# Add p-values
+gg_DF$Pvalue_FDR <- subPmat
+pvals_DF <- melt(Pmat[target_list_cols, interpretation_list_cols, drop=FALSE])
+pvals_DF$Index <- paste0(pvals_DF$Var1, "_", pvals_DF$Var2)
+gg_DF$Index <- paste0(gg_DF$Var1, "_", gg_DF$Var2)
+idx <- match(gg_DF$Index, pvals_DF$Index)
+gg_DF$Pvalue <- pvals_DF$value[idx]
+ggplot(gg_DF, aes(x = Cluster, y = -log(Pvalue, 10), fill = Cluster)) +
+  facet_wrap(~Var1) +
+  geom_bar(stat = "identity", position = position_dodge()) +
+  # scale_fill_brewer(type = "qual", palette = "Set3", direction = 1) +
+  geom_text(aes(x = Cluster, y = -log(Pvalue, 10), label = round(value, 1))
+    , position = position_dodge(width = 1), hjust = -0.3, color = "black"
+    , angle = 90, size = 3) +
+  # ylim(0,15) +
+  geom_hline(yintercept = -log(0.05, 10), color = "red") +
+  ylab("-Log10 p-value") +
+  xlab("Reordered clusters") +
+  ggplot_set_theme_publication +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
+ggsave("../analysis/graphs/MetaMat/MetaMat_HumanGainedEnhancers_Nowakowski_BarPlot_ReorderClusters.png"
+  , width = 13, height = 6)
+
+
+## Nowakowski
+
+# Interpretation Lists
+interpretation_list_cols = c(18:39)
+# Target Lists
+target_list_cols = c(53:69)
+dispMat <- Subset_OR_And_Log2_Odds_Ratio_Matrix(
+  target_list_cols, interpretation_list_cols, ORmat
+)
+subPmat <- Subset_OR_Pval_And_FDR_Correct_Matrix(
+  target_list_cols, interpretation_list_cols, Pmat
+)
+gg_DF <- melt(dispMat)
+gg_DF$Cluster <- gg_DF$Var2
+# Add p-values
+gg_DF$Pvalue_FDR <- subPmat
+pvals_DF <- melt(Pmat[target_list_cols, interpretation_list_cols, drop=FALSE])
+pvals_DF$Index <- paste0(pvals_DF$Var1, "_", pvals_DF$Var2)
+gg_DF$Index <- paste0(gg_DF$Var1, "_", gg_DF$Var2)
+idx <- match(gg_DF$Index, pvals_DF$Index)
+gg_DF$Pvalue <- pvals_DF$value[idx]
+# Make 0 p-values smallest possible value for log transform
+gg_DF$Pvalue[gg_DF$Pvalue == 0] <- 1.333258e-300
+gg_DF$Var1 <- gsub("DS2-11 ", "", gg_DF$Var1)
+gg_DF$Var1 <- factor(gg_DF$Var1
+  , levels = c(9,7,8,10,2,0,1,4,3,13,5,6,11,12,14,15))
+ggplot(gg_DF, aes(x = Var1, y = Var2, fill = -log(Pvalue, 10))) +
+  geom_tile(color = "white") +
+  scale_fill_gradient(low = "white", high = "red", space = "Lab", name = "-log10 p-value") +
+  geom_text(aes(x = Var1, y = Var2, label = signif(value, 2))
+    , color = "black", size = 3) +
+  ylab("Nowakowski et al. 2017") +
+  xlab("Drop-seq") +
+  ggplot_set_theme_publication
+ggsave("../analysis/graphs/MetaMat/MetaMat_Nowakowski_Heatmap.png"
+  , width = 9, height = 7)
+################################################################################
+
+### Epilepsy
+
+# Interpretation Lists
+interpretation_list_cols = c(60:76)
+# Target Lists
+target_list_cols = c(47:50)
+dispMat <- Subset_OR_And_Log2_Odds_Ratio_Matrix(
+  target_list_cols, interpretation_list_cols, ORmat
+)
+subPmat <- Subset_OR_Pval_And_FDR_Correct_Matrix(
+  target_list_cols, interpretation_list_cols, Pmat
+)
+gg_DF <- Format_OR_Pval_Matrices_For_Barplot(
+  dispMat, subPmat, cluster_order = c(9,7,8,10,2,0,1,4,3,13,5,6,11,12,14,15)
+)
+ggplot(gg_DF, aes(x = Cluster2, y = -log(Pvalue, 10), fill = Class)) +
+  facet_wrap(~Var1, scales = "free_x") +
+  geom_bar(stat = "identity", position = position_dodge()) +
+  scale_fill_brewer(type = "qual", palette = "Set3", direction = 1) +
+  geom_text(aes(x = Cluster2, y = -log(Pvalue, 10), label = round(value, 1))
+    , position = position_dodge(width = 1), hjust = -0.3, color = "black"
+    , angle = 90, size = 3) +
+  # ylim(0,15) +
+  geom_hline(yintercept = -log(0.05, 10), color = "red") +
+  ylab("-Log10 p-value") +
+  xlab("Reordered clusters") +
+  ggplot_set_theme_publication
+ggsave("../analysis/graphs/MetaMat/MetaMat_Epilepsy_BarPlot_ReorderClusters.png"
+  , width = 10, height = 8)
+ggsave("../analysis/graphs/MetaMat/MetaMat_Epilepsy_BarPlot_ReorderClusters.pdf"
+  , width = 10, height = 8)
+
+# For paper
+# Interpretation Lists
+interpretation_list_cols = c(60:76)
+# Target Lists
+target_list_cols = c(48:50)
+dispMat <- Subset_OR_And_Log2_Odds_Ratio_Matrix(
+  target_list_cols, interpretation_list_cols, ORmat
+)
+subPmat <- Subset_OR_Pval_And_FDR_Correct_Matrix(
+  target_list_cols, interpretation_list_cols, Pmat
+)
+gg_DF <- Format_OR_Pval_Matrices_For_Barplot(
+  dispMat, subPmat, cluster_order = c(9,7,8,10,2,0,1,4,3,13,5,6,11,12,14,15)
+)
+ggplot(gg_DF, aes(x = Cluster2, y = -log(Pvalue, 10), fill = Class)) +
+  facet_wrap(~Var1, scales = "free_x") +
+  geom_bar(stat = "identity", position = position_dodge()) +
+  scale_fill_brewer(type = "qual", palette = "Set3", direction = 1) +
+  geom_text(aes(x = Cluster2, y = -log(Pvalue, 10), label = round(value, 1))
+    , position = position_dodge(width = 1), hjust = -0.3, color = "black"
+    , angle = 90, size = 3) +
+  # ylim(0,15) +
+  geom_hline(yintercept = -log(0.05, 10), color = "red") +
+  ylab("-Log10 p-value") +
+  xlab("Reordered clusters") +
+  ggplot_set_theme_publication
+ggsave(
+  "../analysis/graphs/MetaMat/MetaMat_Epilepsy_BarPlot_ReorderClusters_paper.pdf"
+  , width = 12, height = 4)
+################################################################################
+
+### ID
+
+# Interpretation Lists
+interpretation_list_cols = c(60:76)
+# Target Lists
+target_list_cols = c(51:53)
+dispMat <- Subset_OR_And_Log2_Odds_Ratio_Matrix(
+  target_list_cols, interpretation_list_cols, ORmat
+)
+subPmat <- Subset_OR_Pval_And_FDR_Correct_Matrix(
+  target_list_cols, interpretation_list_cols, Pmat
+)
+gg_DF <- Format_OR_Pval_Matrices_For_Barplot(
+  dispMat, subPmat, cluster_order = c(9,7,8,10,2,0,1,4,3,13,5,6,11,12,14,15)
+)
+ggplot(gg_DF, aes(x = Cluster2, y = -log(Pvalue, 10), fill = Class)) +
+  facet_wrap(~Var1, scales = "free_x") +
+  geom_bar(stat = "identity", position = position_dodge()) +
+  scale_fill_brewer(type = "qual", palette = "Set3", direction = 1) +
+  geom_text(aes(x = Cluster2, y = -log(Pvalue, 10), label = round(value, 1))
+    , position = position_dodge(width = 1), hjust = -0.3, color = "black"
+    , angle = 90, size = 3) +
+  # ylim(0,15) +
+  geom_hline(yintercept = -log(0.05, 10), color = "red") +
+  ylab("-Log10 p-value") +
+  xlab("Reordered clusters") +
+  ggplot_set_theme_publication
+ggsave("../analysis/graphs/MetaMat/MetaMat_ID_BarPlot_ReorderClusters.png"
+  , width = 10, height = 5)
+ggsave("../analysis/graphs/MetaMat/MetaMat_ID_BarPlot_ReorderClusters.pdf"
+  , width = 10, height = 5)
 ################################################################################
