@@ -18,7 +18,7 @@
 #$ -N vRGoRG
 #$ -o logs/Seurat_Cluster_Cycling_vRGoRG_QSUB_$JOB_ID.log
 #$ -e logs/Seurat_Cluster_Cycling_vRGoRG_QSUB_$JOB_ID.error
-#$ -l h_data=128G,h_rt=24:00:00,highp
+#$ -l h_data=256G,h_rt=24:00:00,highp
 ################################################################################
 echo ""
 echo "Starting Seurat_Cluster_Cycling_vRGoRG_QSUB.sh... "$(date)
@@ -34,7 +34,9 @@ LD_LIBRARY_PATH=/u/local/compilers/gcc/4.9.3/lib:/u/local/compilers/gcc/4.9.3/li
 LIBRARY_PATH=/u/local/compilers/gcc/4.9.3/lib:/u/local/compilers/gcc/4.9.3/lib64:$LIBRARY_PATH
 
 ## Run Seurat_Cluster_Cycling_vRGoRG.R
-${pathRscript} Seurat_Cluster_Cycling_vRGoRG_01.R && ${pathRscript} Seurat_Cluster_Cycling_vRGoRG_Plots.R && ${pathRscript} Seurat_Cluster_Cycling_vRGoRG_02.R
+${pathRscript} Seurat_Cluster_Cycling_vRGoRG_01.R
+
+# ${pathRscript} Seurat_Cluster_Cycling_vRGoRG_01.R && ${pathRscript} Seurat_Cluster_Cycling_vRGoRG_Plots.R && ${pathRscript} Seurat_Cluster_Cycling_vRGoRG_02.R
 ################################################################################
 
 echo ""

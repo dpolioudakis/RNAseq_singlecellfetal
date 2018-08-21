@@ -37,6 +37,9 @@ load("../analysis/analyzed_data/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegN
 # centSO <- ssCentSO; rm(ssCentSO)
 # noCentExM <- ssNoCentExM; rm(ssNoCentExM)
 
+# Cluster enriched genes
+cluster_DE_DF <- read.table("../analysis/tables/Seurat_ClusterDE/DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/res054/Seurat_ClusterDE_ClusterX_Vs_All_Clusters.txt", header = TRUE)
+
 # Cell cycle markers used for phase determination (Tirosh et al. 2016)
 ccGenes <- readLines(con = "../source/regev_lab_cell_cycle_genes.txt")
 # We can segregate this list into markers of G2/M phase and markers of S
@@ -54,9 +57,9 @@ kmDF <- read.csv("../source/MarkersforSingleCell_2017-10-11_Markers.csv", header
 
 ## Variables
 graphCodeTitle <- "Seurat_Cluster_Cycling_vRGoRG_DS2-11.R"
-outGraph <- "../analysis/graphs/Seurat_Cluster_DS2-11_Cycling_vRGoRG/Seurat_Cluster_Cycling_vRGoRG_DS2-11_"
-outTable <- "../analysis/tables/Seurat_Cluster_DS2-11_Cycling_vRGoRG/Seurat_Cluster_Cycling_vRGoRG_DS2-11_"
-outData <- "../analysis/analyzed_data/Seurat_Cluster_DS2-11_Cycling_vRGoRG/Seurat_Cluster_Cycling_vRGoRG_DS2-11_"
+outGraph <- "../analysis/graphs/Seurat_Cluster_DS2-11_Cycling_vRGoRG/20180817/Seurat_Cluster_Cycling_vRGoRG_DS2-11_"
+outTable <- "../analysis/tables/Seurat_Cluster_DS2-11_Cycling_vRGoRG/20180817/Seurat_Cluster_Cycling_vRGoRG_DS2-11_"
+outData <- "../analysis/analyzed_data/Seurat_Cluster_DS2-11_Cycling_vRGoRG/20180817/Seurat_Cluster_Cycling_vRGoRG_DS2-11_"
 
 ## Output Directories
 dir.create(dirname(outGraph), recursive = TRUE)
@@ -138,12 +141,12 @@ de_RG_v_IP_DF <- DE_Clusters_Vs_Clusters(
 )
 # RG vs Migrating Neuron clusters
 de_RG_v_Ne_DF <- DE_Clusters_Vs_Clusters(
-  clusters1 = c(7,9), clusters2 = 0
+  clusters1 = c(7,9), clusters2 = c(0,1)
   , positive_DE_Label = "RG", negative_DE_label = "Neuron"
 )
 # IP vs Migrating Neuron clusters
 de_IP_v_Ne_DF <- DE_Clusters_Vs_Clusters(
-  clusters1 = 2, clusters2 = 0
+  clusters1 = 2, clusters2 = c(0,1)
   , positive_DE_Label = "IP", negative_DE_label = "Neuron"
 )
 
@@ -497,13 +500,13 @@ ME_CellType_RG_to_IP_8 <- function(){
   mk_exp_DF <- Average_MarkersExp_Per_Cell(
     exM = noCentExM, seuratO = centSO)
   cellIDs <- row.names(mk_exp_DF)[
-    mk_exp_DF$RG > 0.5 & mk_exp_DF$Neuron < 0.25 | mk_exp_DF$IP > 0.5 & mk_exp_DF$Neuron < 0.25]
+    mk_exp_DF$RG > 0.5 & mk_exp_DF$Neuron < 0.4 | mk_exp_DF$IP > 0.5 & mk_exp_DF$Neuron < 0.4]
   cellIDs <- intersect(cellIDs, names(centSO@ident)[centSO@ident == 8])
   print(cellIDs)
   me_markerFlag_DF <- Calculate_ME_For_CellTypeDE_Genes(
     cellIDs = cellIDs, deDF = deDF[deDF$Comparison == "RG_vs_IP", ]
     , mk_exp_DF = mk_exp_DF, class1_label = "IP", class2_label = "RG"
-    , foldChange = c(0, 0.25, 0.5)
+    , foldChange = c(0.2, 0.3, 0.4)
   )
   return(me_markerFlag_DF)
 }
@@ -512,12 +515,12 @@ ME_CellType_RG_to_IP_10 <- function(){
   mk_exp_DF <- Average_MarkersExp_Per_Cell(
     exM = noCentExM, seuratO = centSO)
   cellIDs <- row.names(mk_exp_DF)[
-    mk_exp_DF$RG > 0.5 & mk_exp_DF$Neuron < 0.25 | mk_exp_DF$IP > 0.5 & mk_exp_DF$Neuron < 0.25]
+    mk_exp_DF$RG > 0.5 & mk_exp_DF$Neuron < 0.4 | mk_exp_DF$IP > 0.5 & mk_exp_DF$Neuron < 0.4]
   cellIDs <- intersect(cellIDs, names(centSO@ident)[centSO@ident == 10])
   me_markerFlag_DF <- Calculate_ME_For_CellTypeDE_Genes(
     cellIDs = cellIDs, deDF = deDF[deDF$Comparison == "RG_vs_IP", ]
     , mk_exp_DF = mk_exp_DF, class1_label = "IP", class2_label = "RG"
-    , foldChange = c(0, 0.25, 0.5)
+    , foldChange = c(0.2, 0.3, 0.4)
   )
   return(me_markerFlag_DF)
 }
@@ -526,12 +529,12 @@ ME_CellType_RG_to_Neuron_08 <- function(){
   mk_exp_DF <- Average_MarkersExp_Per_Cell(
     exM = noCentExM, seuratO = centSO)
   cellIDs <- row.names(mk_exp_DF)[
-    mk_exp_DF$RG > 0.5 & mk_exp_DF$IP < 0.25 | mk_exp_DF$Neuron > 0.5 & mk_exp_DF$IP < 0.25]
+    mk_exp_DF$RG > 0.5 & mk_exp_DF$IP < 0.4 | mk_exp_DF$Neuron > 0.5 & mk_exp_DF$IP < 0.4]
   cellIDs <- intersect(cellIDs, names(centSO@ident)[centSO@ident == c(0,8)])
   me_markerFlag_DF <- Calculate_ME_For_CellTypeDE_Genes(
     cellIDs = cellIDs, deDF = deDF[deDF$Comparison == "RG_vs_Neuron", ]
     , mk_exp_DF = mk_exp_DF, class1_label = "Neuron", class2_label = "RG"
-    , foldChange = c(0, 0.25, 0.5)
+    , foldChange = c(0.2, 0.3, 0.4)
   )
   return(me_markerFlag_DF)
 }
@@ -540,12 +543,12 @@ ME_CellType_RG_to_Neuron_010 <- function(){
   mk_exp_DF <- Average_MarkersExp_Per_Cell(
     exM = noCentExM, seuratO = centSO)
   cellIDs <- row.names(mk_exp_DF)[
-    mk_exp_DF$RG > 0.5 & mk_exp_DF$IP < 0.25 | mk_exp_DF$Neuron > 0.5 & mk_exp_DF$IP < 0.25]
+    mk_exp_DF$RG > 0.5 & mk_exp_DF$IP < 0.4 | mk_exp_DF$Neuron > 0.5 & mk_exp_DF$IP < 0.4]
   cellIDs <- intersect(cellIDs, names(centSO@ident)[centSO@ident == c(0,10)])
   me_markerFlag_DF <- Calculate_ME_For_CellTypeDE_Genes(
     cellIDs = cellIDs, deDF = deDF[deDF$Comparison == "RG_vs_Neuron", ]
     , mk_exp_DF = mk_exp_DF
-    , class1_label = "Neuron", class2_label = "RG", foldChange = c(0, 0.25, 0.5)
+    , class1_label = "Neuron", class2_label = "RG", foldChange = c(0.2, 0.3, 0.4)
   )
   return(me_markerFlag_DF)
 }
@@ -555,12 +558,12 @@ ME_CellType_IP_to_Neuron_08 <- function(){
   mk_exp_DF <- Average_MarkersExp_Per_Cell(
     exM = noCentExM, seuratO = centSO)
   cellIDs <- row.names(mk_exp_DF)[
-    mk_exp_DF$IP > 0.5 & mk_exp_DF$RG < 0.25 | mk_exp_DF$Neuron > 0.5 & mk_exp_DF$RG < 0.25]
+    mk_exp_DF$IP > 0.5 & mk_exp_DF$RG < 0.4 | mk_exp_DF$Neuron > 0.5 & mk_exp_DF$RG < 0.4]
   cellIDs <- intersect(cellIDs, names(centSO@ident)[centSO@ident == c(0,8)])
   me_markerFlag_DF <- Calculate_ME_For_CellTypeDE_Genes(
     cellIDs = cellIDs, deDF = deDF[deDF$Comparison == "IP_vs_Neuron", ]
     , mk_exp_DF = mk_exp_DF
-    , class1_label = "Neuron", class2_label = "IP", foldChange = c(0, 0.25, 0.5)
+    , class1_label = "Neuron", class2_label = "IP", foldChange = c(0.2, 0.3, 0.4)
   )
   return(me_markerFlag_DF)
 }
@@ -569,12 +572,12 @@ ME_CellType_IP_to_Neuron_010 <- function(){
   mk_exp_DF <- Average_MarkersExp_Per_Cell(
     exM = noCentExM, seuratO = centSO)
   cellIDs <- row.names(mk_exp_DF)[
-    mk_exp_DF$IP > 0.5 & mk_exp_DF$RG < 0.25 | mk_exp_DF$Neuron > 0.5 & mk_exp_DF$RG < 0.25]
+    mk_exp_DF$IP > 0.5 & mk_exp_DF$RG < 0.4 | mk_exp_DF$Neuron > 0.5 & mk_exp_DF$RG < 0.4]
   cellIDs <- intersect(cellIDs, names(centSO@ident)[centSO@ident == c(0,10)])
   me_markerFlag_DF <- Calculate_ME_For_CellTypeDE_Genes(
     cellIDs = cellIDs, deDF = deDF[deDF$Comparison == "IP_vs_Neuron", ]
     , mk_exp_DF = mk_exp_DF
-    , class1_label = "Neuron", class2_label = "IP", foldChange = c(0, 0.25, 0.5)
+    , class1_label = "Neuron", class2_label = "IP", foldChange = c(0.2, 0.3, 0.4)
   )
   return(me_markerFlag_DF)
 }
@@ -679,14 +682,14 @@ ME_CellTypeEnrichedRG_RG_to_IP_8 <- function(){
   mk_exp_DF <- Average_MarkersExp_Per_Cell(
     exM = noCentExM, seuratO = centSO)
   cellIDs <- row.names(mk_exp_DF)[
-    mk_exp_DF$RG > 0.5 & mk_exp_DF$Neuron < 0.25 | mk_exp_DF$IP > 0.5 & mk_exp_DF$Neuron < 0.25]
+    mk_exp_DF$RG > 0.5 & mk_exp_DF$Neuron < 0.4 | mk_exp_DF$IP > 0.5 & mk_exp_DF$Neuron < 0.4]
   cellIDs <- intersect(cellIDs, names(centSO@ident)[centSO@ident == 8])
   me_markerFlag_DF <- Calculate_ME_For_CellTypeEnriched_Genes(
     cellIDs = cellIDs
     , mk_exp_DF = mk_exp_DF
     , seurat_clusters = c(7,9)
     , class_label = "RG"
-    , foldChange = c(0.2, 0.4, 0.5)
+    , foldChange = c(0.2, 0.3, 0.4)
   )
   return(me_markerFlag_DF)
 }
@@ -695,14 +698,14 @@ ME_CellTypeEnrichedIP_RG_to_IP_8 <- function(){
   mk_exp_DF <- Average_MarkersExp_Per_Cell(
     exM = noCentExM, seuratO = centSO)
   cellIDs <- row.names(mk_exp_DF)[
-    mk_exp_DF$RG > 0.5 & mk_exp_DF$Neuron < 0.25 | mk_exp_DF$IP > 0.5 & mk_exp_DF$Neuron < 0.25]
+    mk_exp_DF$RG > 0.5 & mk_exp_DF$Neuron < 0.4 | mk_exp_DF$IP > 0.5 & mk_exp_DF$Neuron < 0.4]
   cellIDs <- intersect(cellIDs, names(centSO@ident)[centSO@ident == 8])
   me_markerFlag_DF <- Calculate_ME_For_CellTypeEnriched_Genes(
     cellIDs = cellIDs
     , mk_exp_DF = mk_exp_DF
     , seurat_clusters = 2
     , class_label = "IP"
-    , foldChange = c(0.2, 0.4, 0.5)
+    , foldChange = c(0.2, 0.3, 0.4)
   )
   return(me_markerFlag_DF)
 }
@@ -711,14 +714,14 @@ ME_CellTypeEnrichedRG_RG_to_IP_10 <- function(){
   mk_exp_DF <- Average_MarkersExp_Per_Cell(
     exM = noCentExM, seuratO = centSO)
   cellIDs <- row.names(mk_exp_DF)[
-    mk_exp_DF$RG > 0.5 & mk_exp_DF$Neuron < 0.25 | mk_exp_DF$IP > 0.5 & mk_exp_DF$Neuron < 0.25]
+    mk_exp_DF$RG > 0.5 & mk_exp_DF$Neuron < 0.4 | mk_exp_DF$IP > 0.5 & mk_exp_DF$Neuron < 0.4]
   cellIDs <- intersect(cellIDs, names(centSO@ident)[centSO@ident == 10])
   me_markerFlag_DF <- Calculate_ME_For_CellTypeEnriched_Genes(
     cellIDs = cellIDs
     , mk_exp_DF = mk_exp_DF
     , seurat_clusters = c(7,9)
     , class_label = "RG"
-    , foldChange = c(0.2, 0.4, 0.5)
+    , foldChange = c(0.2, 0.3, 0.4)
   )
   return(me_markerFlag_DF)
 }
@@ -727,14 +730,14 @@ ME_CellTypeEnrichedIP_RG_to_IP_10 <- function(){
   mk_exp_DF <- Average_MarkersExp_Per_Cell(
     exM = noCentExM, seuratO = centSO)
   cellIDs <- row.names(mk_exp_DF)[
-    mk_exp_DF$RG > 0.5 & mk_exp_DF$Neuron < 0.25 | mk_exp_DF$IP > 0.5 & mk_exp_DF$Neuron < 0.25]
+    mk_exp_DF$RG > 0.5 & mk_exp_DF$Neuron < 0.4 | mk_exp_DF$IP > 0.5 & mk_exp_DF$Neuron < 0.4]
   cellIDs <- intersect(cellIDs, names(centSO@ident)[centSO@ident == 10])
   me_markerFlag_DF <- Calculate_ME_For_CellTypeEnriched_Genes(
     cellIDs = cellIDs
     , mk_exp_DF = mk_exp_DF
     , seurat_clusters = 2
     , class_label = "IP"
-    , foldChange = c(0.2, 0.4, 0.5)
+    , foldChange = c(0.2, 0.3, 0.4)
   )
   return(me_markerFlag_DF)
 }
@@ -743,14 +746,14 @@ ME_CellTypeEnrichedRG_RG_to_Neuron_08 <- function(){
   mk_exp_DF <- Average_MarkersExp_Per_Cell(
     exM = noCentExM, seuratO = centSO)
   cellIDs <- row.names(mk_exp_DF)[
-    mk_exp_DF$RG > 0.5 & mk_exp_DF$IP < 0.25 | mk_exp_DF$Neuron > 0.5 & mk_exp_DF$IP < 0.25]
-  cellIDs <- intersect(cellIDs, names(centSO@ident)[centSO@ident == 8])
+    mk_exp_DF$RG > 0.5 & mk_exp_DF$IP < 0.4 | mk_exp_DF$Neuron > 0.5 & mk_exp_DF$IP < 0.4]
+  cellIDs <- intersect(cellIDs, names(centSO@ident)[centSO@ident %in% c(0,8)])
   me_markerFlag_DF <- Calculate_ME_For_CellTypeEnriched_Genes(
     cellIDs = cellIDs
     , mk_exp_DF = mk_exp_DF
     , seurat_clusters = c(7,9)
     , class_label = "RG"
-    , foldChange = c(0.2, 0.4, 0.5)
+    , foldChange = c(0.2, 0.3, 0.4)
   )
   return(me_markerFlag_DF)
 }
@@ -759,14 +762,14 @@ ME_CellTypeEnrichedNeuron_RG_to_Neuron_08 <- function(){
   mk_exp_DF <- Average_MarkersExp_Per_Cell(
     exM = noCentExM, seuratO = centSO)
   cellIDs <- row.names(mk_exp_DF)[
-    mk_exp_DF$RG > 0.5 & mk_exp_DF$IP < 0.25 | mk_exp_DF$Neuron > 0.5 & mk_exp_DF$IP < 0.25]
-  cellIDs <- intersect(cellIDs, names(centSO@ident)[centSO@ident == 8])
+    mk_exp_DF$RG > 0.5 & mk_exp_DF$IP < 0.4 | mk_exp_DF$Neuron > 0.5 & mk_exp_DF$IP < 0.4]
+  cellIDs <- intersect(cellIDs, names(centSO@ident)[centSO@ident %in% c(0,8)])
   me_markerFlag_DF <- Calculate_ME_For_CellTypeEnriched_Genes(
     cellIDs = cellIDs
     , mk_exp_DF = mk_exp_DF
     , seurat_clusters = 0
     , class_label = "Neuron"
-    , foldChange = c(0.2, 0.4, 0.5)
+    , foldChange = c(0.2, 0.3, 0.4)
   )
   return(me_markerFlag_DF)
 }
@@ -775,14 +778,14 @@ ME_CellTypeEnrichedRG_RG_to_Neuron_010 <- function(){
   mk_exp_DF <- Average_MarkersExp_Per_Cell(
     exM = noCentExM, seuratO = centSO)
   cellIDs <- row.names(mk_exp_DF)[
-    mk_exp_DF$RG > 0.5 & mk_exp_DF$IP < 0.25 | mk_exp_DF$Neuron > 0.5 & mk_exp_DF$IP < 0.25]
-  cellIDs <- intersect(cellIDs, names(centSO@ident)[centSO@ident == 10])
+    mk_exp_DF$RG > 0.5 & mk_exp_DF$IP < 0.4 | mk_exp_DF$Neuron > 0.5 & mk_exp_DF$IP < 0.4]
+  cellIDs <- intersect(cellIDs, names(centSO@ident)[centSO@ident %in% c(0,10)])
   me_markerFlag_DF <- Calculate_ME_For_CellTypeEnriched_Genes(
     cellIDs = cellIDs
     , mk_exp_DF = mk_exp_DF
     , seurat_clusters = c(7,9)
     , class_label = "RG"
-    , foldChange = c(0.2, 0.4, 0.5)
+    , foldChange = c(0.2, 0.3, 0.4)
   )
   return(me_markerFlag_DF)
 }
@@ -791,14 +794,14 @@ ME_CellTypeEnrichedNeuron_RG_to_Neuron_010 <- function(){
   mk_exp_DF <- Average_MarkersExp_Per_Cell(
     exM = noCentExM, seuratO = centSO)
   cellIDs <- row.names(mk_exp_DF)[
-    mk_exp_DF$RG > 0.5 & mk_exp_DF$IP < 0.25 | mk_exp_DF$Neuron > 0.5 & mk_exp_DF$IP < 0.25]
-  cellIDs <- intersect(cellIDs, names(centSO@ident)[centSO@ident == 10])
+    mk_exp_DF$RG > 0.5 & mk_exp_DF$IP < 0.4 | mk_exp_DF$Neuron > 0.5 & mk_exp_DF$IP < 0.4]
+  cellIDs <- intersect(cellIDs, names(centSO@ident)[centSO@ident %in% c(0,10)])
   me_markerFlag_DF <- Calculate_ME_For_CellTypeEnriched_Genes(
     cellIDs = cellIDs
     , mk_exp_DF = mk_exp_DF
     , seurat_clusters = 0
     , class_label = "Neuron"
-    , foldChange = c(0.2, 0.4, 0.5)
+    , foldChange = c(0.2, 0.3, 0.4)
   )
   return(me_markerFlag_DF)
 }
@@ -807,14 +810,14 @@ ME_CellTypeEnrichedIP_IP_to_Neuron_08 <- function(){
   mk_exp_DF <- Average_MarkersExp_Per_Cell(
     exM = noCentExM, seuratO = centSO)
   cellIDs <- row.names(mk_exp_DF)[
-    mk_exp_DF$IP > 0.5 & mk_exp_DF$RG < 0.25 | mk_exp_DF$Neuron > 0.5 & mk_exp_DF$RG < 0.25]
-  cellIDs <- intersect(cellIDs, names(centSO@ident)[centSO@ident == 8])
+    mk_exp_DF$IP > 0.5 & mk_exp_DF$RG < 0.4 | mk_exp_DF$Neuron > 0.5 & mk_exp_DF$RG < 0.4]
+  cellIDs <- intersect(cellIDs, names(centSO@ident)[centSO@ident %in% c(0,8)])
   me_markerFlag_DF <- Calculate_ME_For_CellTypeEnriched_Genes(
     cellIDs = cellIDs
     , mk_exp_DF = mk_exp_DF
     , seurat_clusters = 2
     , class_label = "IP"
-    , foldChange = c(0.2, 0.4, 0.5)
+    , foldChange = c(0.2, 0.3, 0.4)
   )
   return(me_markerFlag_DF)
 }
@@ -823,14 +826,14 @@ ME_CellTypeEnrichedNeuron_IP_to_Neuron_08 <- function(){
   mk_exp_DF <- Average_MarkersExp_Per_Cell(
     exM = noCentExM, seuratO = centSO)
   cellIDs <- row.names(mk_exp_DF)[
-    mk_exp_DF$IP > 0.5 & mk_exp_DF$RG < 0.25 | mk_exp_DF$Neuron > 0.5 & mk_exp_DF$RG < 0.25]
-  cellIDs <- intersect(cellIDs, names(centSO@ident)[centSO@ident == 8])
+    mk_exp_DF$IP > 0.5 & mk_exp_DF$RG < 0.4 | mk_exp_DF$Neuron > 0.5 & mk_exp_DF$RG < 0.4]
+  cellIDs <- intersect(cellIDs, names(centSO@ident)[centSO@ident %in% c(0,8)])
   me_markerFlag_DF <- Calculate_ME_For_CellTypeEnriched_Genes(
     cellIDs = cellIDs
     , mk_exp_DF = mk_exp_DF
     , seurat_clusters = 0
     , class_label = "Neuron"
-    , foldChange = c(0.2, 0.4, 0.5)
+    , foldChange = c(0.2, 0.3, 0.4)
   )
   return(me_markerFlag_DF)
 }
@@ -839,14 +842,14 @@ ME_CellTypeEnrichedIP_IP_to_Neuron_010 <- function(){
   mk_exp_DF <- Average_MarkersExp_Per_Cell(
     exM = noCentExM, seuratO = centSO)
   cellIDs <- row.names(mk_exp_DF)[
-    mk_exp_DF$IP > 0.5 & mk_exp_DF$RG < 0.25 | mk_exp_DF$Neuron > 0.5 & mk_exp_DF$RG < 0.25]
-  cellIDs <- intersect(cellIDs, names(centSO@ident)[centSO@ident == 10])
+    mk_exp_DF$IP > 0.5 & mk_exp_DF$RG < 0.4 | mk_exp_DF$Neuron > 0.5 & mk_exp_DF$RG < 0.4]
+  cellIDs <- intersect(cellIDs, names(centSO@ident)[centSO@ident %in% c(0,10)])
   me_markerFlag_DF <- Calculate_ME_For_CellTypeEnriched_Genes(
     cellIDs = cellIDs
     , mk_exp_DF = mk_exp_DF
     , seurat_clusters = 2
     , class_label = "IP"
-    , foldChange = c(0.2, 0.4, 0.5)
+    , foldChange = c(0.2, 0.3, 0.4)
   )
   return(me_markerFlag_DF)
 }
@@ -855,14 +858,14 @@ ME_CellTypeEnrichedNeuron_IP_to_Neuron_010 <- function(){
   mk_exp_DF <- Average_MarkersExp_Per_Cell(
     exM = noCentExM, seuratO = centSO)
   cellIDs <- row.names(mk_exp_DF)[
-    mk_exp_DF$IP > 0.5 & mk_exp_DF$RG < 0.25 | mk_exp_DF$Neuron > 0.5 & mk_exp_DF$RG < 0.25]
-  cellIDs <- intersect(cellIDs, names(centSO@ident)[centSO@ident == 10])
+    mk_exp_DF$IP > 0.5 & mk_exp_DF$RG < 0.4 | mk_exp_DF$Neuron > 0.5 & mk_exp_DF$RG < 0.4]
+  cellIDs <- intersect(cellIDs, names(centSO@ident)[centSO@ident %in% c(0,10)])
   me_markerFlag_DF <- Calculate_ME_For_CellTypeEnriched_Genes(
     cellIDs = cellIDs
     , mk_exp_DF = mk_exp_DF
     , seurat_clusters = 0
     , class_label = "Neuron"
-    , foldChange = c(0.2, 0.4, 0.5)
+    , foldChange = c(0.2, 0.3, 0.4)
   )
   return(me_markerFlag_DF)
 }
@@ -1055,7 +1058,7 @@ tSNE_CCgenes_Markers <- function(cellIDs, title, df1) {
 # Identify RG+ and / or IP+ but Neuron- cluster 8 cells
 df1 <- Average_MarkersExp_Per_Cell(
   exM = noCentExM, seuratO = centSO)
-cellIDs <- row.names(df1)[df1$RG > 0.5 & df1$Neuron < 0.25 | df1$IP > 0.5 & df1$Neuron < 0.25]
+cellIDs <- row.names(df1)[df1$RG > 0.5 & df1$Neuron < 0.4 | df1$IP > 0.5 & df1$Neuron < 0.4]
 cellIDs <- intersect(cellIDs, names(centSO@ident)[centSO@ident == 8])
 # tSNE and plot
 tSNE_CCgenes_Markers(cellIDs = cellIDs
@@ -1067,7 +1070,7 @@ ggsave(paste0(outGraph, "RG_IP_Neuronn_Cluster8_FeaturePlot.png")
 # Identify RG+ and / or IP+ but Neuron- cluster 10 cells
 df1 <- Average_MarkersExp_Per_Cell(
   exM = noCentExM, seuratO = centSO)
-cellIDs <- row.names(df1)[df1$RG > 0.5 & df1$Neuron < 0.25 | df1$IP > 0.5 & df1$Neuron < 0.25]
+cellIDs <- row.names(df1)[df1$RG > 0.5 & df1$Neuron < 0.4 | df1$IP > 0.5 & df1$Neuron < 0.4]
 cellIDs <- intersect(cellIDs, names(centSO@ident)[centSO@ident == 10])
 # tSNE and plot
 tSNE_CCgenes_Markers(cellIDs = cellIDs
@@ -1250,42 +1253,42 @@ exLM[["Cluster10"]] <- centSO@scale.data[ ,colnames(centSO@scale.data) %in% cell
 # Identify RG+ and / or IP+ but Neuron- cluster 8 cells
 df1 <- Average_MarkersExp_Per_Cell(
   exM = noCentExM, seuratO = centSO)
-cellIDs <- row.names(df1)[df1$RG > 0.5 & df1$Neuron < 0.25 | df1$IP > 0.5 & df1$Neuron < 0.25]
+cellIDs <- row.names(df1)[df1$RG > 0.5 & df1$Neuron < 0.4 | df1$IP > 0.5 & df1$Neuron < 0.4]
 cellIDs <- intersect(cellIDs, names(centSO@ident[centSO@ident == 8]))
 exLM[["RG_IP_Neuronn_Cluster8"]] <- centSO@scale.data[ ,colnames(centSO@scale.data) %in% cellIDs]
 
 # Identify RG+ and / or IP+ but Neuron- cluster 10 cells
 df1 <- Average_MarkersExp_Per_Cell(
   exM = noCentExM, seuratO = centSO)
-cellIDs <- row.names(df1)[df1$RG > 0.5 & df1$Neuron < 0.25 | df1$IP > 0.5 & df1$Neuron < 0.25]
+cellIDs <- row.names(df1)[df1$RG > 0.5 & df1$Neuron < 0.4 | df1$IP > 0.5 & df1$Neuron < 0.4]
 cellIDs <- intersect(cellIDs, names(centSO@ident[centSO@ident == 10]))
 exLM[["RG_IP_Neuronn_Cluster10"]] <- centSO@scale.data[ ,colnames(centSO@scale.data) %in% cellIDs]
 
 # Identify RG+ and / or Neuron+ but IP- cluster 8 cells
 df1 <- Average_MarkersExp_Per_Cell(
   exM = noCentExM, seuratO = centSO)
-cellIDs <- row.names(df1)[df1$RG > 0.5 & df1$IP < 0.25 | df1$Neuron > 0.5 & df1$IP < 0.25]
+cellIDs <- row.names(df1)[df1$RG > 0.5 & df1$IP < 0.4 | df1$Neuron > 0.5 & df1$IP < 0.4]
 cellIDs <- intersect(cellIDs, names(centSO@ident[centSO@ident == 8]))
 exLM[["RG_IPn_Neuron_Cluster8"]] <- centSO@scale.data[ ,colnames(centSO@scale.data) %in% cellIDs]
 
 # Identify RG+ and / or Neuron+ but IP- cluster 10 cells
 df1 <- Average_MarkersExp_Per_Cell(
   exM = noCentExM, seuratO = centSO)
-cellIDs <- row.names(df1)[df1$RG > 0.5 & df1$IP < 0.25 | df1$Neuron > 0.5 & df1$IP < 0.25]
+cellIDs <- row.names(df1)[df1$RG > 0.5 & df1$IP < 0.4 | df1$Neuron > 0.5 & df1$IP < 0.4]
 cellIDs <- intersect(cellIDs, names(centSO@ident[centSO@ident == 10]))
 exLM[["RG_IPn_Neuron_Cluster10"]] <- centSO@scale.data[ ,colnames(centSO@scale.data) %in% cellIDs]
 
 # Identify RG+ IP- Neuron- cluster 8 cells
 df1 <- Average_MarkersExp_Per_Cell(
   exM = noCentExM, seuratO = centSO)
-cellIDs <- row.names(df1)[df1$RG > 0.5 & df1$IP < 0.25 & df1$Neuron < 0.25]
+cellIDs <- row.names(df1)[df1$RG > 0.5 & df1$IP < 0.4 & df1$Neuron < 0.4]
 cellIDs <- intersect(cellIDs, names(centSO@ident[centSO@ident == 8]))
 exLM[["RG_IPn_Neuronn_Cluster8"]] <- centSO@scale.data[ ,colnames(centSO@scale.data) %in% cellIDs]
 
 # Identify RG+  IP- Neuron- cluster 10 cells
 df1 <- Average_MarkersExp_Per_Cell(
   exM = noCentExM, seuratO = centSO)
-cellIDs <- row.names(df1)[df1$RG > 0.5 & df1$IP < 0.25 & df1$Neuron < 0.25]
+cellIDs <- row.names(df1)[df1$RG > 0.5 & df1$IP < 0.4 & df1$Neuron < 0.4]
 cellIDs <- intersect(cellIDs, names(centSO@ident[centSO@ident == 10]))
 exLM[["RG_IPn_Neuronn_Cluster10"]] <- centSO@scale.data[ ,colnames(centSO@scale.data) %in% cellIDs]
 
@@ -1666,8 +1669,8 @@ genes <- row.names(deDF)[deDF$FDR < 0.05]
 # IP+ and Neuron- or RG+ and Neuron- cells
 df1 <- Average_MarkersExp_Per_Cell(
   exM = noCentExM, seuratO = centSO)
-ids <- row.names(df1)[df1$CLUSTER == 8 & df1$RG > 0.5 & df1$Neuron < 0.25
-  | df1$CLUSTER == 8 & df1$IP > 0.5 & df1$Neuron < 0.25]
+ids <- row.names(df1)[df1$CLUSTER == 8 & df1$RG > 0.5 & df1$Neuron < 0.4
+  | df1$CLUSTER == 8 & df1$IP > 0.5 & df1$Neuron < 0.4]
 # Subset
 exM <- as.matrix(centSO@scale.data)
 exM <- exM[row.names(exM) %in% genes, colnames(exM) %in% ids]
@@ -1713,8 +1716,8 @@ genes <- row.names(deDF)[deDF$FDR < 0.05]
 # IP+ and Neuron- or RG+ and Neuron- cells
 df1 <- Average_MarkersExp_Per_Cell(
   exM = noCentExM, seuratO = centSO)
-ids <- row.names(df1)[df1$CLUSTER == 10 & df1$RG > 0.5 & df1$Neuron < 0.25
-  | df1$CLUSTER == 10 & df1$IP > 0.5 & df1$Neuron < 0.25]
+ids <- row.names(df1)[df1$CLUSTER == 10 & df1$RG > 0.5 & df1$Neuron < 0.4
+  | df1$CLUSTER == 10 & df1$IP > 0.5 & df1$Neuron < 0.4]
 # Subset
 exM <- as.matrix(centSO@scale.data)
 exM <- exM[row.names(exM) %in% genes, colnames(exM) %in% ids]
@@ -1797,8 +1800,8 @@ df1 <- Average_MarkersExp_Per_Cell(
   exM = noCentExM, seuratO = centSO)
 
 # S phase RG+ Neuron- vs RG+ IP+ Neuron-
-ids1 <- row.names(df1)[df1$CLUSTER == 8 & df1$RG > 0.5 & df1$IP > 0.5 & df1$Neuron < 0.25]
-ids2 <- row.names(df1)[df1$CLUSTER == 8 & df1$RG > 0.5 & df1$IP < 0.25 & df1$Neuron < 0.25]
+ids1 <- row.names(df1)[df1$CLUSTER == 8 & df1$RG > 0.5 & df1$IP > 0.5 & df1$Neuron < 0.4]
+ids2 <- row.names(df1)[df1$CLUSTER == 8 & df1$RG > 0.5 & df1$IP < 0.4 & df1$Neuron < 0.4]
 # DE
 deRGvsRgIpDF <- DE_CellGroup1_Vs_CellGroup2(ids1, ids2)
 # Save as csv
@@ -1809,8 +1812,8 @@ deRGvsRgIpDF <- read.csv(paste0(outTable, "DE_RGvsRGIP_S.csv")
 
 
 # S phase RG+ Neuron- vs RG+ IP+ Neuron-
-ids1 <- row.names(df1)[df1$CLUSTER == 8 & df1$RG > 0.5 & df1$IP > 0.5 & df1$Neuron < 0.25]
-ids2 <- row.names(df1)[df1$CLUSTER == 8 & df1$IP > 0.5 & df1$RG < 0.25 & df1$Neuron < 0.25]
+ids1 <- row.names(df1)[df1$CLUSTER == 8 & df1$RG > 0.5 & df1$IP > 0.5 & df1$Neuron < 0.4]
+ids2 <- row.names(df1)[df1$CLUSTER == 8 & df1$IP > 0.5 & df1$RG < 0.4 & df1$Neuron < 0.4]
 # DE
 deIPvsRgIpDF <- DE_CellGroup1_Vs_CellGroup2(ids1, ids2)
 # Save as csv

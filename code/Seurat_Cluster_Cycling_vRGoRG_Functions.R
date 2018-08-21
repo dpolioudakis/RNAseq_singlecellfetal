@@ -37,6 +37,7 @@ Positive_Negative_Expression_Flag <- function(
   df$TYPE[apply((df[ ,c("IP", "RG")] > highThreshold), 1, all)] <- "IP+ RG+"
   df$TYPE[apply((df[ ,c("Neuron", "IP")] > highThreshold), 1, all)] <- "Neuron+ IP+"
   df$TYPE[apply((df[ ,c("Neuron", "RG")] > highThreshold), 1, all)] <- "Neuron+ RG+"
+  # df$TYPE[apply((df[ ,c("Neuron", "RG", "IP")] > highThreshold), 1, all)] <- "Neuron+ RG+ IP+"
 
   # Controls
   df$TYPE[df[ ,c("Endothelial")] > highThreshold &
@@ -46,8 +47,9 @@ Positive_Negative_Expression_Flag <- function(
 
   df$TYPE <- factor(df$TYPE, levels = c("Neuron+", "IP+", "RG+"
     , "RG+ vRG- oRG-", "IP+ RG+", "Neuron+ IP+", "Neuron+ RG+"
-    , "Endothelial+ IP+", "Interneuron IP+"))
-  df$CLUSTER <- factor(df$CLUSTER, levels = sort(unique(as.numeric(df$CLUSTER))))
+    , "Endothelial+ IP+", "Interneuron+ IP+", "Neuron+ RG+ IP+"))
+  df$CLUSTER <- factor(as.character(df$CLUSTER)
+    , levels = sort(unique(as.numeric(as.character(df$CLUSTER)))))
 
   return(df)
 }
@@ -59,24 +61,29 @@ Mean_Gene_Group_Expression <- function(exM, grouping) {
   )
 }
 
-Average_MarkersExp_Per_Cell <- function (exM, seuratO) {
+Average_MarkersExp_Per_Cell <- function(exM, seuratO) {
 
   mnExDF <- data.frame(
     vRG = Mean_Gene_Group_Expression(exM = exM, grouping = "vRG")
-    , vRG_PollenS3 = Mean_Gene_Group_Expression(exM = exM, grouping = "vRG-PollenS3")
+    , vRG_PollenS3 = Mean_Gene_Group_Expression(
+      exM = exM, grouping = "vRG-PollenS3")
     , oRG = Mean_Gene_Group_Expression(exM = exM, grouping = "oRG")
-    , oRG_PollenS3 = Mean_Gene_Group_Expression(exM = exM, grouping = "oRG-PollenS3")
+    , oRG_PollenS3 = Mean_Gene_Group_Expression(
+      exM = exM, grouping = "oRG-PollenS3")
     , RG = Mean_Gene_Group_Expression(exM = exM, grouping = "RG")
-    , RG_PollenS3 = Mean_Gene_Group_Expression(exM = exM, grouping = "RG-PollenS3")
+    , RG_PollenS3 = Mean_Gene_Group_Expression(
+      exM = exM, grouping = "RG-PollenS3")
     , IP = Mean_Gene_Group_Expression(exM = exM, grouping = "IP")
-    , Endothelial = Mean_Gene_Group_Expression(exM = exM, grouping = "Endothelial Cell")
+    , Endothelial = Mean_Gene_Group_Expression(
+      exM = exM, grouping = "Endothelial Cell")
     , Neuron = Mean_Gene_Group_Expression(exM = exM, grouping = "Neuron")
-    , Interneuron = Mean_Gene_Group_Expression(exM = exM, grouping = "GABAergic interneuron")
+    , Interneuron = Mean_Gene_Group_Expression(
+      exM = exM, grouping = "GABAergic interneuron")
   )
 
   idx <- match(row.names(mnExDF), row.names(seuratO@meta.data))
   mnExDF$PHASE <- seuratO@meta.data$Phase[idx]
-  mnExDF$CLUSTER <- seuratO@meta.data$res.0.6[idx]
+  mnExDF$CLUSTER <- seuratO@ident[idx]
   mnExDF$nUMI <- seuratO@meta.data$nUMI[idx]
   mnExDF$G2Mscore <- seuratO@meta.data$G2M.Score[idx]
   mnExDF$Sscore <- seuratO@meta.data$S.Score[idx]

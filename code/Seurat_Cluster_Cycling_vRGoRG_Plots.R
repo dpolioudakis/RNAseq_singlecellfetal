@@ -25,6 +25,7 @@ require(monocle)
 require(WGCNA)
 require(gridExtra)
 require(ggpubr)
+require(ggbeeswarm)
 source("Function_Library.R")
 source("Seurat_Cluster_Cycling_vRGoRG_Functions.R")
 
@@ -32,7 +33,7 @@ options(stringsAsFactors = FALSE)
 
 ## Inputs
 
-# Keep CC genes from variable gene list used for clustering
+# Seurat object
 load("../analysis/analyzed_data/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_seuratO.Robj")
 # load("../analysis/analyzed_data/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_TEST5000_seuratO.Robj")
 # load("../analysis/analyzed_data/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_TESTcluster0278910_seuratO.Robj")
@@ -130,8 +131,13 @@ Calculate_Quantile_Limits <- function(df, value_col, group_col){
 
 Plot_ME_CellType_Genes <- function(
   me_markerFlag_DF, color_1 = NA, color_2 = NA){
+  # browser()
 
   print("Plot_ME_CellType_Genes")
+
+  me_markerFlag_DF$variable <- factor(me_markerFlag_DF$variable
+    , levels = c("RG eigengene", "IP eigengene", "Neuron eigengene"))
+  me_markerFlag_DF$variable <- droplevels(me_markerFlag_DF$variable)
 
   me_markerFlag_DFL <- split(me_markerFlag_DF
     , list(me_markerFlag_DF$Fold_Change_Cutoff
@@ -143,6 +149,19 @@ Plot_ME_CellType_Genes <- function(
     print(name)
 
     me_markerFlag_DF <- me_markerFlag_DFL[[name]]
+
+    # Fill color of boxplots
+    fill_color <- ifelse(grepl("RG", name), "#8dd3c7"
+      , ifelse(grepl("IP", name), "#bebada"
+        , ifelse(grepl("Neuron", name), "#fb8072", NA
+    )))
+
+    # For mixed marker cells subset to cycling cells only
+    idx <- me_markerFlag_DF$Cell_Subset_025 %in% c(
+        "RG IP", "RG Neuron", "IP Neuron") &
+      me_markerFlag_DF$CellID %in% names(centSO@ident)[
+        centSO@ident %in% 0]
+    me_markerFlag_DF <- me_markerFlag_DF[! idx, ]
 
     # Format for ggplot
     me_markerFlag_DF$Cell_Subset <- factor(me_markerFlag_DF$Cell_Subset
@@ -160,7 +179,7 @@ Plot_ME_CellType_Genes <- function(
     print("Plotting ME boxplot...")
     gg <- ggplot(me_markerFlag_DF, aes(x = Cell_Subset, y = value)) +
       geom_boxplot(aes(fill = variable), outlier.shape = NA) +
-      scale_fill_manual(values = color_1) +
+      scale_fill_manual(values = fill_color) +
       coord_cartesian(
         ylim = c(limits_L$Minimum * 1.05, limits_L$Maximum * 1.8)) +
       stat_compare_means(value ~ Cell_Subset, data = me_markerFlag_DF
@@ -175,250 +194,364 @@ Plot_ME_CellType_Genes <- function(
       xlab("Cell subset") +
       ggtitle(paste0("DE log2 fold change cutoff: ", name
         , "\nNumber of DE genes: ", me_markerFlag_DF$Number_DE_Genes))
-      #
-      # gg <- plot_grid(gg, ncol = 1, rel_heights = c(1,0.5))
       return(gg)
   })
-  ggL[4:6] <- lapply(ggL[4:6], function(gg){
-    gg + scale_fill_manual(values = color_2)
-  })
+  # ggL[4:6] <- lapply(ggL[4:6], function(gg){
+  #   gg + scale_fill_manual(values = color_2)
+  # })
   return(ggL)
 }
 
 # Plotting
+Plot_ME_CellType_Genes_Run <- function(){
 
-# RG IP cluster 8
-gg1L <- Plot_ME_CellType_Genes(
-  me_markerFlag_DF = ME_CellType_L[["RG_to_IP_8"]]
-  , color_1 = "#8dd3c7", color_2 = "#bebada"
-)
-Plot_Grid(gg1L, ncol = 3, rel_height = 0.2
-  , title = paste0(graphCodeTitle
-    , "\n\nME of DE RG vs IP genes in"
-    , "\ncluster 8 RG+, IP+, RG+IP+, Neuron-")
-)
-ggsave(paste0(outGraph, "DE_ME_boxplot_RGpIPpNn_Cluster8.pdf")
-  , height = 8, width = 12)
+  # RG IP cluster 8
+  gg1L <- Plot_ME_CellType_Genes(
+    me_markerFlag_DF = ME_CellType_L[["RG_to_IP_8"]]
+  )
+  Plot_Grid(gg1L, ncol = 3, rel_height = 0.2
+    , title = paste0(graphCodeTitle
+      , "\n\nME of DE RG vs IP genes in"
+      , "\ncluster 8 RG+, IP+, RG+IP+, Neuron-")
+  )
+  ggsave(paste0(outGraph, "DE_ME_boxplot_RGpIPpNn_Cluster8.pdf")
+    , height = 8, width = 12)
 
-# RG IP cluster 10
-gg2L <- Plot_ME_CellType_Genes(
-  me_markerFlag_DF = ME_CellType_L[["RG_to_IP_10"]]
-  , color_1 = "#8dd3c7", color_2 = "#bebada"
-)
-Plot_Grid(gg2L, ncol = 3, rel_height = 0.2
-  , title = paste0(graphCodeTitle
-    , "\n\nME of DE RG vs IP genes in"
-    , "\ncluster 10 RG+, IP+, RG+IP+, Neuron-")
-)
-ggsave(paste0(outGraph, "DE_ME_boxplot_RGpIPpNn_Cluster10.pdf")
-  , height = 8, width = 12)
+  # RG IP cluster 10
+  gg2L <- Plot_ME_CellType_Genes(
+    me_markerFlag_DF = ME_CellType_L[["RG_to_IP_10"]]
+  )
+  Plot_Grid(gg2L, ncol = 3, rel_height = 0.2
+    , title = paste0(graphCodeTitle
+      , "\n\nME of DE RG vs IP genes in"
+      , "\ncluster 10 RG+, IP+, RG+IP+, Neuron-")
+  )
+  ggsave(paste0(outGraph, "DE_ME_boxplot_RGpIPpNn_Cluster10.pdf")
+    , height = 8, width = 12)
 
-# RG neuron cluster 8
-gg3L <- Plot_ME_CellType_Genes(
-  me_markerFlag_DF = ME_CellType_L[["RG_to_Neuron_08"]]
-  , color_1 = "#8dd3c7", color_2 = "#fb8072"
-)
-Plot_Grid(gg3L, ncol = 3, rel_height = 0.2
-  , title = paste0(graphCodeTitle
-    , "\n\nME of DE RG vs Neuron genes in"
-    , "\ncluster 0,8 RG+, Neuron+, RG+Neuron+, IP-")
-)
-ggsave(paste0(outGraph, "DE_ME_boxplot_RGpIPnNp_Cluster08.pdf")
-  , height = 8, width = 12)
+  # RG neuron cluster 8
+  gg3L <- Plot_ME_CellType_Genes(
+    me_markerFlag_DF = ME_CellType_L[["RG_to_Neuron_08"]]
+  )
+  Plot_Grid(gg3L, ncol = 3, rel_height = 0.2
+    , title = paste0(graphCodeTitle
+      , "\n\nME of DE RG vs Neuron genes in"
+      , "\ncluster 0,8 RG+, Neuron+, RG+Neuron+, IP-")
+  )
+  ggsave(paste0(outGraph, "DE_ME_boxplot_RGpIPnNp_Cluster08.pdf")
+    , height = 8, width = 12)
 
-# RG neuron cluster 10
-gg4L <- Plot_ME_CellType_Genes(
-  me_markerFlag_DF = ME_CellType_L[["RG_to_Neuron_010"]]
-  , color_1 = "#8dd3c7", color_2 = "#fb8072"
-)
-Plot_Grid(gg4L, ncol = 3, rel_height = 0.2
-  , title = paste0(graphCodeTitle
-    , "\n\nME of DE RG vs Neuron genes in"
-    , "\ncluster 0,10 RG+, Neuron+, RG+Neuron+, IP-")
-)
-ggsave(paste0(outGraph, "DE_ME_boxplot_RGpIPnNp_Cluster010.pdf")
-  , height = 8, width = 12)
+  # RG neuron cluster 10
+  gg4L <- Plot_ME_CellType_Genes(
+    me_markerFlag_DF = ME_CellType_L[["RG_to_Neuron_010"]]
+  )
+  Plot_Grid(gg4L, ncol = 3, rel_height = 0.2
+    , title = paste0(graphCodeTitle
+      , "\n\nME of DE RG vs Neuron genes in"
+      , "\ncluster 0,10 RG+, Neuron+, RG+Neuron+, IP-")
+  )
+  ggsave(paste0(outGraph, "DE_ME_boxplot_RGpIPnNp_Cluster010.pdf")
+    , height = 8, width = 12)
 
-# IP neuron cluster 8
-gg5L <- Plot_ME_CellType_Genes(
-  me_markerFlag_DF = ME_CellType_L[["IP_to_Neuron_08"]]
-  , color_1 = "#bebada", color_2 = "#fb8072"
-)
-Plot_Grid(gg5L, ncol = 3, rel_height = 0.2
-  , title = paste0(graphCodeTitle
-    , "\n\nME of DE IP vs Neuron genes in"
-    , "\ncluster 0,8 IP+, Neuron+, IP+Neuron+, RG-")
-)
-ggsave(paste0(outGraph, "DE_ME_boxplot_RGnIPpNp_Cluster08.pdf")
-  , height = 8, width = 12)
+  # IP neuron cluster 8
+  gg5L <- Plot_ME_CellType_Genes(
+    me_markerFlag_DF = ME_CellType_L[["IP_to_Neuron_08"]]
+  )
+  Plot_Grid(gg5L, ncol = 3, rel_height = 0.2
+    , title = paste0(graphCodeTitle
+      , "\n\nME of DE IP vs Neuron genes in"
+      , "\ncluster 0,8 IP+, Neuron+, IP+Neuron+, RG-")
+  )
+  ggsave(paste0(outGraph, "DE_ME_boxplot_RGnIPpNp_Cluster08.pdf")
+    , height = 8, width = 12)
 
-# IP neuron cluster 10
-gg6L <- Plot_ME_CellType_Genes(
-  me_markerFlag_DF = ME_CellType_L[["IP_to_Neuron_010"]]
-  , color_1 = "#bebada", color_2 = "#fb8072"
-)
-Plot_Grid(gg6L, ncol = 3, rel_height = 0.2
-  , title = paste0(graphCodeTitle
-    , "\n\nME of DE IP vs Neuron genes in"
-    , "\ncluster 0,10 IP+, Neuron+, IP+Neuron+, RG-")
-)
-ggsave(paste0(outGraph, "DE_ME_boxplot_RGnIPpNp_Cluster010.pdf")
-  , height = 8, width = 12)
+  # IP neuron cluster 10
+  gg6L <- Plot_ME_CellType_Genes(
+    me_markerFlag_DF = ME_CellType_L[["IP_to_Neuron_010"]]
+  )
+  Plot_Grid(gg6L, ncol = 3, rel_height = 0.2
+    , title = paste0(graphCodeTitle
+      , "\n\nME of DE IP vs Neuron genes in"
+      , "\ncluster 0,10 IP+, Neuron+, IP+Neuron+, RG-")
+  )
+  ggsave(paste0(outGraph, "DE_ME_boxplot_RGnIPpNp_Cluster010.pdf")
+    , height = 8, width = 12)
 
-# Paper
-Append_List <- function(list_of_list_objects){
-  ggL <- append(list_of_list_objects[1], list_of_list_objects[2])
-  for(i in 3:length(list_of_list_objects)){
-    gg <- list_of_list_objects[i]
-    ggL <- append(ggL, gg)
+  # Paper
+  Append_List <- function(list_of_list_objects){
+    ggL <- append(list_of_list_objects[1], list_of_list_objects[2])
+    for(i in 3:length(list_of_list_objects)){
+      gg <- list_of_list_objects[i]
+      ggL <- append(ggL, gg)
+    }
+    return(ggL)
   }
+  ggL <- Append_List(list_of_list_objects = c(
+    # S phase
+    gg1L[2]
+    , gg3L[2]
+    , gg5L[2]
+    , gg1L[5]
+    , gg3L[5]
+    , gg5L[5]
+    # G2/M
+    , gg2L[2]
+    , gg4L[2]
+    , gg6L[2]
+    , gg2L[5]
+    , gg4L[5]
+    , gg6L[5]
+  ))
+  # ggL <- lapply(ggL, function(gg){
+  #   gg <- gg + ggtitle("") + xlab("")
+  #   return(gg)
+  # })
+  Plot_Grid(ggL, ncol = 3, rel_height = 0.1, align = 'v', axis = 'r'
+    , title = paste0(graphCodeTitle
+      , "\n\nME of DE genes")
+  )
+  ggsave(paste0(outGraph, "DE_ME_boxplot_paper.pdf")
+    , height = 12, width = 10)
+}
+Plot_ME_CellType_Genes_Run()
+
+# Violin plots
+
+Plot_ME_CellType_Genes_Violin <- function(
+  me_markerFlag_DF, color_1 = NA, color_2 = NA){
+
+  print("Plot_ME_CellType_Genes_Violin")
+
+  me_markerFlag_DF$variable <- factor(me_markerFlag_DF$variable
+    , levels = c("RG eigengene", "IP eigengene", "Neuron eigengene"))
+  me_markerFlag_DF$variable <- droplevels(me_markerFlag_DF$variable)
+
+  me_markerFlag_DFL <- split(me_markerFlag_DF
+    , list(me_markerFlag_DF$Fold_Change_Cutoff
+    , me_markerFlag_DF$variable)
+  )
+
+  ggL <- lapply(names(me_markerFlag_DFL), function(name){
+
+    print(name)
+
+    me_markerFlag_DF <- me_markerFlag_DFL[[name]]
+
+    # Fill color of boxplots
+    fill_color <- ifelse(grepl("RG", name), "#8dd3c7"
+      , ifelse(grepl("IP", name), "#bebada"
+        , ifelse(grepl("Neuron", name), "#fb8072", NA
+    )))
+
+    # For mixed marker cells subset to cycling cells only
+    idx <- me_markerFlag_DF$Cell_Subset %in% c(
+        "RG IP", "RG Neuron", "IP Neuron") &
+      me_markerFlag_DF$CellID %in% names(centSO@ident)[
+        centSO@ident %in% 0]
+    me_markerFlag_DF <- me_markerFlag_DF[! idx, ]
+
+    # Format for ggplot
+    me_markerFlag_DF$Cell_Subset <- factor(me_markerFlag_DF$Cell_Subset
+      , levels = c("RG", "RG IP", "IP", "RG Neuron", "IP Neuron", "Neuron"))
+    me_markerFlag_DF$variable <- factor(me_markerFlag_DF$variable
+      , levels = c("RG eigengene", "IP eigengene", "Neuron eigengene"))
+
+    # Determine ggplot limits from whiskers
+    limits_L <- Calculate_Quantile_Limits(
+      me_markerFlag_DF, value_col = "value", group_col = "Cell_Subset"
+    )
+    # outliers_removed_DF <- GGplot_Remove_Outliers(
+    #   me_markerFlag_DF, value_col = "value", group_col = "Cell_Subset"
+    # )
+
+    print("Plotting ME boxplot...")
+    gg <- ggplot(me_markerFlag_DF, aes(x = Cell_Subset, y = value)) +
+      geom_violin(aes(fill = variable)) +
+      scale_fill_manual(values = fill_color) +
+      geom_quasirandom(size = 0.1) +
+      coord_cartesian(
+        ylim = c(limits_L$Minimum * 1.05, limits_L$Maximum * 1.8)) +
+      # stat_compare_means(value ~ Cell_Subset, data = me_markerFlag_DF
+      #   , comparisons = list(c(1,2), c(1,3), c(2,3))
+      #   , method = "t.test", p.adjust.method = "none", label = "p.signif"
+      #   , label.y = c(limits_L$Maximum*c(1.2, 1.4, 1.6))
+      # ) +
+      ggplot_set_theme_publication +
+      theme(legend.position = "none") +
+      theme(text = element_text(size = 12, colour = "black")) +
+      ylab("Eigengene value") +
+      xlab("Cell subset") +
+      ggtitle(paste0("DE log2 fold change cutoff: ", name
+        , "\nNumber of DE genes: ", me_markerFlag_DF$Number_DE_Genes))
+      return(gg)
+  })
   return(ggL)
 }
-ggL <- Append_List(list_of_list_objects = c(
-  # RG IP
-  gg1L[2]
-  , gg2L[2]
-  , gg1L[5]
-  , gg2L[5]
-  # RG neuron
-  , gg3L[2]
-  , gg4L[2]
-  , gg3L[5]
-  , gg4L[5]
-  # IP neuron
-  , gg5L[2]
-  , gg6L[2]
-  , gg5L[5]
-  , gg6L[5]
-))
-ggL <- lapply(ggL, function(gg){
-  gg <- gg + ggtitle("") + xlab("")
-  return(gg)
-})
-Plot_Grid(ggL, ncol = 2, rel_height = 0.1, align = 'v', axis = 'r'
-  , title = paste0(graphCodeTitle
-    , "\n\nME of DE genes")
-)
-ggsave(paste0(outGraph, "DE_ME_boxplot_paper.pdf")
-  , height = 16, width = 6)
+
+Plot_ME_CellType_Genes_Violin_Run <- function(){
+  # RG IP cluster 8
+  gg1L <- Plot_ME_CellType_Genes_Violin(
+    me_markerFlag_DF = ME_CellType_L[["RG_to_IP_8"]]
+    , color_1 = "#8dd3c7", color_2 = "#bebada"
+  )
+  # RG IP cluster 10
+  gg2L <- Plot_ME_CellType_Genes_Violin(
+    me_markerFlag_DF = ME_CellType_L[["RG_to_IP_10"]]
+    , color_1 = "#8dd3c7", color_2 = "#bebada"
+  )
+  # RG neuron cluster 8
+  gg3L <- Plot_ME_CellType_Genes_Violin(
+    me_markerFlag_DF = ME_CellType_L[["RG_to_Neuron_08"]]
+    , color_1 = "#8dd3c7", color_2 = "#fb8072"
+  )
+  # RG neuron cluster 10
+  gg4L <- Plot_ME_CellType_Genes_Violin(
+    me_markerFlag_DF = ME_CellType_L[["RG_to_Neuron_010"]]
+    , color_1 = "#8dd3c7", color_2 = "#fb8072"
+  )
+  # IP neuron cluster 8
+  gg5L <- Plot_ME_CellType_Genes_Violin(
+    me_markerFlag_DF = ME_CellType_L[["IP_to_Neuron_08"]]
+    , color_1 = "#bebada", color_2 = "#fb8072"
+  )
+  # IP neuron cluster 10
+  gg6L <- Plot_ME_CellType_Genes_Violin(
+    me_markerFlag_DF = ME_CellType_L[["IP_to_Neuron_010"]]
+    , color_1 = "#bebada", color_2 = "#fb8072"
+  )
+  ggL <- Append_List(list_of_list_objects = c(
+    # S phase
+    gg1L[2]
+    , gg3L[2]
+    , gg5L[2]
+    , gg1L[5]
+    , gg3L[5]
+    , gg5L[5]
+    # G2/M
+    , gg2L[2]
+    , gg4L[2]
+    , gg6L[2]
+    , gg2L[5]
+    , gg4L[5]
+    , gg6L[5]
+  ))
+  Plot_Grid(ggL, ncol = 3, rel_height = 0.1, align = 'v', axis = 'r'
+    , title = paste0(graphCodeTitle
+      , "\n\nME of DE genes")
+  )
+  ggsave(paste0(outGraph, "DE_ME_violin.png")
+    , height = 12, width = 12)
+}
+Plot_ME_CellType_Genes_Violin_Run()
 
 
 # Plotting ME of cell type enriched genes
+Plot_ME_CellTypeEnriched_Genes_Run <- function(){
+  # RG IP cluster 8
+  gg1L <- Plot_ME_CellType_Genes(
+    me_markerFlag_DF = ME_CellTypeEnriched_L[["RG_to_IP_8"]]
+  )
+  Plot_Grid(gg1L, ncol = 3, rel_height = 0.2
+    , title = paste0(graphCodeTitle
+      , "\n\nME of RG or IP cell type enriched genes in"
+      , "\ncluster 8 RG+, IP+, RG+IP+, Neuron-")
+  )
+  ggsave(paste0(outGraph, "CellTypeEnriched_ME_boxplot_RGpIPpNn_Cluster8.pdf")
+    , height = 8, width = 12)
 
-# RG IP cluster 8
-gg1L <- Plot_ME_CellType_Genes(
-  me_markerFlag_DF = ME_CellTypeEnriched_L[["RG_to_IP_8"]]
-  , color_1 = "#8dd3c7", color_2 = "#bebada"
-)
-Plot_Grid(gg1L, ncol = 3, rel_height = 0.2
-  , title = paste0(graphCodeTitle
-    , "\n\nME of RG or IP cell type enriched genes in"
-    , "\ncluster 8 RG+, IP+, RG+IP+, Neuron-")
-)
-ggsave(paste0(outGraph, "CellTypeEnriched_ME_boxplot_RGpIPpNn_Cluster8.pdf")
-  , height = 8, width = 12)
+  # RG IP cluster 10
+  gg2L <- Plot_ME_CellType_Genes(
+    me_markerFlag_DF = ME_CellTypeEnriched_L[["RG_to_IP_10"]]
+  )
+  Plot_Grid(gg2L, ncol = 3, rel_height = 0.2
+    , title = paste0(graphCodeTitle
+      , "\n\nME of RG vs IP cell type enriched genes in"
+      , "\ncluster 10 RG+, IP+, RG+IP+, Neuron-")
+  )
+  ggsave(paste0(outGraph, "CellTypeEnriched_ME_boxplot_RGpIPpNn_Cluster10.pdf")
+    , height = 8, width = 12)
 
-# RG IP cluster 10
-gg2L <- Plot_ME_CellType_Genes(
-  me_markerFlag_DF = ME_CellTypeEnriched_L[["RG_to_IP_10"]]
-  , color_1 = "#8dd3c7", color_2 = "#bebada"
-)
-Plot_Grid(gg2L, ncol = 3, rel_height = 0.2
-  , title = paste0(graphCodeTitle
-    , "\n\nME of RG vs IP cell type enriched genes in"
-    , "\ncluster 10 RG+, IP+, RG+IP+, Neuron-")
-)
-ggsave(paste0(outGraph, "CellTypeEnriched_ME_boxplot_RGpIPpNn_Cluster10.pdf")
-  , height = 8, width = 12)
+  # RG neuron cluster 8
+  gg3L <- Plot_ME_CellType_Genes(
+    me_markerFlag_DF = ME_CellTypeEnriched_L[["RG_to_Neuron_08"]]
+  )
+  Plot_Grid(gg3L, ncol = 3, rel_height = 0.2
+    , title = paste0(graphCodeTitle
+      , "\n\nME of RG vs Neuron cell type enriched genes in"
+      , "\ncluster 0,8 RG+, Neuron+, RG+Neuron+, IP-")
+  )
+  ggsave(paste0(outGraph, "CellTypeEnriched_ME_boxplot_RGpIPnNp_Cluster08.pdf")
+    , height = 8, width = 12)
 
-# RG neuron cluster 8
-gg3L <- Plot_ME_CellType_Genes(
-  me_markerFlag_DF = ME_CellTypeEnriched_L[["RG_to_Neuron_08"]]
-  , color_1 = "#8dd3c7", color_2 = "#fb8072"
-)
-Plot_Grid(gg3L, ncol = 3, rel_height = 0.2
-  , title = paste0(graphCodeTitle
-    , "\n\nME of RG vs Neuron cell type enriched genes in"
-    , "\ncluster 0,8 RG+, Neuron+, RG+Neuron+, IP-")
-)
-ggsave(paste0(outGraph, "CellTypeEnriched_ME_boxplot_RGpIPnNp_Cluster08.pdf")
-  , height = 8, width = 12)
+  # RG neuron cluster 10
+  gg4L <- Plot_ME_CellType_Genes(
+    me_markerFlag_DF = ME_CellTypeEnriched_L[["RG_to_Neuron_010"]]
+  )
+  Plot_Grid(gg4L, ncol = 3, rel_height = 0.2
+    , title = paste0(graphCodeTitle
+      , "\n\nME of RG vs Neuron cell type enriched genes in"
+      , "\ncluster 0,10 RG+, Neuron+, RG+Neuron+, IP-")
+  )
+  ggsave(paste0(outGraph, "CellTypeEnriched_ME_boxplot_RGpIPnNp_Cluster010.pdf")
+    , height = 8, width = 12)
 
-# RG neuron cluster 10
-gg4L <- Plot_ME_CellType_Genes(
-  me_markerFlag_DF = ME_CellTypeEnriched_L[["RG_to_Neuron_010"]]
-  , color_1 = "#8dd3c7", color_2 = "#fb8072"
-)
-Plot_Grid(gg4L, ncol = 3, rel_height = 0.2
-  , title = paste0(graphCodeTitle
-    , "\n\nME of RG vs Neuron cell type enriched genes in"
-    , "\ncluster 0,10 RG+, Neuron+, RG+Neuron+, IP-")
-)
-ggsave(paste0(outGraph, "CellTypeEnriched_ME_boxplot_RGpIPnNp_Cluster010.pdf")
-  , height = 8, width = 12)
+  # IP neuron cluster 8
+  gg5L <- Plot_ME_CellType_Genes(
+    me_markerFlag_DF = ME_CellTypeEnriched_L[["IP_to_Neuron_08"]]
+  )
+  Plot_Grid(gg5L, ncol = 3, rel_height = 0.2
+    , title = paste0(graphCodeTitle
+      , "\n\nME of IP vs Neuron cell type enriched genes in"
+      , "\ncluster 0,8 IP+, Neuron+, IP+Neuron+, RG-")
+  )
+  ggsave(paste0(outGraph, "CellTypeEnriched_ME_boxplot_RGnIPpNp_Cluster08.pdf")
+    , height = 8, width = 12)
 
-# IP neuron cluster 8
-gg5L <- Plot_ME_CellType_Genes(
-  me_markerFlag_DF = ME_CellTypeEnriched_L[["IP_to_Neuron_08"]]
-  , color_1 = "#bebada", color_2 = "#fb8072"
-)
-Plot_Grid(gg5L, ncol = 3, rel_height = 0.2
-  , title = paste0(graphCodeTitle
-    , "\n\nME of IP vs Neuron cell type enriched genes in"
-    , "\ncluster 0,8 IP+, Neuron+, IP+Neuron+, RG-")
-)
-ggsave(paste0(outGraph, "CellTypeEnriched_ME_boxplot_RGnIPpNp_Cluster08.pdf")
-  , height = 8, width = 12)
+  # IP neuron cluster 10
+  gg6L <- Plot_ME_CellType_Genes(
+    me_markerFlag_DF = ME_CellTypeEnriched_L[["IP_to_Neuron_010"]]
+  )
+  Plot_Grid(gg6L, ncol = 3, rel_height = 0.2
+    , title = paste0(graphCodeTitle
+      , "\n\nME of IP vs Neuron cell type enriched genes in"
+      , "\ncluster 0,10 IP+, Neuron+, IP+Neuron+, RG-")
+  )
+  ggsave(paste0(outGraph, "CellTypeEnriched_ME_boxplot_RGnIPpNp_Cluster010.pdf")
+    , height = 8, width = 12)
 
-# IP neuron cluster 10
-gg6L <- Plot_ME_CellType_Genes(
-  me_markerFlag_DF = ME_CellTypeEnriched_L[["IP_to_Neuron_010"]]
-  , color_1 = "#bebada", color_2 = "#fb8072"
-)
-Plot_Grid(gg6L, ncol = 3, rel_height = 0.2
-  , title = paste0(graphCodeTitle
-    , "\n\nME of IP vs Neuron cell type enriched genes in"
-    , "\ncluster 0,10 IP+, Neuron+, IP+Neuron+, RG-")
-)
-ggsave(paste0(outGraph, "CellTypeEnriched_ME_boxplot_RGnIPpNp_Cluster010.pdf")
-  , height = 8, width = 12)
-
-# Paper
-Append_List <- function(list_of_list_objects){
-  ggL <- append(list_of_list_objects[1], list_of_list_objects[2])
-  for(i in 3:length(list_of_list_objects)){
-    gg <- list_of_list_objects[i]
-    ggL <- append(ggL, gg)
+  # Paper
+  Append_List <- function(list_of_list_objects){
+    ggL <- append(list_of_list_objects[1], list_of_list_objects[2])
+    for(i in 3:length(list_of_list_objects)){
+      gg <- list_of_list_objects[i]
+      ggL <- append(ggL, gg)
+    }
+    return(ggL)
   }
-  return(ggL)
+  ggL <- Append_List(list_of_list_objects = c(
+    # S phase
+    gg1L[2]
+    , gg3L[2]
+    , gg5L[2]
+    , gg1L[5]
+    , gg3L[5]
+    , gg5L[5]
+    # G2/M
+    , gg2L[2]
+    , gg4L[2]
+    , gg6L[2]
+    , gg2L[5]
+    , gg4L[5]
+    , gg6L[5]
+  ))
+  Plot_Grid(ggL, ncol = 2, rel_height = 0.1, align = 'v', axis = 'r'
+    , title = paste0(graphCodeTitle
+      , "\n\nME of cell type enriched genes")
+  )
+  ggsave(paste0(outGraph, "CellTypeEnriched_ME_boxplot_paper.pdf")
+    , height = 12, width = 12)
 }
-ggL <- Append_List(list_of_list_objects = c(
-  # RG IP
-  gg1L[2]
-  , gg2L[2]
-  , gg1L[5]
-  , gg2L[5]
-  # RG neuron
-  , gg3L[2]
-  , gg4L[2]
-  , gg3L[5]
-  , gg4L[5]
-  # IP neuron
-  , gg5L[2]
-  , gg6L[2]
-  , gg5L[5]
-  , gg6L[5]
-))
-ggL <- lapply(ggL, function(gg){
-  gg <- gg + ggtitle("") + xlab("")
-  return(gg)
-})
-Plot_Grid(ggL, ncol = 2, rel_height = 0.1, align = 'v', axis = 'r'
-  , title = paste0(graphCodeTitle
-    , "\n\nME of cell type enriched genes")
-)
-ggsave(paste0(outGraph, "CellTypeEnriched_ME_boxplot_paper.pdf")
-  , height = 16, width = 6)
+Plot_ME_CellTypeEnriched_Genes_Run()
 
 ## Average Expression
 # df1 <- Average_MarkersExp_Per_Cell(
@@ -1463,8 +1596,15 @@ gg3 <- Mixed_Marker_By_Cluster_Percent_Barplot(
     , "Interneuron+ IP+")
   , title = "Keep CC\n+ = > 0.75 normalized expression\n- = < 0.25 normalized expression"
 )
+gg4 <- Mixed_Marker_By_Cluster_Percent_Barplot(
+  exM = noCentExM, seuratO = centSO
+  , highThreshold = 0.4, lowThreshold = 0.25
+  , type_keep = c("IP+ RG+", "Neuron+ RG+", "Neuron+ IP+", "Endothelial+ IP+"
+    , "Interneuron+ IP+")
+  , title = "Keep CC\n+ = > 0.4 normalized expression\n- = < 0.25 normalized expression"
+)
 # Plot grid
-pg <- plot_grid(gg1, gg2, gg3, ncol = 2)
+pg <- plot_grid(gg1, gg2, gg3, gg4, ncol = 2)
 # now add the title
 title <- ggdraw() + draw_label(paste0(graphCodeTitle
   , "\n\nPercent of cells passing combinations of marker expression filters"
@@ -1473,6 +1613,47 @@ title <- ggdraw() + draw_label(paste0(graphCodeTitle
 plot_grid(title, pg, ncol = 1, rel_heights = c(0.2, 1))
 # Save
 ggsave(paste0(outGraph, "PercentMixedCluster_Barplot.pdf")
+  , width = 12, height = 14)
+
+# Plot
+gg1 <- Mixed_Marker_By_Cluster_Percent_Barplot(
+  exM = noCentExM, seuratO = centSO
+  , highThreshold = 0.5, lowThreshold = 0.5
+  , type_keep = c("IP+ RG+", "Neuron+ RG+", "Neuron+ IP+", "Endothelial+ IP+"
+    , "Interneuron+ IP+", "RG+", "IP+", "Neuron+", "Neuron+ RG+ IP+")
+  , title = "Keep CC\n+ = > 0.5 normalized expression\n- = < 0.5 normalized expression"
+)
+gg2 <- Mixed_Marker_By_Cluster_Percent_Barplot(
+  exM = noCentExM, seuratO = centSO
+  , highThreshold = 0.5, lowThreshold = 0.25
+  , type_keep = c("IP+ RG+", "Neuron+ RG+", "Neuron+ IP+", "Endothelial+ IP+"
+    , "Interneuron+ IP+", "RG+", "IP+", "Neuron+", "Neuron+ RG+ IP+")
+  , title = "Keep CC\n+ = > 0.5 normalized expression\n- = < 0.25 normalized expression"
+)
+gg3 <- Mixed_Marker_By_Cluster_Percent_Barplot(
+  exM = noCentExM, seuratO = centSO
+  , highThreshold = 0.75, lowThreshold = 0.25
+  , type_keep = c("IP+ RG+", "Neuron+ RG+", "Neuron+ IP+", "Endothelial+ IP+"
+    , "Interneuron+ IP+", "RG+", "IP+", "Neuron+", "Neuron+ RG+ IP+")
+  , title = "Keep CC\n+ = > 0.75 normalized expression\n- = < 0.25 normalized expression"
+)
+gg4 <- Mixed_Marker_By_Cluster_Percent_Barplot(
+  exM = noCentExM, seuratO = centSO
+  , highThreshold = 0.4, lowThreshold = 0.25
+  , type_keep = c("IP+ RG+", "Neuron+ RG+", "Neuron+ IP+", "Endothelial+ IP+"
+    , "Interneuron+ IP+", "RG+", "IP+", "Neuron+")
+  , title = "Keep CC\n+ = > 0.4 normalized expression\n- = < 0.25 normalized expression"
+)
+# Plot grid
+pg <- plot_grid(gg1, gg2, gg3, gg4, ncol = 2)
+# now add the title
+title <- ggdraw() + draw_label(paste0(graphCodeTitle
+  , "\n\nPercent of cells passing combinations of marker expression filters"
+  , "\n"))
+# rel_heights values control title margins
+plot_grid(title, pg, ncol = 1, rel_heights = c(0.2, 1))
+# Save
+ggsave(paste0(outGraph, "PercentMixedCluster2_Barplot.pdf")
   , width = 12, height = 14)
 
 # Paper - plot with reordered clusters
@@ -1512,6 +1693,325 @@ gg + ggplot_set_theme_publication
 # Save
 ggsave(paste0(outGraph, "PercentMixedCluster_Barplot_paper_supp.pdf")
   , width = 5, height = 3)
+
+# Paper - table of percents for making differentiation diagram
+percentDF <- Mixed_Marker_By_Cluster_Percent(
+  exM = noCentExM, seuratO = centSO
+  , highThreshold = 0.5, lowThreshold = 0.25
+  , type_keep = c("IP+ RG+", "Neuron+ RG+", "Neuron+ IP+", "RG+", "IP+"
+    , "Neuron+")
+  , cluster_order = c(9,7,8,10,2,0,1,4,3,13,5,6,11,12,14,15)
+)
+percentDF <- percentDF[with(percentDF, CLUSTER == 10), ]
+percentDF$Percent_NA_Removed <-
+  c(NA, (percentDF$value[2:6] / sum(percentDF$value[2:6])) * 100, NA)
+percentDF[ ,c(3:4)] <- round(percentDF[ ,c(3:4)], 1)
+write.csv(percentDF, file = paste0(
+    outTable, "PercentMixedCluster_paper_supp.csv")
+  , quote = FALSE)
+
+Mixed_Marker_By_Cluster_Numbers <- function(
+  exM
+  , seuratO
+  , highThreshold
+  , lowThreshold
+  , type_keep
+  , cluster_order = NULL){
+    # browser()
+    print("Mixed_Marker_By_Cluster_Numbers")
+    expr_flag_DF <- Average_MarkersExp_Per_Cell(exM = exM, seuratO = seuratO)
+    expr_flag_DF <- Positive_Negative_Expression_Flag(
+      exDF = expr_flag_DF
+      , highThreshold = highThreshold
+      , lowThreshold = lowThreshold
+    )
+    expr_flag_DF$Type_Plot <- expr_flag_DF$TYPE
+    expr_flag_DF$Type_Plot[! expr_flag_DF$Type_Plot %in% type_keep] <- "NA"
+    expr_flag_DF$Type_Plot <- droplevels(expr_flag_DF$Type_Plot)
+    numbers_DF <- with(expr_flag_DF, table(Type_Plot, CLUSTER))
+    numbers_DF <- as.data.frame(numbers_DF)
+    return(numbers_DF)
+}
+number_DF <- Mixed_Marker_By_Cluster_Numbers(
+  exM = noCentExM, seuratO = centSO
+  , highThreshold = 0.5, lowThreshold = 0.25
+  , type_keep = c("IP+ RG+", "Neuron+ RG+", "Neuron+ IP+", "RG+", "IP+"
+    , "Neuron+")
+  , cluster_order = c(9,7,8,10,2,0,1,4,3,13,5,6,11,12,14,15)
+)
+write.csv(number_DF, file = paste0(
+    outTable, "Number_Mixed_Cluster.csv")
+  , quote = FALSE)
+################################################################################
+
+### Percent of cells passing expression filters of cell type enriched genes
+
+Mixed_CellTypeEnriched_By_Cluster_Percent <- function(
+  exM
+  , seuratO
+  , highThreshold
+  , lowThreshold
+  , type_keep
+  , fold_change
+  , cluster_order = NULL){
+    # browser()
+    print("Mixed_CellTypeEnriched_By_Cluster_Percent")
+    expr_flag_DF <- Format_Mean_CellTypeEnriched_Expression(
+      exM = exM
+      , seuratO = seuratO
+      , fold_change = fold_change
+    )
+    expr_flag_DF <- Positive_Negative_Expression_Flag(
+      exDF = expr_flag_DF
+      , highThreshold = highThreshold
+      , lowThreshold = lowThreshold
+    )
+    expr_flag_DF$Type_Plot <- expr_flag_DF$TYPE
+    expr_flag_DF$Type_Plot[! expr_flag_DF$Type_Plot %in% type_keep] <- "NA"
+    expr_flag_DF$Type_Plot <- droplevels(expr_flag_DF$Type_Plot)
+    expr_flag_DFL <- tapply(
+      expr_flag_DF$Type_Plot, expr_flag_DF$CLUSTER, Percent_Of_Table
+    )
+    expr_flag_DF <- do.call("rbind", expr_flag_DFL)
+    # expr_flag_DF <- aggregate(expr_flag_DF$Type_Plot
+    #   , list(expr_flag_DF$CLUSTER), Percent_Of_Table)
+    # tmp_df <- as.data.frame(expr_flag_DF[ ,2])
+    # tmp_df$CLUSTER <- expr_flag_DF[ ,1]
+    expr_flag_DF <- as.data.frame(expr_flag_DF)
+    expr_flag_DF$CLUSTER <- rownames(expr_flag_DF)
+    # Set cluster order
+    if (! is.null(cluster_order)){
+      expr_flag_DF$CLUSTER <- factor(as.character(expr_flag_DF$CLUSTER)
+        , levels = as.character(cluster_order))
+    }
+    expr_flag_DF <- expr_flag_DF[! is.na(expr_flag_DF$CLUSTER), ]
+    expr_flag_DF <- melt(expr_flag_DF)
+    return(expr_flag_DF)
+}
+
+Mixed_CellTypeEnriched_By_Cluster_Percent_Barplot <- function(
+  exM
+  , seuratO
+  , highThreshold
+  , lowThreshold
+  , fold_change
+  , type_keep
+  , title
+  , cluster_order = NULL) {
+  # browser()
+  print("Mixed_CellTypeEnriched_By_Cluster_Percent_Barplot")
+  expr_flag_DF <- Mixed_CellTypeEnriched_By_Cluster_Percent(
+    exM = exM
+    , seuratO = seuratO
+    , highThreshold = highThreshold
+    , lowThreshold = lowThreshold
+    , type_keep = type_keep
+    , cluster_order = cluster_order
+    , fold_change = fold_change
+  )
+  # Format
+  # Set marker plotting order
+  expr_flag_DF$variable <- as.character(expr_flag_DF$variable)
+  expr_flag_DF$variable[is.na(expr_flag_DF$variable)] <- "Unknown"
+  expr_flag_DF$variable <- factor(expr_flag_DF$variable
+    , levels = rev(
+      c("RG+", "IP+", "Neuron+", "IP+ RG+", "Neuron+ RG+"
+      , "Neuron+ IP+", "Interneuron+ IP+", "Endothelial+ IP+", "Unknown")
+    )
+  )
+  # Plot
+  gg <- ggplot(expr_flag_DF, aes(x = CLUSTER, y = value, fill = variable)) +
+    geom_bar(stat = "identity") +
+    scale_y_continuous(expand = c(0, 0), limits = c(0, 101)) +
+    scale_fill_manual(
+      name = "Cell type markers"
+      # Set legend order and colors
+      , breaks = c(
+        "RG+"
+        , "IP+"
+        , "Neuron+"
+        , "IP+ RG+"
+        , "Neuron+ RG+"
+        , "Neuron+ IP+"
+        , "Interneuron+ IP+"
+        , "Endothelial+ IP+"
+        , "Unknown"
+      )
+      , values = c(
+        "RG+" = "#8DD1C6"
+        , "IP+" = "#BFBBDA"
+        , "Neuron+" = "#F47F73"
+        , "IP+ RG+" = "#A8C6D0"
+        , "Neuron+ RG+" = "#C9AC9A"
+        , "Neuron+ IP+" = "#CB9898"
+        , "Interneuron+ IP+" = "#A1B5D6"
+        , "Endothelial+ IP+" = "#BAC8A9"
+        , "Unknown" = "#E7E6E5")
+      ) +
+    xlab("Cluster") +
+    ylab("Percent of cells") +
+    ggtitle(title)
+  return(gg)
+}
+
+
+Mean_CellTypeEnriched_Expression <- function(exM, clusters, fold_change ){
+  print("Mean_CellTypeEnriched_Expression")
+  genes <- cluster_DE_DF$Gene[
+    cluster_DE_DF$Cluster %in% clusters
+    & cluster_DE_DF$Log2_Fold_Change > fold_change
+    ]
+  mean_expr <- colMeans(
+    exM[row.names(exM) %in% genes, ]
+  )
+  return(mean_expr)
+}
+
+Format_Mean_CellTypeEnriched_Expression <- function(exM, seuratO, fold_change){
+  print("Format_Mean_CellTypeEnriched_Expression")
+  # Mean expression of cell type enriched genes
+  mnExDF <- data.frame(
+    RG = Mean_CellTypeEnriched_Expression(
+      exM = exM, clusters = c(7,9), fold_change = fold_change
+    )
+    , IP = Mean_CellTypeEnriched_Expression(
+      exM = exM, clusters = 2, fold_change = fold_change
+    )
+    , Neuron = Mean_CellTypeEnriched_Expression(
+      exM = exM, clusters = 0, fold_change = fold_change
+    )
+    , vRG = 0
+    , oRG = 0
+    , Endothelial = 0
+    , Interneuron = 0
+  )
+  # Add metadata
+  idx <- match(row.names(mnExDF), row.names(seuratO@meta.data))
+  mnExDF$PHASE <- seuratO@meta.data$Phase[idx]
+  mnExDF$CLUSTER <- seuratO@ident[idx]
+  mnExDF$nUMI <- seuratO@meta.data$nUMI[idx]
+  mnExDF$G2Mscore <- seuratO@meta.data$G2M.Score[idx]
+  mnExDF$Sscore <- seuratO@meta.data$S.Score[idx]
+  return(mnExDF)
+}
+
+
+expr_flag_DF <- Format_Mean_CellTypeEnriched_Expression(
+  exM = noCentExM
+  , seuratO = centSO
+  , fold_change = 0.4
+)
+ggDF <- expr_flag_DF[ ,c(1:3, 9)]
+ggDF <- melt(ggDF)
+stdev_DF <- data.frame(
+  Stdev = c(
+    sd(ggDF$value[ggDF$CLUSTER %in% c(7,9)])
+    , sd(ggDF$value[ggDF$CLUSTER %in% c(2)])
+    , sd(ggDF$value[ggDF$CLUSTER %in% c(0)])
+  )
+  , Median = c(
+    median(ggDF$value[ggDF$CLUSTER %in% c(7,9)])
+    , median(ggDF$value[ggDF$CLUSTER %in% c(2)])
+    , median(ggDF$value[ggDF$CLUSTER %in% c(0)])
+  )
+  , variable = c("RG", "IP", "Neuron")
+)
+stdev_DF$Median - stdev_DF$Stdev
+ggplot(ggDF, aes(x = CLUSTER, y = value)) +
+  facet_wrap(~variable) +
+  geom_violin() +
+  geom_jitter(size = 0.01, alpha = 0.1)
+ggsave(paste0(outGraph, "CellTypeEnriched_violin.png"), width = 9, height = 6
+ , dpi = 150)
+
+
+
+ Positive_Negative_Expression_Flag <- function(
+   exDF, highThreshold, lowThreshold) {
+
+   # Expected input data frame format
+   # (from Average_MarkersExp_Per_Cell)
+   # vRG         oRG          RG          IP Endothelial
+   # ACCAGCTAGCCT -0.12961098 -0.04274303 -0.16390677 -0.05747777  0.08723860
+   # GGAAGGACTGCA  0.17994922 -0.08862593  0.47211654 -0.02872334  1.65468242
+   # Neuron PHASE CLUSTER nUMI
+   # ACCAGCTAGCCT  0.8625643    G1       3 6165
+   # GGAAGGACTGCA -0.9443603   G2M      11 4166
+
+   df <- exDF
+   df$TYPE <- NA
+   df$TYPE[df[ ,c("Neuron")] > 1] <- "Neuron+"
+   df$TYPE[df[ ,c("IP")] > 1.3] <- "IP+"
+   df$TYPE[df[ ,c("RG")] > 0.4] <- "RG+"
+   df$TYPE[df[ ,c("IP")] > 1.3 & df[ ,c("RG")] > 0.4] <- "IP+ RG+"
+   df$TYPE[df[ ,c("IP")] > 1.3 & df[ ,c("Neuron")] > 1] <- "Neuron+ IP+"
+   df$TYPE[df[ ,c("Neuron")] > 1 & df[ ,c("RG")] > 0.4] <- "Neuron+ RG+"
+
+   df$TYPE <- factor(df$TYPE, levels = c("Neuron+", "IP+", "RG+"
+     , "IP+ RG+", "Neuron+ IP+", "Neuron+ RG+")
+   )
+   df$CLUSTER <- factor(as.character(df$CLUSTER)
+     , levels = sort(unique(as.numeric(as.character(df$CLUSTER)))))
+
+   return(df)
+ }
+
+expr_flag_DF <- Positive_Negative_Expression_Flag(
+  exDF = expr_flag_DF
+  , highThreshold = 0.5
+  , lowThreshold = 0.25
+)
+
+df <- Mixed_CellTypeEnriched_By_Cluster_Percent(
+  exM = noCentExM
+  , seuratO = centSO
+  , highThreshold = 0.5
+  , lowThreshold = 0.25
+  , type_keep = c("IP+ RG+", "Neuron+ RG+", "Neuron+ IP+", "RG+", "IP+"
+    , "Neuron+")
+  , fold_change = 0.4
+  , cluster_order = NULL)
+
+
+# Paper - plot with reordered clusters
+gg <- Mixed_CellTypeEnriched_By_Cluster_Percent_Barplot(
+  exM = noCentExM
+  , seuratO = centSO
+  , fold_change = 0.4
+  , highThreshold = 0.75, lowThreshold = 0.25
+  , type_keep = c("IP+ RG+", "Neuron+ RG+", "Neuron+ IP+", "RG+", "IP+"
+    , "Neuron+")
+  , cluster_order = c(9,7,8,10,2,0,1,4,3,13,5,6,11,12,14,15)
+  , title = paste0(graphCodeTitle
+    , "\n\nPercent of cells passing combinations of cell type enriched gene expression filters"
+    , "\nKeep CC"
+    , "\n+ = > 0.5 normalized expression"
+    , "\n- = < 0.25 normalized expression"
+  )
+)
+gg + ggplot_set_theme_publication
+# Save
+ggsave(paste0(outGraph
+  , "PercentMixedCluster_CellTypeEnriched_Barplot_paper_supp.pdf")
+  , width = 5, height = 3)
+
+# Paper - table of percents for making differentiation diagram
+percentDF <- Mixed_CellTypeEnriched_By_Cluster_Percent_Barplot(
+  exM = noCentExM, seuratO = centSO
+  , fold_change = 0.4
+  , highThreshold = 0.5, lowThreshold = 0.25
+  , type_keep = c("IP+ RG+", "Neuron+ RG+", "Neuron+ IP+", "RG+", "IP+"
+    , "Neuron+")
+  , cluster_order = c(9,7,8,10,2,0,1,4,3,13,5,6,11,12,14,15)
+)
+percentDF <- percentDF[with(percentDF, CLUSTER == 10), ]
+percentDF$Percent_NA_Removed <-
+  c(NA, (percentDF$value[2:6] / sum(percentDF$value[2:6])) * 100, NA)
+percentDF[ ,c(3:4)] <- round(percentDF[ ,c(3:4)], 1)
+write.csv(percentDF, file = paste0(
+    outTable, "PercentMixedCluster_CellTypeEnriched_paper_supp.csv")
+  , quote = FALSE)
+
 ################################################################################
 
 ### Number of mixed marker cells by region
@@ -1712,3 +2212,38 @@ ggplot(df, aes(x = SUBSET, y = Freq, fill = Var1)) +
 ggsave(paste0(outGraph, "NumberCCphase_RG_IP_Subset_Barplot.pdf")
   , width = 7, height = 7)
 ################################################################################
+
+me_DF <- ME_CellType_L[["RG_to_IP_8"]]
+me_DF <- me_DF[me_DF$Cell_Subset_025 == "RG IP" & me_DF$Fold_Change_Cutoff == 0.25, ]
+df1 <- me_DF[me_DF$variable == "IP eigengene", ]
+df2 <- me_DF[me_DF$variable == "RG eigengene", ]
+df3 <- merge(df1, df2, by = "CellID")
+ggplot(df3, aes(x = value.x, y = value.y)) +
+  geom_point() +
+  xlab(df3$variable.x[1]) +
+  ylab(df3$variable.y[1]) +
+  ggtitle("S phase")
+ggsave(paste0(outGraph, "Eigengene_Sphase_ScatterPlot.png"))
+
+me_DF <- ME_CellType_L[["RG_to_IP_10"]]
+me_DF <- me_DF[me_DF$Cell_Subset_025 == "RG IP" & me_DF$Fold_Change_Cutoff == 0.25, ]
+df1 <- me_DF[me_DF$variable == "IP eigengene", ]
+df2 <- me_DF[me_DF$variable == "RG eigengene", ]
+df3 <- merge(df1, df2, by = "CellID")
+ggplot(df3, aes(x = value.x, y = value.y)) +
+  geom_point() +
+  xlab(df3$variable.x[1]) +
+  ylab(df3$variable.y[1]) +
+  ggtitle("G2/M phase")
+ggsave(paste0(outGraph, "Eigengene_G2Mphase_ScatterPlot.png"))
+################################################################################
+
+ssExM <- noCentExM[rownames(noCentExM) %in% c("STMN2", "PAX6", "PCNA"), ]
+ssExM <- ssExM > 0.5
+ssExM <- as.data.frame(t(ssExM))
+sum(ssExM$PAX6 == TRUE & ssExM$STMN2 == TRUE & ssExM$PCNA == TRUE)
+sum(ssExM$PAX6 == TRUE & ssExM$STMN2 == TRUE & ssExM$PCNA == FALSE)
+sum(ssExM$PAX6 == TRUE & ssExM$STMN2 == FALSE & ssExM$PCNA == TRUE)
+sum(ssExM$PAX6 == TRUE)
+sum(ssExM$STMN2 == TRUE)
+sum(ssExM$PCNA == TRUE)
