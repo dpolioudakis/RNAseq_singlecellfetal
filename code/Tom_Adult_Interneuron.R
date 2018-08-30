@@ -216,7 +216,7 @@ ggsave(paste0(outGraph, "ASDtada_Fetal_Interneuron_Heatmap.png"), width = 5, hei
 ### Epilepsy heatmaps
 
 # Adult
-gg_DF <- adult_mn_expr[rownames(adult_mn_expr) %in% epilepsy_high_conf
+gg_DF <- adult_mn_expr[rownames(adult_mn_expr) %in% epilepsy_high_conf, ]
 gg_DF$Gene <- rownames(gg_DF)
 gg_DF <- melt(gg_DF)
 gg_DF$value[gg_DF$value > 2] <- 2
@@ -245,7 +245,7 @@ ggsave(paste0(outGraph, "Epilepsy_Adult_Interneuron_Heatmap.png")
 
 # Adult
 # Unique epilepsy genes
-gg_DF <- adult_mn_expr[rownames(adult_mn_expr) %in% epilepsy_unique
+gg_DF <- adult_mn_expr[rownames(adult_mn_expr) %in% epilepsy_unique, ]
 gg_DF$Gene <- rownames(gg_DF)
 gg_DF <- melt(gg_DF)
 gg_DF$value[gg_DF$value > 2] <- 2
