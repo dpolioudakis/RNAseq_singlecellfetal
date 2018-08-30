@@ -97,6 +97,10 @@ tada <- unique(tadaDF[tadaDF$tadaFdrAscSscExomeSscAgpSmallDel<0.1, "RefSeqGeneNa
 
 ## iHART
 ihartDF$HGNC.gene.symbol <- gsub("\"", "", ihartDF$HGNC.gene.symbol)
+
+## Subset to high confidence epilepsy genes
+epilepsy_high_conf <- epilepsy_DF$Gene[
+  epilepsy_DF$Classification == "High-confidence"]
 ################################################################################
 
 ### Data processing
@@ -109,6 +113,20 @@ for (i in 1:ncol(adult_mn_expr)){
   enrich <- adult_mn_expr[ ,i] - rowMeans(adult_mn_expr[,-i])
   adult_enrich_M[,i] <- enrich
 }
+
+## Unique disease genes
+# ASD
+tada_unique <- tada[
+  ! tada %in% epilepsy_high_conf
+  & ! tada %in% id_genes]
+# Epilepsy
+epilepsy_unique <- epilepsy_high_conf[
+  ! epilepsy_high_conf %in% tada
+  & ! epilepsy_high_conf %in% id_genes]
+# ID
+id_unique <- id_genes[
+  ! id_genes %in% tada
+  & ! id_genes %in% epilepsy_high_conf]
 ################################################################################
 
 ### ASD TADA heatmaps
@@ -138,7 +156,35 @@ ggplot(gg_DF, aes(x = variable, y = Gene, fill = value)) +
     , "\n\nExpression of ASD risk genes"
     , "\n(Sanders et al)"
     , "\nAdult interneuron clusters"))
-ggsave(paste0(outGraph, "TADA_Adult_Interneuron_Heatmap.png")
+ggsave(paste0(outGraph, "ASDtada_Adult_Interneuron_Heatmap.png")
+  , width = 4, height = 9)
+
+# Adult unique
+gg_DF <- adult_mn_expr[rownames(adult_mn_expr) %in% tada_unique, ]
+gg_DF$Gene <- rownames(gg_DF)
+gg_DF <- melt(gg_DF)
+gg_DF$value[gg_DF$value > 2] <- 2
+gg_DF$value[gg_DF$value < 0] <- 0
+ggplot(gg_DF, aes(x = variable, y = Gene, fill = value)) +
+  geom_tile() +
+  # scale_fill_distiller(name = "Normalized\nexpression", type = "seq"
+  #   , palette = "YlGnBu", direction = -1, na.value = "grey90"
+  #   , limits = c(0,2)) +
+  scale_fill_viridis(name = "Expression", limits = c(0,2)) +
+  theme_bw() +
+  theme(strip.text.x = element_text(angle = 90)) +
+  theme(strip.text.y = element_text(angle = 0)) +
+  theme(strip.background = element_blank()) +
+  theme(axis.ticks.y = element_blank()) +
+  theme(text = element_text(size = 12)) +
+  theme(axis.text.y = element_text(size = 10)) +
+  ylab("Genes") +
+  xlab("Clusters") +
+  ggtitle(paste0(graphCodeTitle
+    , "\n\nExpression of unique ASD risk genes"
+    , "\n(Sanders et al)"
+    , "\nAdult interneuron clusters"))
+ggsave(paste0(outGraph, "ASDtadaUnique_Adult_Interneuron_Heatmap.png")
   , width = 4, height = 9)
 
 # Fetal
@@ -164,13 +210,13 @@ ggplot(gg_DF, aes(x = variable, y = Gene, fill = value)) +
   theme(axis.text.y = element_text(size = 10)) +
   ylab("Genes") +
   xlab("Clusters") +
-ggsave(paste0(outGraph, "TADA_Fetal_Interneuron_Heatmap.png"), width = 5, height = 8)
+ggsave(paste0(outGraph, "ASDtada_Fetal_Interneuron_Heatmap.png"), width = 5, height = 8)
 ################################################################################
 
 ### Epilepsy heatmaps
 
 # Adult
-gg_DF <- adult_mn_expr[rownames(adult_mn_expr) %in% epilepsy_DF$Gene[epilepsy_DF$Classification == "High-confidence"], ]
+gg_DF <- adult_mn_expr[rownames(adult_mn_expr) %in% epilepsy_high_conf
 gg_DF$Gene <- rownames(gg_DF)
 gg_DF <- melt(gg_DF)
 gg_DF$value[gg_DF$value > 2] <- 2
@@ -196,9 +242,38 @@ ggplot(gg_DF, aes(x = variable, y = Gene, fill = value)) +
     , "\nAdult interneuron clusters"))
 ggsave(paste0(outGraph, "Epilepsy_Adult_Interneuron_Heatmap.png")
   , width = 4, height = 14)
+
+# Adult
+# Unique epilepsy genes
+gg_DF <- adult_mn_expr[rownames(adult_mn_expr) %in% epilepsy_unique
+gg_DF$Gene <- rownames(gg_DF)
+gg_DF <- melt(gg_DF)
+gg_DF$value[gg_DF$value > 2] <- 2
+gg_DF$value[gg_DF$value < 0] <- 0
+ggplot(gg_DF, aes(x = variable, y = Gene, fill = value)) +
+  geom_tile() +
+  # scale_fill_distiller(name = "Normalized\nexpression", type = "seq"
+  #   , palette = "YlGnBu", direction = -1, na.value = "grey90"
+  #   , limits = c(0,2)) +
+  scale_fill_viridis(name = "Expression", limits = c(0,2)) +
+  theme_bw() +
+  theme(strip.text.x = element_text(angle = 90)) +
+  theme(strip.text.y = element_text(angle = 0)) +
+  theme(strip.background = element_blank()) +
+  theme(axis.ticks.y = element_blank()) +
+  theme(text = element_text(size = 12)) +
+  theme(axis.text.y = element_text(size = 10)) +
+  ylab("Genes") +
+  xlab("Clusters") +
+  ggtitle(paste0(graphCodeTitle
+    , "\n\nExpression of unique Epilepsy risk genes"
+    , "\n(Elizabeth Ruzzo compiled)"
+    , "\nAdult interneuron clusters"))
+ggsave(paste0(outGraph, "EpilepsyUnique_Adult_Interneuron_Heatmap.png")
+  , width = 4, height = 14)
 ################################################################################
 
-### ASD TADA heatmaps
+### ID heatmaps
 
 # Adult
 gg_DF <- adult_mn_expr[rownames(adult_mn_expr) %in% id_genes, ]
@@ -226,6 +301,35 @@ ggplot(gg_DF, aes(x = variable, y = Gene, fill = value)) +
     , "\n(Luis de la Torre-Ubieta compiled)"
     , "\nAdult interneuron clusters"))
 ggsave(paste0(outGraph, "ID_Adult_Interneuron_Heatmap.png")
+  , width = 4, height = 7)
+
+# Adult
+# Unique ID genes
+gg_DF <- adult_mn_expr[rownames(adult_mn_expr) %in% id_unique, ]
+gg_DF$Gene <- rownames(gg_DF)
+gg_DF <- melt(gg_DF)
+gg_DF$value[gg_DF$value > 2] <- 2
+gg_DF$value[gg_DF$value < 0] <- 0
+ggplot(gg_DF, aes(x = variable, y = Gene, fill = value)) +
+  geom_tile() +
+  # scale_fill_distiller(name = "Normalized\nexpression", type = "seq"
+  #   , palette = "YlGnBu", direction = -1, na.value = "grey90"
+  #   , limits = c(0,2)) +
+  scale_fill_viridis(name = "Expression", limits = c(0,2)) +
+  theme_bw() +
+  theme(strip.text.x = element_text(angle = 90)) +
+  theme(strip.text.y = element_text(angle = 0)) +
+  theme(strip.background = element_blank()) +
+  theme(axis.ticks.y = element_blank()) +
+  theme(text = element_text(size = 12)) +
+  theme(axis.text.y = element_text(size = 10)) +
+  ylab("Genes") +
+  xlab("Clusters") +
+  ggtitle(paste0(graphCodeTitle
+    , "\n\nExpression of unique ID risk genes"
+    , "\n(Luis de la Torre-Ubieta compiled)"
+    , "\nAdult interneuron clusters"))
+ggsave(paste0(outGraph, "IDunique_Adult_Interneuron_Heatmap.png")
   , width = 4, height = 7)
 ################################################################################
 
@@ -286,11 +390,18 @@ gene_binary_M <- Add_Gene_List_To_Binary_Matrix(
   gene_binary_M = gene_binary_M, gene_list = tada, gene_list_name = "ASD")
 gene_binary_M <- Add_Gene_List_To_Binary_Matrix(
   gene_binary_M = gene_binary_M
-  , gene_list = epilepsy_DF$Gene[
-    epilepsy_DF$Classification == "High-confidence"]
-  , gene_list_name = "Epilepsy")
+  , gene_list = epilepsy_high_conf, gene_list_name = "Epilepsy")
 gene_binary_M <- Add_Gene_List_To_Binary_Matrix(
   gene_binary_M = gene_binary_M, gene_list = id_genes, gene_list_name = "ID")
+gene_binary_M <- Add_Gene_List_To_Binary_Matrix(
+  gene_binary_M = gene_binary_M, gene_list = tada_unique
+  , gene_list_name = "ASD_unique")
+gene_binary_M <- Add_Gene_List_To_Binary_Matrix(
+  gene_binary_M = gene_binary_M
+  , gene_list = epilepsy_unique, gene_list_name = "Epilepsy_unique")
+gene_binary_M <- Add_Gene_List_To_Binary_Matrix(
+  gene_binary_M = gene_binary_M, gene_list = id_unique
+  , gene_list_name = "ID_unique")
 
 ## Calculate odds ratio
 log2OR_DF <- expand.grid(colnames(gene_binary_M), colnames(gene_binary_M))
@@ -317,7 +428,8 @@ for(i in 1:ncol(gene_binary_M)){
 
 # Plot
 gg_DF <- log2OR_DF[log2OR_DF$Var1 %in% c("ASD", "Epilepsy", "ID"), ]
-gg_DF <- gg_DF[! gg_DF$Var2 %in% c("ASD", "Epilepsy", "ID"), ]
+gg_DF <- gg_DF[! gg_DF$Var2 %in% c(
+  "ASD_unique", "Epilepsy_unique", "ID_unique", "ASD", "Epilepsy", "ID"), ]
 gg_DF <- gg_DF[gg_DF$Var1 != gg_DF$Var2, ]
 gg_DF$FDR <- p.adjust(gg_DF$Pvalue, method="BH")
 gg_DF$Method <- ifelse(
@@ -346,5 +458,40 @@ ggplot(gg_DF, aes(x = Cluster, y = -log(FDR, 10), fill = Cluster)) +
 # ggsave("../analysis/graphs/MetaMat/MetaMat_ID_BarPlot_ReorderClusters.png"
 #   , width = 10, height = 5)
 ggsave(paste0(outGraph, "Enrichment_Disease_Barplot.pdf")
+  , width = 6, height = 9)
+
+# Plot unique disease genes
+gg_DF <- log2OR_DF[log2OR_DF$Var1 %in% c(
+  "ASD_unique", "Epilepsy_unique", "ID_unique"), ]
+gg_DF <- gg_DF[! gg_DF$Var2 %in% c(
+  "ASD_unique", "Epilepsy_unique", "ID_unique", "ASD", "Epilepsy", "ID"), ]
+gg_DF <- gg_DF[gg_DF$Var1 != gg_DF$Var2, ]
+gg_DF$FDR <- p.adjust(gg_DF$Pvalue, method="BH")
+gg_DF$Method <- ifelse(
+  grepl("Enriched", gg_DF$Var2) == TRUE, "Enriched", "Top expressed")
+gg_DF$Cluster <- gsub("Enriched ", "", gg_DF$Var2)
+gg_DF$Cluster <- gsub("Top expressed ", "", gg_DF$Cluster)
+ggplot(gg_DF, aes(x = Cluster, y = -log(FDR, 10), fill = Cluster)) +
+  facet_wrap(~Var1+Method, scales = "free", ncol = 2) +
+  geom_bar(stat = "identity", position = position_dodge()) +
+  scale_fill_brewer(type = "qual", palette = "Set3", direction = 1) +
+  geom_text(aes(x = Cluster, y = -log(FDR, 10)
+    , label = paste0(round(Log2_Odds_Ratio, 1), "\n(", Number, ")"))
+    , position = position_dodge(width = 1), color = "black"
+    # , angle = 90, hjust = 0.3
+    , size = 3) +
+  # ylim(0,15) +
+  geom_hline(yintercept = -log(0.05, 10), color = "red") +
+  ylab("-Log10 p-value") +
+  xlab("Clusters") +
+  ggplot_set_theme_publication +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  ggtitle(paste0(graphCodeTitle
+    , "\n\nEnrichment of unique disease risk genes"
+    , "\nNumber = log2 odds ratio; () = size of intersection"
+    , "\nAdult interneuron clusters"))
+# ggsave("../analysis/graphs/MetaMat/MetaMat_ID_BarPlot_ReorderClusters.png"
+#   , width = 10, height = 5)
+ggsave(paste0(outGraph, "Enrichment_DiseaseGeneUnique_Barplot.pdf")
   , width = 6, height = 9)
 ################################################################################
