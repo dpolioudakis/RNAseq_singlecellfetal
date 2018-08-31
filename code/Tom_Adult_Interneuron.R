@@ -30,6 +30,10 @@ source("Function_Library.R")
 ## Inputs
 
 # Tom cluster mean expression tables
+# X1 - Parvalbumin
+# X2 + X5 - Calbindin
+# X3 + X6 - Somatostatin
+# X4 - ID2
 adult_mn_expr <- read.table(
   "../analysis/analyzed_data/Tom_Adult_Interneuron/Adult.Subtypes.tsv"
   , header = TRUE, row.names = 1)
