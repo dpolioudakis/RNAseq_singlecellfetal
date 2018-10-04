@@ -29,14 +29,14 @@ source("GGplot_Theme.R")
 load("../analysis/analyzed_data/Seurat_ClusterRound2/DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/VarGenes/RegNumiLibBrain/PC1-40/Seurat_ClusterRound2_DS2-11_Cluster3_seuratO.Robj")
 
 # Seurat
-# load("../analysis/analyzed_data/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_seuratO.Robj")
-# ds_so <- centSO
-# ds_ex_m <- noCentExM
-# rm(centSO)
-# rm(noCentExM)
-load("../analysis/analyzed_data/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_TEST_seuratO.Robj")
-ds_so <- ssCentSO
-ds_ex_m <- ssNoCentExM
+load("../analysis/analyzed_data/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_seuratO.Robj")
+ds_so <- centSO
+ds_ex_m <- noCentExM
+rm(centSO)
+rm(noCentExM)
+# load("../analysis/analyzed_data/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_TEST_seuratO.Robj")
+# ds_so <- ssCentSO
+# ds_ex_m <- ssNoCentExM
 
 # Subplate markers
 sp_markers_tb <- read_csv(
@@ -78,6 +78,9 @@ idx <- match(rownames(layer.max), miller_lcm_row_annot_df$gene_symbol)
 idx <- idx[! is.na(idx)]
 miller_lcm_row_annot_df <- miller_lcm_row_annot_df[idx, ]
 
+# TFs, chromatin remodelers, and co-factors
+tf_cr_cf_tb <- load_tf_cofactors_remodelers()
+
 
 ## Output Directories
 out_graph <- "../analysis/graphs/Subplate/Subplate_Markers/Subplate_Markers_"
@@ -98,7 +101,7 @@ cluster_annot_key <- c(
   , "1" = "ExM"
   , "4" = "ExCal"
   , "3" = "ExDp1"
-  , "13" = "ExDp2"
+  # , "13" = "ExDp2"
   , "17" = "SP"
   , "5" = "InSST"
   , "6" = "InCALB2"
@@ -210,7 +213,10 @@ make_cell_id_cluster_id_key <- function(){
       (so@ident %>% enframe(name = "cell_id", value = "sub_cluster_id"))
       , by = "cell_id") %>%
     mutate_if(is.factor, as.character) %>%
-    mutate(cluster_id = replace(cluster_id, sub_cluster_id == 2, 17)) %>%
+    # Label subcluster 3:2,0 cells as 17 (subplate)
+    mutate(cluster_id = replace(cluster_id, sub_cluster_id %in% c(2,0), 17)) %>%
+    # Label cluster 13 cells as 17 (subplate)
+    mutate(cluster_id = replace(cluster_id, cluster_id == 13, 17)) %>%
     left_join(
       (cluster_annot_key %>% enframe(
         name = "cluster_id", value = "cluster_annot"))
@@ -231,7 +237,11 @@ asd_tada_tb <- clean_variable_names(asd_tada_tb)
 asd_ihart_tb <- clean_variable_names(asd_ihart_tb)
 epilepsy_tb <- clean_variable_names(epilepsy_tb)
 id_genes_tb <- clean_variable_names(id_genes_tb)
+tf_cr_cf_tb <- clean_variable_names(tf_cr_cf_tb)
 ################################################################################
+
+### Heatmaps of expression in Miller LCM of SP markers intersect with gene of
+#interest
 
 plot_miller_heatmaps <- function(){
   print("plot_miller_heatmaps")
@@ -297,6 +307,14 @@ plot_miller_heatmaps <- function(){
   ggsave(paste0(out_graph, "id_miller_heatmap.pdf")
     , width = 9, height = 5)
 
+    # TFs
+    sp_markers_tb %>%
+      left_join(tf_cr_cf_tb, by = c("gene" = "hgnc_symbol")) %>%
+      plot_miller_lcm() +
+      ggtitle(paste0(script_name
+        , "\nIntersection of subplate markers and TFsk, co-factors, and chromatin remodelers"))
+    ggsave(paste0(out_graph, "tfs_miller_heatmap.pdf")
+      , width = 9, height = 5)
 }
 ################################################################################
 
