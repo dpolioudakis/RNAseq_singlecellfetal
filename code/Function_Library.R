@@ -338,6 +338,7 @@ Plot_Marker_Genes_Heatmap_SetColWidths <- function(
   , upperLimit = 1.5
   , geneOrder = TRUE
   , clusterOrder = c(9,7,8,10,2,0,1,4,3,13,5,6,11,12,14,15)
+  , color_viridis = FALSE
   ) {
 
   print("Plot_Marker_Genes_Heatmap_SetColWidths")
@@ -362,10 +363,18 @@ Plot_Marker_Genes_Heatmap_SetColWidths <- function(
     geom_tile() +
     facet_grid(Group~Cluster, space = "free_y", scales = "free"
       , drop = TRUE) +
-    # scale_fill_gradient2(high = "#d7191c", low = "#2c7bb6")
-    scale_fill_distiller(name = "Normalized\nexpression", type = "div"
-      , palette = 5, direction = -1, limits = c(lowerLimit, upperLimit)
-      , na.value = "grey90") +
+    { if(color_viridis == TRUE) {
+      scale_fill_viridis(name = "Normalized expression"
+      , limits = c(lowerLimit, upperLimit))
+    } else {
+      scale_fill_distiller(name = "Normalized\nexpression\nzscore"
+        , type = "div", palette = 5, direction = -1
+        , limits = c(lowerLimit, upperLimit)
+        , na.value = "grey90")
+    }} +
+    # scale_fill_distiller(name = "Normalized\nexpression", type = "div"
+    #   , palette = 5, direction = -1, limits = c(lowerLimit, upperLimit)
+    #   , na.value = "grey90") +
     theme_bw() +
     theme(strip.text.x = element_text(angle = 90)) +
     theme(strip.text.y = element_text(angle = 0)) +
@@ -596,6 +605,16 @@ FeaturePlot <- function(genes, tsneDF, seuratO, exM, limLow, limHigh
 
 ### General functions
 
+# Add gene list as column to 0 1 matrix with genes as row names
+Add_Gene_List_To_Binary_Matrix <- function(
+  gene_binary_M, gene_list, gene_list_name){
+  print("Add_Gene_List_To_Binary_Matrix")
+  binary_gene_list <- as.numeric(rownames(gene_binary_M) %in% gene_list)
+  gene_binary_M <- cbind(gene_binary_M, binary_gene_list)
+  colnames(gene_binary_M)[dim(gene_binary_M)[2]] <- gene_list_name
+  return(gene_binary_M)
+}
+
 Convert_Mixed_GeneSym_EnsID_To_EnsID <- function(ids){
   # Converts vector of gene symbols and ensembl IDs to ensembl IDs
   # ids must be character format
@@ -607,6 +626,18 @@ Convert_Mixed_GeneSym_EnsID_To_EnsID <- function(ids){
   ens <- bmDF$ensembl_gene_id[idx]
   ids[! is.na(ens)] <- as.character(ens[! is.na(ens)])
   return(ids)
+}
+
+clean_variable_names <- function(data){
+  cleaned <- data %>%
+    rename_all(
+      funs(
+        gsub("* ", "_", .) %>%
+        gsub("*\\.", "_", .) %>%
+        tolower
+      )
+    )
+  return(cleaned)
 }
 
 # Cowplot plot_grid and add title
@@ -627,16 +658,6 @@ Remove_Outliers_By_SD <- function(x, nStdev, na.rm = TRUE, ...) {
   x[x > (mn + nStdev*stdev) | x < (mn - nStdev*stdev)] <- NA
   # x <- as.numeric(x)
   return(x)
-}
-
-# Add gene list as column to 0 1 matrix with genes as row names
-Add_Gene_List_To_Binary_Matrix <- function(
-  gene_binary_M, gene_list, gene_list_name){
-  print("Add_Gene_List_To_Binary_Matrix")
-  binary_gene_list <- as.numeric(rownames(gene_binary_M) %in% gene_list)
-  gene_binary_M <- cbind(gene_binary_M, binary_gene_list)
-  colnames(gene_binary_M)[dim(gene_binary_M)[2]] <- gene_list_name
-  return(gene_binary_M)
 }
 ################################################################################
 
@@ -666,6 +687,86 @@ ggplot_set_theme_publication_nolabels <-
     , axis.text = element_blank()
     , axis.ticks = element_blank()
   )
+################################################################################
+
+### Load datasets
+
+# ASD
+# TADA Sanders 2015 = from Luis metaMat
+load_asd_sanders_genes <- function(){
+  read_csv(
+    "../source/Gene_Lists/geschwindlabshares/Hi-C/traitsenrichment/data/Lists/Sanders_2015_TADA.csv") %>%
+    filter(tadaFdrAscSscExomeSscAgpSmallDel < 0.1) %>%
+    select(gene = RefSeqGeneName) %>%
+    clean_variable_names()
+}
+
+# ihart
+load_asd_ihart_genes <- function(){
+  read_csv(
+    "../source/Gene_Lists/ASD.risk-genes.ForDamon.SingleCellExp_2018-04-18.csv") %>%
+    clean_variable_names() %>%
+    mutate(hgnc_gene_symbol = gsub("\"", "", hgnc_gene_symbol)) %>%
+    filter(ihart_69 == 1) %>%
+    select(hgnc_gene_symbol)
+}
+
+
+# Epilepsy high confidence risk genes from Elizabeth Ruzzo
+load_epilepsy_high_conf_genes <- function(){
+  read_tsv(
+    "../source/Gene_Lists/High-Confidence_Epilepsy_Risk_Genes_Ruzzo_2018-05-11.txt") %>%
+    clean_variable_names() %>%
+    filter(classification == "High-confidence") %>%
+    select(gene)
+}
+
+# ID risk genes
+# de novo ID: NEJM + Lancet
+load_id_nejm_lancet_genes <- function(){
+  id_genes_tb <- bind_rows(
+    read_tsv("../source/Gene_Lists/geschwindlabshares/Hi-C/traitsenrichment/data/Lists/ID_denovo_deLigt_NEJM.txt") %>%
+      clean_variable_names() %>%
+      filter(nature_of_mutation == "D") %>%
+      select(gene)
+    , read_tsv("../source/Gene_Lists/geschwindlabshares/Hi-C/traitsenrichment/data/Lists/ID_denovo_Rauch_Lancet.txt") %>%
+      clean_variable_names() %>%
+      filter(type %in% c("frameshift", "nonsense", "splice")) %>%
+      select(gene = gene_symbol) %>%
+      rename()
+  ) %>% distinct()
+  return(id_genes_tb)
+}
+
+## TFs, chromatin remodelers, and co-factors
+load_tf_cofactors_remodelers <- function(){
+  print("load_tf_cofactors_remodelers")
+
+  # Load
+  factors_tb <- bind_rows(
+    # Human TFs
+    read_tsv("../source/AnimalTFDB_Homo_sapiens_TF_EnsemblID.txt"
+      , col_names = FALSE) %>%
+      add_column(type = "TF")
+
+    # Human chromatin remodeling factors
+    , read_tsv("../source/AnimalTFDB_Homo_sapiens_chr_remodeling_factor_EnsemblID.txt"
+      , col_names = FALSE) %>%
+      add_column(type = "chromatin remodeler")
+
+    # Human co-factors
+    , read_tsv("../source/AnimalTFDB_Homo_sapiens_cofactor_EnsemblID.txt"
+      , col_names = FALSE) %>%
+      add_column(type = "cofactor")
+  )
+  # Add hgnc symbols
+  bm_tb <- read_csv("../source/BiomaRt_Compile_GeneInfo_GRCh38_Ensembl87.csv"
+    , col_names = TRUE)
+  factors_tb <- bm_tb %>% select(ensembl_gene_id, hgnc_symbol) %>%
+    right_join(factors_tb, by = c("ensembl_gene_id" = "X1"))
+
+  return(factors_tb)
+}
 ################################################################################
 
 ### Monocle functions
@@ -858,6 +959,8 @@ ScatterPlot_Expression <- function (genes, exprM, limLow, limHigh){
   return(gg)
 }
 ################################################################################
+
+### Violin plots
 
 ## Violin plots of expression by cluster
 Gene_Expression_By_Cluster_ViolinPlot <- function(genes, exprM, clusterIDs
