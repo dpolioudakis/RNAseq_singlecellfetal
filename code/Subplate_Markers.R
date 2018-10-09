@@ -29,14 +29,14 @@ source("GGplot_Theme.R")
 load("../analysis/analyzed_data/Seurat_ClusterRound2/DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/VarGenes/RegNumiLibBrain/PC1-40/Seurat_ClusterRound2_DS2-11_Cluster3_seuratO.Robj")
 
 # Seurat
-load("../analysis/analyzed_data/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_seuratO.Robj")
-ds_so <- centSO
-ds_ex_m <- noCentExM
-rm(centSO)
-rm(noCentExM)
-# load("../analysis/analyzed_data/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_TEST_seuratO.Robj")
-# ds_so <- ssCentSO
-# ds_ex_m <- ssNoCentExM
+# load("../analysis/analyzed_data/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_seuratO.Robj")
+# ds_so <- centSO
+# ds_ex_m <- noCentExM
+# rm(centSO)
+# rm(noCentExM)
+load("../analysis/analyzed_data/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_TEST_seuratO.Robj")
+ds_so <- ssCentSO
+ds_ex_m <- ssNoCentExM
 
 # Subplate markers
 sp_markers_tb <- read_csv(
@@ -238,6 +238,11 @@ asd_ihart_tb <- clean_variable_names(asd_ihart_tb)
 epilepsy_tb <- clean_variable_names(epilepsy_tb)
 id_genes_tb <- clean_variable_names(id_genes_tb)
 tf_cr_cf_tb <- clean_variable_names(tf_cr_cf_tb)
+
+# Subset marker sets
+sp_markers_tb <- sp_markers_tb %>% filter(group %in% c(
+  "SP_vs_all_DE04", "SP_vs_all_DE04_top80", "SP_vs_cluster3_DE04"
+  , "ST18_correlate_top80", "Intersect_SPDE_ST18cor"))
 ################################################################################
 
 ### Heatmaps of expression in Miller LCM of SP markers intersect with gene of
@@ -309,10 +314,10 @@ plot_miller_heatmaps <- function(){
 
     # TFs
     sp_markers_tb %>%
-      left_join(tf_cr_cf_tb, by = c("gene" = "hgnc_symbol")) %>%
+      inner_join(tf_cr_cf_tb, by = c("gene" = "hgnc_symbol")) %>%
       plot_miller_lcm() +
       ggtitle(paste0(script_name
-        , "\nIntersection of subplate markers and TFsk, co-factors, and chromatin remodelers"))
+        , "\nIntersection of subplate markers and TFs, co-factors, and chromatin remodelers"))
     ggsave(paste0(out_graph, "tfs_miller_heatmap.pdf")
       , width = 9, height = 5)
 }
@@ -420,6 +425,20 @@ plot_dropseq_tsnes <- function(){
     ggsave(paste0(out_graph, "id_featureplotind_normcentscale.png")
       , width = 13, height = 9)
 
+  sp_markers_tb %>%
+    inner_join(tf_cr_cf_tb, by = c("gene" = "hgnc_symbol")) %>%
+    pull(gene) %>%
+    # Feature plot normalized, mean centered scaled
+    # Individual expression
+    plot_tsne_expression(.) %>%
+    Plot_Grid(., ncol = 4, align = 'v', axis = 'r', rel_height = c(0.1)
+      , title = paste0(script_name
+        , "\n\nIntersection of subplate markers and TFs, co-factors, and chromatin remodelers"
+        , "\nNormalized expression, mean centered and variance scaled"
+        , "\n")
+    )
+    ggsave(paste0(out_graph, "tfs_featureplotind_normcentscale.png")
+      , width = 13, height = 21)
 }
 ################################################################################
 
@@ -629,6 +648,30 @@ plot_dropseq_heatmaps <- function(){
       out_graph
       , "id_heatmapsetcolwid_normcentscale.png")
     , width = 10, height = 6
+  )
+
+  ## TFs
+  gene_group_df <- sp_markers_tb %>%
+    inner_join(tf_cr_cf_tb, by = c("gene" = "hgnc_symbol")) %>%
+    select(Gene = gene, Group = group) %>% as.data.frame
+  Plot_Marker_Genes_Heatmap_SetColWidths(
+    geneGroupDF = gene_group_df
+    , exprM = ds_so@scale.data
+    , cellID_clusterID <- make_cell_id_cluster_id_key()
+    , clusters = cluster_annot_key[cluster_annot_key != "NA"]
+    , clusterOrder = cluster_annot_key[cluster_annot_key != "NA"]
+  ) +
+    ggtitle(paste0(script_name
+      , "\n\nIntersection of subplate markers and TFs, co-factors, and chromatin remodelers"
+      , "\nx-axis: Genes"
+      , "\ny-axis: Cells ordered by cluster"
+      , "\nNormalized expression, mean centered, variance scaled"
+      , "\n")
+    )
+  ggsave(paste0(
+      out_graph
+      , "tfs_heatmapsetcolwid_normcentscale.png")
+    , width = 10, height = 10
   )
 }
 ################################################################################
