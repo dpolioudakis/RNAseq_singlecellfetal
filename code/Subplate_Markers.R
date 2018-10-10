@@ -29,14 +29,14 @@ source("GGplot_Theme.R")
 load("../analysis/analyzed_data/Seurat_ClusterRound2/DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/VarGenes/RegNumiLibBrain/PC1-40/Seurat_ClusterRound2_DS2-11_Cluster3_seuratO.Robj")
 
 # Seurat
-# load("../analysis/analyzed_data/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_seuratO.Robj")
-# ds_so <- centSO
-# ds_ex_m <- noCentExM
-# rm(centSO)
-# rm(noCentExM)
-load("../analysis/analyzed_data/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_TEST_seuratO.Robj")
-ds_so <- ssCentSO
-ds_ex_m <- ssNoCentExM
+load("../analysis/analyzed_data/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_seuratO.Robj")
+ds_so <- centSO
+ds_ex_m <- noCentExM
+rm(centSO)
+rm(noCentExM)
+# load("../analysis/analyzed_data/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_TEST_seuratO.Robj")
+# ds_so <- ssCentSO
+# ds_ex_m <- ssNoCentExM
 
 # Subplate markers
 sp_markers_tb <- read_csv(
@@ -223,6 +223,42 @@ make_cell_id_cluster_id_key <- function(){
       , by = "cluster_id") %>%
       select(cell_id, cluster_annot) %>% deframe
   return(cellid_clusterid)
+}
+
+plot_expression_by_cluster_boxplot <- function(
+  genes
+  , expr_m
+  , cell_cluster_key
+  , cluster_order = NULL
+  ){
+  print("plot_expression_by_cluster_boxplot")
+
+  # make cell_cluster_key a tibble if it's not
+  if (any(class(cell_cluster_key) != "tibble")) {
+    cell_cluster_key_tb <- cell_cluster_key %>%
+      enframe(name = "cell_id", value = "cluster") %>%
+      as_tibble
+  }
+  print(cell_cluster_key_tb)
+
+  # gather data
+  gg_tb <- expr_m %>%
+    as_tibble(rownames = "gene") %>%
+    filter(gene %in% genes) %>%
+    gather(., key = "cell_id", value = "expression", -gene) %>%
+    left_join(., cell_cluster_key_tb) %>%
+    # order clusters
+    mutate(cluster = fct_relevel(cluster, cluster_annot_key)) %>%
+    # order genes
+    mutate(genes = fct_relevel(gene, unique(genes)))
+
+  # plot
+  ggplot(gg_tb, aes(x = cluster, y = expression, fill = cluster)) +
+    facet_wrap(~gene, ncol = 4, scales = "free") +
+    geom_boxplot(outlier.size = 0.1) +
+    theme(
+      axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)
+      , legend.position = "none")
 }
 ################################################################################
 
@@ -674,6 +710,93 @@ plot_dropseq_heatmaps <- function(){
     , width = 10, height = 10
   )
 }
+################################################################################
+
+# Allen Developmental Macaque human specific genes
+sp_markers_tb %>%
+  left_join(hs_tb, by = "gene") %>%
+  filter(set %in% c("Human-specific", "Primate-specific")) %>%
+  plot_miller_lcm() +
+  ggtitle(paste0(script_name
+    , "\nIntersection of subplate markers and human specific expression pattern genes"))
+ggsave(paste0(out_graph, "human_specific_miller_heatmap.pdf")
+  , width = 9, height = 5)
+
+# Do SP markers have human gained enhancers?
+gg_1 <- sp_markers_tb %>%
+  inner_join(hge_tb, by = c("gene" = "hgnc")) %>%
+  filter(gz_or_cp == "GZ>CP") %>%
+  plot_miller_lcm() +
+    ggtitle("GZ>CP")
+gg_2 <- sp_markers_tb %>%
+  inner_join(hge_tb, by = c("gene" = "hgnc")) %>%
+  filter(gz_or_cp == "CP>GZ") %>%
+  plot_miller_lcm() +
+    ggtitle("CP>GZ")
+Plot_Grid(list(gg_1, gg_2), ncol = 1
+    , title = paste0(script_name, "\nIntersection of subplate markers and human gained enhancers"))
+ggsave(paste0(out_graph, "hge_miller_heatmap.pdf")
+  , width = 9, height = 10)
+
+# Are SP markers disease risk genes?
+# ASD Sanders
+sp_markers_tb %>%
+  inner_join(asd_tada_tb, by = "gene") %>%
+  plot_miller_lcm() +
+    ggtitle(paste0(script_name
+      , "\nIntersection of subplate markers and ASD (Sanders)"))
+ggsave(paste0(out_graph, "asd_sanders_miller_heatmap.pdf")
+  , width = 9, height = 5)
+# ASD ihart
+sp_markers_tb %>%
+  inner_join(asd_ihart_tb, by = c("gene" = "hgnc_gene_symbol")) %>%
+  plot_miller_lcm() +
+    ggtitle(paste0(script_name
+      , "\nIntersection of subplate markers and ASD (ihart)"))
+ggsave(paste0(out_graph, "asd_ihart_miller_heatmap.pdf")
+  , width = 9, height = 5)
+# Epilepsy
+sp_markers_tb %>%
+  inner_join(epilepsy_tb, by = "gene") %>%
+  plot_miller_lcm() +
+    ggtitle(paste0(script_name
+      , "\nIntersection of subplate markers and epilepsy (Ruzzo)"))
+ggsave(paste0(out_graph, "epilepsy_miller_heatmap.pdf")
+  , width = 9, height = 5)
+
+
+### need to boxplot gene lists above here
+
+# ID
+sp_markers_tb %>%
+  inner_join(id_genes_tb, by = "gene") %>%
+  plot_expression_by_cluster_boxplot(
+    genes = .
+    , expr_m = ds_ex_m
+    , cell_cluster_key = make_cell_id_cluster_id_key()
+    , cluster_order = cluster_annot_key
+  ) +
+    ggtitle(paste0(script_name
+      , "\n\nIntersection of subplate markers and ID (deLigt and Rauch)"
+      , "\nNormalized expression"))
+ggsave(paste0(out_graph, "id_miller_heatmap.pdf")
+  , width = 11, height = 5)
+
+# TFs, chromatin remodelers, co-factors
+sp_markers_tb %>%
+  inner_join(tf_cr_cf_tb, by = c("gene" = "hgnc_symbol")) %>%
+  pull(gene) %>%
+  plot_expression_by_cluster_boxplot(
+    genes = .
+    , expr_m = ds_ex_m
+    , cell_cluster_key = make_cell_id_cluster_id_key()
+    , cluster_order = cluster_annot_key
+  ) +
+    ggtitle(paste0(script_name
+    , "\n\nIntersection of subplate markers and TFs, co-factors, and chromatin remodelers"
+    , "\nNormalized expression"))
+ggsave(paste0(out_graph, "tfs_boxplot_normcentscale.png")
+  , width = 11, height = 11)
 ################################################################################
 
 # How much do subplate markers overlap with deep layer markers?
