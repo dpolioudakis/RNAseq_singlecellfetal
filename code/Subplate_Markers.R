@@ -81,6 +81,10 @@ miller_lcm_row_annot_df <- miller_lcm_row_annot_df[idx, ]
 # TFs, chromatin remodelers, and co-factors
 tf_cr_cf_tb <- load_tf_cofactors_remodelers()
 
+# Known cell type markers
+known_marker_tb <- read_csv(
+  "../source/MarkersforSingleCell_2017-10-11_Markers.csv")
+
 
 ## Output Directories
 out_graph <- "../analysis/graphs/Subplate/Subplate_Markers/Subplate_Markers_"
@@ -213,8 +217,10 @@ make_cell_id_cluster_id_key <- function(){
       (so@ident %>% enframe(name = "cell_id", value = "sub_cluster_id"))
       , by = "cell_id") %>%
     mutate_if(is.factor, as.character) %>%
+    # Label subcluster 3:2 cells as 17 (subplate)
+    mutate(cluster_id = replace(cluster_id, sub_cluster_id %in% c(2), 17)) %>%
     # Label subcluster 3:2,0 cells as 17 (subplate)
-    mutate(cluster_id = replace(cluster_id, sub_cluster_id %in% c(2,0), 17)) %>%
+    # mutate(cluster_id = replace(cluster_id, sub_cluster_id %in% c(2,0), 17)) %>%
     # Label cluster 13 cells as 17 (subplate)
     mutate(cluster_id = replace(cluster_id, cluster_id == 13, 17)) %>%
     left_join(
@@ -239,7 +245,6 @@ plot_expression_by_cluster_boxplot <- function(
       enframe(name = "cell_id", value = "cluster") %>%
       as_tibble
   }
-  print(cell_cluster_key_tb)
 
   # gather data
   gg_tb <- expr_m %>%
@@ -260,6 +265,59 @@ plot_expression_by_cluster_boxplot <- function(
       axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)
       , legend.position = "none")
 }
+
+determine_number_of_cells_genes_are_both_expressed_in <- function(
+  genes, expr_m, title){
+
+  print("determine_number_of_cells_genes_are_both_expressed_in")
+
+  m1 <- expr_m[row.names(expr_m) %in% genes, ] > 0.5
+  l1 <- apply(m1, 2, function(col) row.names(m1)[col])
+
+  ldf <- lapply(l1, function(genes) {
+    v2 <- genes[genes %in% genes]
+    v3 <- genes[genes %in% genes]
+    expand.grid(v2, v3)
+  })
+  df1 <- do.call("rbind", ldf)
+
+  # format for matrix
+  df3 <- dcast(df1, Var1 ~ Var2)
+  row.names(df3) <- df3$Var1
+  df3 <- df3[ ,-1]
+
+  # long format
+  df3$gene1 <- row.names(df3)
+  df3 <- melt(df3)
+  df3$gene1 <- factor(df3$gene, levels = genes)
+  df3$gene2 <- factor(df3$variable, levels = genes)
+  df3 <- df3[ ,c("gene1", "gene2", "value")]
+
+  return(df3)
+}
+
+calculate_jaccard_overlap_of_cells_expressing_two_genes_of_interest <-
+  function(gene1, gene2){
+
+  print("calculate_jaccard_overlap_of_cells_expressing_genes")
+  print(gene1, gene2)
+
+  # tibble of gene1, gene2, cell IDs, and if gene is expressed in a given cell
+  expressed_tb <- ds_ex_m %>% as_tibble(rownames = "gene") %>% filter(gene %in% c(gene1, gene2)) %>% gather(., key = "cell_id", value = "expression", -gene) %>%
+    mutate(expressed = expression > 0.5)
+
+  # select cell ids of cells that express gene 1 or 2
+  cell_ids_1 <- filter(expressed_tb, gene == gene1 & expressed == TRUE) %>%
+    pull(cell_id)
+  cell_ids_2 <- filter(expressed_tb, gene == gene2 & expressed == TRUE) %>%
+    pull(cell_id)
+
+  # calculate jaccard index using cell ids
+  jaccard_index <- length(intersect(cell_ids_1, cell_ids_2)) /
+    length(union(cell_ids_1, cell_ids_2))
+
+  return(jaccard_index)
+}
 ################################################################################
 
 ### Clean data
@@ -274,6 +332,7 @@ asd_ihart_tb <- clean_variable_names(asd_ihart_tb)
 epilepsy_tb <- clean_variable_names(epilepsy_tb)
 id_genes_tb <- clean_variable_names(id_genes_tb)
 tf_cr_cf_tb <- clean_variable_names(tf_cr_cf_tb)
+known_marker_tb <- clean_variable_names(known_marker_tb)
 
 # Subset marker sets
 sp_markers_tb <- sp_markers_tb %>% filter(group %in% c(
@@ -361,8 +420,8 @@ plot_miller_heatmaps <- function(){
 
 ### tSNE expression of subplate markers intersected with genes of interest
 
-plot_dropseq_tsnes <- function(){
-  print("plot_dropseq_tsnes")
+plot_dropseq_expression_tsnes <- function(){
+  print("plot_dropseq_expression_tsnes")
 
   sp_markers_tb %>%
     left_join(hs_tb, by = "gene") %>%
@@ -480,8 +539,8 @@ plot_dropseq_tsnes <- function(){
 
 ### Heatmaps expression of subplate markers intersected with genes of interest
 
-plot_dropseq_heatmaps <- function(){
-  print("plot_dropseq_heatmaps")
+plot_dropseq_expression_heatmaps <- function(){
+  print("plot_dropseq_expression_heatmaps")
 
   ## Allen human specific
   gene_group_df <- sp_markers_tb %>%
@@ -712,104 +771,256 @@ plot_dropseq_heatmaps <- function(){
 }
 ################################################################################
 
-# Allen Developmental Macaque human specific genes
-sp_markers_tb %>%
-  left_join(hs_tb, by = "gene") %>%
-  filter(set %in% c("Human-specific", "Primate-specific")) %>%
-  plot_miller_lcm() +
-  ggtitle(paste0(script_name
-    , "\nIntersection of subplate markers and human specific expression pattern genes"))
-ggsave(paste0(out_graph, "human_specific_miller_heatmap.pdf")
-  , width = 9, height = 5)
+### Drop-seq expression boxplots
 
-# Do SP markers have human gained enhancers?
-gg_1 <- sp_markers_tb %>%
-  inner_join(hge_tb, by = c("gene" = "hgnc")) %>%
-  filter(gz_or_cp == "GZ>CP") %>%
-  plot_miller_lcm() +
-    ggtitle("GZ>CP")
-gg_2 <- sp_markers_tb %>%
-  inner_join(hge_tb, by = c("gene" = "hgnc")) %>%
-  filter(gz_or_cp == "CP>GZ") %>%
-  plot_miller_lcm() +
+plot_dropseq_expression_boxplots <- function(){
+
+  print("plot_dropseq_expression_boxplots")
+
+  # Allen Developmental Macaque human specific genes
+  sp_markers_tb %>%
+    left_join(hs_tb, by = "gene") %>%
+    filter(set %in% c("Human-specific")) %>%
+    plot_expression_by_cluster_boxplot(
+      genes = .
+      , expr_m = ds_ex_m
+      , cell_cluster_key = make_cell_id_cluster_id_key()
+      , cluster_order = cluster_annot_key
+    ) +
+      ggtitle(paste0(script_name
+        , "\n\nIntersection of subplate markers and ASD (Sanders)"
+        , "\nNormalized expression"))
+  ggsave(paste0(out_graph, "asd_sanders_miller_heatmap.pdf")
+    , width = 11, height = 5)
+
+  # Do SP markers have human gained enhancers?
+  gg_1 <- sp_markers_tb %>%
+    inner_join(hge_tb, by = c("gene" = "hgnc")) %>%
+    filter(gz_or_cp == "GZ>CP") %>%
+    plot_expression_by_cluster_boxplot(
+      genes = .
+      , expr_m = ds_ex_m
+      , cell_cluster_key = make_cell_id_cluster_id_key()
+      , cluster_order = cluster_annot_key
+    ) +
+      ggtitle("GZ>CP")
+  gg_2 <- sp_markers_tb %>%
+    inner_join(hge_tb, by = c("gene" = "hgnc")) %>%
+    filter(gz_or_cp == "CP>GZ") %>%
+    plot_expression_by_cluster_boxplot(
+      genes = .
+      , expr_m = ds_ex_m
+      , cell_cluster_key = make_cell_id_cluster_id_key()
+      , cluster_order = cluster_annot_key
+    ) +
     ggtitle("CP>GZ")
-Plot_Grid(list(gg_1, gg_2), ncol = 1
-    , title = paste0(script_name, "\nIntersection of subplate markers and human gained enhancers"))
-ggsave(paste0(out_graph, "hge_miller_heatmap.pdf")
-  , width = 9, height = 10)
+  Plot_Grid(list(gg_1, gg_2), ncol = 1
+      , title = paste0(
+        script_name
+        , "\nIntersection of subplate markers and human gained enhancers"
+        , "\nNormalized expression"))
+  ggsave(paste0(out_graph, "hge_miller_heatmap.pdf")
+    , width = 11, height = 5)
 
-# Are SP markers disease risk genes?
-# ASD Sanders
-sp_markers_tb %>%
-  inner_join(asd_tada_tb, by = "gene") %>%
-  plot_miller_lcm() +
-    ggtitle(paste0(script_name
-      , "\nIntersection of subplate markers and ASD (Sanders)"))
-ggsave(paste0(out_graph, "asd_sanders_miller_heatmap.pdf")
-  , width = 9, height = 5)
-# ASD ihart
-sp_markers_tb %>%
-  inner_join(asd_ihart_tb, by = c("gene" = "hgnc_gene_symbol")) %>%
-  plot_miller_lcm() +
-    ggtitle(paste0(script_name
-      , "\nIntersection of subplate markers and ASD (ihart)"))
-ggsave(paste0(out_graph, "asd_ihart_miller_heatmap.pdf")
-  , width = 9, height = 5)
-# Epilepsy
-sp_markers_tb %>%
-  inner_join(epilepsy_tb, by = "gene") %>%
-  plot_miller_lcm() +
-    ggtitle(paste0(script_name
-      , "\nIntersection of subplate markers and epilepsy (Ruzzo)"))
-ggsave(paste0(out_graph, "epilepsy_miller_heatmap.pdf")
-  , width = 9, height = 5)
+  # ASD Sanders
+  sp_markers_tb %>%
+    inner_join(asd_tada_tb, by = "gene") %>%
+    plot_expression_by_cluster_boxplot(
+      genes = .
+      , expr_m = ds_ex_m
+      , cell_cluster_key = make_cell_id_cluster_id_key()
+      , cluster_order = cluster_annot_key
+    ) +
+      ggtitle(paste0(script_name
+        , "\n\nIntersection of subplate markers and ASD (Sanders)"
+        , "\nNormalized expression"))
+  ggsave(paste0(out_graph, "asd_sanders_miller_heatmap.pdf")
+    , width = 11, height = 5)
 
+  # ASD ihart
+  sp_markers_tb %>%
+    inner_join(asd_ihart_tb, by = c("gene" = "hgnc_gene_symbol")) %>%
+    plot_expression_by_cluster_boxplot(
+      genes = .
+      , expr_m = ds_ex_m
+      , cell_cluster_key = make_cell_id_cluster_id_key()
+      , cluster_order = cluster_annot_key
+    ) +
+      ggtitle(paste0(script_name
+        , "\n\nIntersection of subplate markers and ASD (ihart)"
+        , "\nNormalized expression"))
+  ggsave(paste0(out_graph, "asd_ihart_miller_heatmap.pdf")
+    , width = 11, height = 5)
 
-### need to boxplot gene lists above here
+  # Epilepsy
+  sp_markers_tb %>%
+    inner_join(epilepsy_tb, by = "gene") %>%
+    plot_expression_by_cluster_boxplot(
+      genes = .
+      , expr_m = ds_ex_m
+      , cell_cluster_key = make_cell_id_cluster_id_key()
+      , cluster_order = cluster_annot_key
+    ) +
+      ggtitle(paste0(script_name
+        , "\n\nIntersection of subplate markers and epilepsy (Ruzzo)"
+        , "\nNormalized expression"))
+  ggsave(paste0(out_graph, "epilepsy_miller_heatmap.pdf")
+    , width = 11, height = 5)
 
-# ID
-sp_markers_tb %>%
-  inner_join(id_genes_tb, by = "gene") %>%
-  plot_expression_by_cluster_boxplot(
-    genes = .
-    , expr_m = ds_ex_m
-    , cell_cluster_key = make_cell_id_cluster_id_key()
-    , cluster_order = cluster_annot_key
-  ) +
-    ggtitle(paste0(script_name
-      , "\n\nIntersection of subplate markers and ID (deLigt and Rauch)"
+  # ID
+  sp_markers_tb %>%
+    inner_join(id_genes_tb, by = "gene") %>%
+    plot_expression_by_cluster_boxplot(
+      genes = .
+      , expr_m = ds_ex_m
+      , cell_cluster_key = make_cell_id_cluster_id_key()
+      , cluster_order = cluster_annot_key
+    ) +
+      ggtitle(paste0(script_name
+        , "\n\nIntersection of subplate markers and ID (deLigt and Rauch)"
+        , "\nNormalized expression"))
+  ggsave(paste0(out_graph, "id_miller_heatmap.pdf")
+    , width = 11, height = 5)
+
+  # TFs, chromatin remodelers, co-factors
+  sp_markers_tb %>%
+    inner_join(tf_cr_cf_tb, by = c("gene" = "hgnc_symbol")) %>%
+    pull(gene) %>%
+    plot_expression_by_cluster_boxplot(
+      genes = .
+      , expr_m = ds_ex_m
+      , cell_cluster_key = make_cell_id_cluster_id_key()
+      , cluster_order = cluster_annot_key
+    ) +
+      ggtitle(paste0(script_name
+      , "\n\nIntersection of subplate markers and TFs, co-factors, and chromatin remodelers"
       , "\nNormalized expression"))
-ggsave(paste0(out_graph, "id_miller_heatmap.pdf")
-  , width = 11, height = 5)
+  ggsave(paste0(out_graph, "tfs_boxplot_normcentscale.png")
+    , width = 11, height = 11)
 
-# TFs, chromatin remodelers, co-factors
-sp_markers_tb %>%
-  inner_join(tf_cr_cf_tb, by = c("gene" = "hgnc_symbol")) %>%
-  pull(gene) %>%
-  plot_expression_by_cluster_boxplot(
-    genes = .
-    , expr_m = ds_ex_m
-    , cell_cluster_key = make_cell_id_cluster_id_key()
-    , cluster_order = cluster_annot_key
-  ) +
-    ggtitle(paste0(script_name
-    , "\n\nIntersection of subplate markers and TFs, co-factors, and chromatin remodelers"
-    , "\nNormalized expression"))
-ggsave(paste0(out_graph, "tfs_boxplot_normcentscale.png")
-  , width = 11, height = 11)
+}
 ################################################################################
+
+### Cells expressing combinations of subplate and / or deep layer markers
 
 # How much do subplate markers overlap with deep layer markers?
 
 # Are subplate markers in the same cell?
+
+plot_cells_expressing_gene_combinations_heatmaps <- function(){
+
+  print("plot_cells_expressing_gene_combinations_heatmaps")
+
+  # Numbers of cells both genes are expressed in
+  genes <- c(sp_markers_tb %>%
+      filter(group == "Intersect_SPDE_ST18cor") %>% pull(gene)
+    , known_marker_tb %>% filter(grouping == "Excitatory Deep Layer Cortical") %>% pull(gene_symbol)
+  )
+  genes %>% determine_number_of_cells_genes_are_both_expressed_in(
+      genes = ., expr_m = ds_ex_m) %>%
+    as_tibble() %>%
+    ggplot(aes(x = gene1, y = gene2, fill = value)) +
+      geom_tile() +
+      geom_text(aes(x = gene1, y = gene2, label = value), color = "black") +
+      scale_fill_gradient(low = "white", high = "red", space = "Lab", name = "Number of cells") +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+      xlab("Genes") +
+      ylab("Genes") +
+      ggtitle(paste0(script_name
+        , "\n\nNumber of cells both genes are expressed in (>0.5 normalized expression)"))
+      ggsave(paste0(out_graph, "number_cells_both_genes_expressed_heatmap.png")
+        , width = 11, height = 11)
+
+
+  # jaccard index heatmap of cells expressing both genes
+
+  genes <- c(sp_markers_tb %>%
+      filter(group == "Intersect_SPDE_ST18cor") %>% pull(gene)
+    , known_marker_tb %>% filter(grouping == "Excitatory Deep Layer Cortical") %>% pull(gene_symbol)
+  )
+
+  expand.grid(genes, genes) %>%
+    as_tibble %>%
+    mutate_if(is.factor, as.character) %>%
+    rename(gene1 = Var1, gene2 = Var2) %>%
+    mutate(jaccard_index = pmap(.
+      , calculate_jaccard_overlap_of_cells_expressing_two_genes_of_interest) %>%
+        unlist %>% round(., 2)) %>%
+    mutate(gene1 = factor(gene1, levels = unique(gene1))) %>%
+    mutate(gene2 = factor(gene2, levels = unique(gene1))) %>%
+    ggplot(aes(x = gene1, y = gene2, fill = jaccard_index)) +
+      geom_tile() +
+      geom_text(aes(x = gene1, y = gene2, label = jaccard_index), color = "black") +
+      scale_fill_gradient(low = "white", high = "red", space = "Lab", name = "Number of cells") +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+      xlab("Genes") +
+      ylab("Genes") +
+      ggtitle(paste0(script_name
+        , "\n\nJaccard index of cells both genes are expressed in (>0.5 normalized expression)"))
+      ggsave(paste0(out_graph
+          , "number_cells_both_genes_expressed_jaccard_heatmap.png")
+        , width = 14, height = 14)
+}
+################################################################################
+
+### Heatmap of deep layer markers
+
+plot_deep_layer_marker_expression <- function(){
+
+  print("plot_deep_layer_marker_expression")
+
+  known_marker_tb %>%
+    filter(grouping == "Excitatory Deep Layer Cortical") %>%
+    select(gene_symbol, grouping) %>%
+    rename(Gene = gene_symbol, Group = grouping) %>% as.data.frame %>%
+    Plot_Marker_Genes_Heatmap_SetColWidths(
+      geneGroupDF = .
+      , exprM = ds_so@scale.data
+      , cellID_clusterID <- make_cell_id_cluster_id_key()
+      , clusters = cluster_annot_key[cluster_annot_key != "NA"]
+      , clusterOrder = cluster_annot_key[cluster_annot_key != "NA"]
+    ) +
+      ggtitle(paste0(script_name
+        , "\n\nDeep layer markers"
+        , "\nx-axis: Genes"
+        , "\ny-axis: Cells ordered by cluster"
+        , "\nNormalized expression, mean centered, variance scaled"
+        , "\n")
+      )
+    ggsave(paste0(
+        out_graph
+        , "deeplayermarkers_heatmapsetcolwid_normcentscale.png")
+      , width = 10, height = 5
+    )
+
+  # TFs, chromatin remodelers, co-factors
+  known_marker_tb %>%
+    filter(grouping == "Excitatory Deep Layer Cortical") %>%
+    select(gene_symbol, grouping) %>%
+    pull(gene_symbol) %>%
+    plot_expression_by_cluster_boxplot(
+      genes = .
+      , expr_m = ds_ex_m
+      , cell_cluster_key = make_cell_id_cluster_id_key()
+      , cluster_order = cluster_annot_key
+    ) +
+      ggtitle(paste0(script_name
+      , "\n\nDeep layer markers"
+      , "\nNormalized expression"))
+  ggsave(paste0(out_graph, "deeplayermarkers_boxplot_normcentscale.png")
+    , width = 11, height = 11)
+}
 ################################################################################
 
 ### Run
 
 main_function <- function(){
   plot_miller_heatmaps()
-  plot_dropseq_tsnes()
-  plot_dropseq_heatmaps()
+  plot_dropseq_expression_tsnes()
+  plot_dropseq_expression_heatmaps()
+  plot_dropseq_expression_boxplots()
+  plot_cells_expressing_gene_combinations_heatmaps()
+  plot_deep_layer_marker_expression()
 }
 main_function()
 ################################################################################
