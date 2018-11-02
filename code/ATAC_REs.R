@@ -18,6 +18,7 @@ require(reshape2)
 require(tidyverse)
 require(cowplot)
 require(ggbeeswarm)
+require(ggpubr)
 source("Function_Library.R")
 source("GGplot_Theme.R")
 
@@ -37,7 +38,11 @@ celltype_specific_df <- read.csv("../analysis/tables/Seurat_ClassMarkers/DS2-11/
 # ATAC regulatory elements
 atac_hic_re_df <- read.csv("../source/Gene_Lists/TorreUbieta_2018_TS2.csv"
   , header = TRUE)
-atac_nohic_re_df <- read.csv("../source/All_ATACcor_toTSS.csv", header = TRUE)
+# atac_nohic_re_df <- read.csv("../source/All_ATACcor_toTSS.csv", header = TRUE)
+atac_nohic_re_df <- read.csv(
+  "../source/All_ATACcor_toTSSwDiffAcc-SignifCor.csv"
+  , header = TRUE)
+
 
 # Nowakowski cluster DE table
 nowakowski_de_df <- read.csv(
@@ -60,9 +65,9 @@ hk_genes_tb <- read_tsv("../source/Gene_Lists/hk_gene_list.txt")
 
 ## Variables
 script_name <- "ATAC_REs.R"
-out_graph <- "../analysis/graphs/ATAC_REs/ATAC_REs_"
-out_table <- "../analysis/tables/ATAC_REs/ATAC_REs_"
-out_data <- "../analysis/analyzed_data/ATAC_REs/ATAC_REs_"
+out_graph <- "../analysis/graphs/ATAC_REs/20181031/ATAC_REs_"
+out_table <- "../analysis/tables/ATAC_REs/20181031/ATAC_REs_"
+out_data <- "../analysis/analyzed_data/20181031/ATAC_REs/ATAC_REs_"
 
 ## Output Directories
 dir.create(dirname(out_graph), recursive = TRUE)
@@ -314,6 +319,7 @@ atac_hic_re_cluster_df <- add_column(
 atac_hic_re_cluster_df <- rename(atac_hic_re_cluster_df
   , p.value = cor.p.value
   , p.fdr = cor.p.fdr
+  , padj = padj.diffacc
   , promoterchr = promoterpeakchr
   , promoterstart = promoterpeakstart
   , promoterend = promoterpeakend)
@@ -336,6 +342,26 @@ re_cluster_df <- re_cluster_df %>%
   mutate(gene_category = if_else(
     is.na(gene_category), "other genes", gene_category))
 
+# add GZ vs CP differential accessibility gene category column
+# (housekeeping, cluster enriched, GZ > CP, CP > GZ)
+re_cluster_df <- re_cluster_df %>%
+  mutate(gene_category_diff_acc = if_else(
+    housekeeping == TRUE, "housekeeping", "other genes")) %>%
+  mutate(gene_category_diff_acc = if_else(
+    ! is.na(Cluster), "cluster enriched", gene_category_diff_acc)) %>%
+  mutate(gene_category_diff_acc = if_else(
+      ! is.na(Cluster) &
+      padj < 0.05 &
+      log2FoldChange > 0
+    , "GZ > CP & cluster enriched", gene_category_diff_acc)) %>%
+  mutate(gene_category_diff_acc = if_else(
+      ! is.na(Cluster) &
+      padj < 0.05 &
+      log2FoldChange < 0
+    , "CP > GZ & cluster enriched", gene_category_diff_acc)) %>%
+  mutate(gene_category_diff_acc = if_else(
+    is.na(gene_category_diff_acc), "other genes", gene_category_diff_acc))
+
 # Remove cluster 16
 re_cluster_df <- filter(re_cluster_df, is.na(Cluster) | Cluster != 16)
 
@@ -355,30 +381,16 @@ re_cluster_df$distance_enhancer_promoter <- abs(
   re_cluster_df$promoterstart
 )
 
-# Enhancers per gene
-enhancers_per_gene_df <- melt(
-  with(re_cluster_df, table(ENSGID, re_source, gene_category)))
-# Add biomart gene info
-idx <- match(enhancers_per_gene_df$ENSGID, bm_df$ensembl_gene_id)
-enhancers_per_gene_df <- cbind(enhancers_per_gene_df
-  , bm_df[idx, c("percentage_gc_content", "cds_length")]
-)
-enhancers_per_gene_df <- enhancers_per_gene_df[
-  enhancers_per_gene_df$value != 0, ]
-
-# # Flag GZ>CP, CP>GZ
-# atac_hic_re_cluster_df %>% mutate(
-#   gz_vs_cp_peaks = ifelse(expr.beta > 0 & expr.padj < 0.05, "GZ"
-#     , ifelse(expr.beta < 0 & expr.padj < 0.05, "CP", "NA"))) %>% select(gz_vs_cp_peaks, Gene)
-
-require(ggpubr)
-
 # distance_enhancer_promoter
 means <- re_cluster_df %>% as_tibble %>%
   filter(! is.na(re_source)) %>%
   group_by(gene_category,re_source) %>%
-  summarize(mean_distance = round(mean(distance_enhancer_promoter, na.rm = TRUE), 1)) %>%
-  ungroup %>% data.frame
+  summarize(
+    mean_distance = round(mean(distance_enhancer_promoter, na.rm = TRUE), 1)
+    , median_distance = round(median(distance_enhancer_promoter, na.rm = TRUE),1)
+  ) %>%
+  mutate(label = paste0(
+    "mean:\n", mean_distance, "\nmedian:\n", median_distance))
 re_cluster_df %>% as_tibble %>%
   filter(! is.na(re_source)) %>%
   ggplot(aes(
@@ -386,7 +398,8 @@ re_cluster_df %>% as_tibble %>%
     facet_wrap(~re_source) +
     geom_violin(fill = "lightgrey", color = "lightgrey") +
     geom_boxplot(width = 0.05, outlier.shape = NA) +
-    geom_text(data = means, aes(x = gene_category, y = mean_distance, label = mean_distance)) +
+    geom_text(data = means, aes(
+      x = gene_category, y = median_distance + 5e5, label = label)) +
     stat_compare_means(comparisons = list(
       c("cluster enriched", "housekeeping")
       , c("cluster enriched", "other genes")
@@ -397,56 +410,124 @@ re_cluster_df %>% as_tibble %>%
       , "\n\nATAC enhancers with cell type specific enrichment"
       , "\nDistance of enhancer end to promoter start"))
     ggsave(paste0(out_graph, "atac_hic_housekeeping_distance_enhancer_promoter_boxplot.pdf")
-      , width = 7, height = 5)
+      , width = 9, height = 7)
 
-# Enhancers per gene boxplot
-means <- enhancers_per_gene_df %>% as_tibble %>%
-  filter(re_source == "atac and hic") %>%
-  group_by(gene_category, re_source) %>%
-  summarize(mean_number = round(
-    mean(value, na.rm = TRUE), 1)) %>%
-  ungroup %>% data.frame
-p1 <- enhancers_per_gene_df %>% filter(re_source == "atac and hic") %>%
-  ggplot(aes(x = gene_category, y = value, fill = gene_category)) +
+# distance_enhancer_promoter diff acc
+means <- re_cluster_df %>% as_tibble %>%
+  filter(! is.na(re_source)) %>%
+  group_by(gene_category_diff_acc,re_source) %>%
+  summarize(
+    mean_distance = round(mean(distance_enhancer_promoter, na.rm = TRUE), 1)
+    , median_distance = round(median(distance_enhancer_promoter, na.rm = TRUE),1)
+  ) %>%
+  mutate(label = paste0(
+    "mean:\n", mean_distance, "\nmedian:\n", median_distance))
+re_cluster_df %>% as_tibble %>%
+  filter(! is.na(re_source)) %>%
+  ggplot(aes(x = gene_category_diff_acc, y = distance_enhancer_promoter
+    , fill = gene_category_diff_acc)) +
+    facet_wrap(~re_source) +
     geom_violin(fill = "lightgrey", color = "lightgrey") +
     geom_boxplot(width = 0.05, outlier.shape = NA) +
-    coord_cartesian(ylim = c(0, 10)) +
-    geom_text(data = means, aes(x = gene_category, y = mean_number + 3, label = mean_number)) +
-    stat_compare_means(comparisons = list(
-        c("cluster enriched", "housekeeping")
-        , c("cluster enriched", "other genes")
-        , c("housekeeping", "other genes"))
-      , label.y = c(9.5, 8.5, 7.5), tip.length = 0.003) +
+    geom_text(data = means, aes(
+      x = gene_category_diff_acc, y = Inf, label = label), vjust = 1) +
     ggplot_set_theme_publication +
-    theme(legend.position = "none") +
-    ylab("Enhancers per gene") +
-    ggtitle("atac and hic")
-means <- enhancers_per_gene_df %>% as_tibble %>%
-  filter(re_source == "atac only") %>%
-  group_by(gene_category, re_source) %>%
-  summarize(mean_number = round(
-    mean(value, na.rm = TRUE), 1)) %>%
-  ungroup %>% data.frame
-p2 <- enhancers_per_gene_df %>% filter(re_source == "atac only") %>%
-  ggplot(aes(x = gene_category, y = value, fill = gene_category)) +
-    geom_violin(fill = "lightgrey", color = "lightgrey") +
-    geom_boxplot(width = 0.05, outlier.shape = NA) +
-    coord_cartesian(ylim = c(0, 60)) +
-    geom_text(data = means, aes(x = gene_category, y = mean_number + 5, label = mean_number)) +
-    stat_compare_means(comparisons = list(
-        c("cluster enriched", "housekeeping")
-        , c("cluster enriched", "other genes")
-        , c("housekeeping", "other genes"))
-      , label.y = c(55, 50, 45), tip.length = 0.003) +
-    ggplot_set_theme_publication +
-    theme(legend.position = "none") +
-    ylab("Enhancers per gene") +
-    ggtitle("atac only")
-Plot_Grid(list(p1, p2), title = paste0(script_name
-  , "\n\nATAC enhancers with cell type specific enrichment"
-  , "\nEnhancers per gene"))
-ggsave(paste0(out_graph, "atac_hic_housekeeping_enhancers_per_gene_boxplot.pdf")
-  , width = 7, height = 5)
+    theme(legend.position = "none"
+      , axis.text.x = element_text(angle = 45, hjust = 1)) +
+    ggtitle(paste0(script_name
+      , "\n\nATAC enhancers with cell type specific enrichment"
+      , "\nDistance of enhancer end to promoter start"))
+    ggsave(paste0(out_graph, "atac_hic_housekeeping_diff_acc_distance_enhancer_promoter_boxplot.pdf")
+      , width = 9, height = 7)
+
+plot_enhancers_per_gene_box_violin_plots <- function(
+  enhancers_per_gene_df, re_source_filter){
+  print("plot_enhancers_per_gene_box_violin_plots")
+  # calculate means and medians
+  mean_median_df <- enhancers_per_gene_df %>% as_tibble %>%
+    filter(re_source == re_source_filter) %>%
+    group_by(gene_category, re_source) %>%
+    summarize(
+      mean_number = round(mean(value, na.rm = TRUE), 1)
+      , median_number = round(median(value, na.rm = TRUE), 1)
+    ) %>%
+    mutate(label = paste0(
+      "mean: ", mean_number, "\nmedian: ", median_number))
+  # select atac only or atac + hic data and plot
+  enhancers_per_gene_df %>% filter(re_source == re_source_filter) %>%
+    ggplot(aes(x = gene_category, y = value, fill = gene_category)) +
+      geom_violin(fill = "lightgrey", color = "lightgrey") +
+      geom_boxplot(width = 0.05, outlier.shape = NA) +
+      # coord_cartesian(ylim = c(0, 10)) +
+      geom_text(data = mean_median_df, aes(
+        x = gene_category, y = Inf, label = label), vjust = 1) +
+      ggplot_set_theme_publication +
+      theme(legend.position = "none") +
+      ylab("Enhancers per gene")
+}
+
+# Enhancers per gene
+enhancers_per_gene_df <- melt(
+  with(re_cluster_df, table(ENSGID, re_source, gene_category)))
+enhancers_per_gene_df <- enhancers_per_gene_df[
+  enhancers_per_gene_df$value != 0, ]
+# atac and hic
+atac_hic_gg <- plot_enhancers_per_gene_box_violin_plots(
+  enhancers_per_gene_df = enhancers_per_gene_df
+  , re_source_filter = "atac and hic")
+atac_hic_gg <- atac_hic_gg + stat_compare_means(comparisons = list(
+    c("cluster enriched", "housekeeping")
+    , c("cluster enriched", "other genes")
+    , c("housekeeping", "other genes"))
+  , label.y = c(9.5, 8.5, 7.5), tip.length = 0.003) +
+  coord_cartesian(ylim = c(0, 20)) +
+  ggtitle("atac and hic")
+# atac only
+atac_only_gg <- plot_enhancers_per_gene_box_violin_plots(
+  enhancers_per_gene_df = enhancers_per_gene_df, re_source = "atac only")
+atac_only_gg <- atac_only_gg + stat_compare_means(comparisons = list(
+    c("cluster enriched", "housekeeping")
+    , c("cluster enriched", "other genes")
+    , c("housekeeping", "other genes"))
+  , label.y = c(55, 50, 45), tip.length = 0.003) +
+  coord_cartesian(ylim = c(0, 75)) +
+  ggtitle("atac and hic")
+# combine plots
+Plot_Grid(list(atac_hic_gg, atac_only_gg), rel_height = 0.3, label_size = 10
+  , title = paste0(script_name
+    , "\n\nATAC enhancers with cell type specific enrichment"
+    , "\nEnhancers per gene"))
+  ggsave(paste0(out_graph, "atac_hic_housekeeping_enhancers_per_gene_boxplot.pdf")
+    , width = 9, height = 6)
+
+# Enhancers per gene diff accessibility
+enhancers_per_gene_df <- melt(
+  with(re_cluster_df, table(ENSGID, re_source, gene_category_diff_acc)))
+enhancers_per_gene_df <- enhancers_per_gene_df[
+  enhancers_per_gene_df$value != 0, ]
+enhancers_per_gene_df <- rename(enhancers_per_gene_df
+  , gene_category = gene_category_diff_acc)
+# atac and hic
+atac_hic_gg <- plot_enhancers_per_gene_box_violin_plots(
+  enhancers_per_gene_df = enhancers_per_gene_df
+  , re_source_filter = "atac and hic")
+atac_hic_gg <- atac_hic_gg + coord_cartesian(ylim = c(0, 20)) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  ggtitle("atac and hic")
+# atac only
+atac_only_gg <- plot_enhancers_per_gene_box_violin_plots(
+  enhancers_per_gene_df = enhancers_per_gene_df, re_source = "atac only")
+atac_only_gg <- atac_only_gg + coord_cartesian(ylim = c(0, 75)) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  ggtitle("atac and hic")
+# combine plots
+Plot_Grid(list(atac_hic_gg, atac_only_gg), rel_height = 0.3, label_size = 10
+  , title = paste0(script_name
+    , "\n\nATAC enhancers with cell type specific enrichment"
+    , "\nEnhancers per gene"))
+ggsave(paste0(out_graph
+    , "atac_hic_housekeeping_diff_acc_enhancers_per_gene_boxplot.pdf")
+  , width = 11, height = 6)
 ################################################################################
 
 ### Plots ATAC and HiC
