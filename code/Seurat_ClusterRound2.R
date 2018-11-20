@@ -36,23 +36,17 @@ load("../analysis/analyzed_data/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegN
 # centSO <- ssCentSO
 # noCentExM <- ssNoCentExM
 
-# Cell cycle markers from Macosko 2015 Table S2 to remove from variable gene
-# list used for clustering
-ccDF <- read.csv("../source/Macosko_2015_ST2_CellCycle.csv", header = TRUE
-  , fill = TRUE)
-
 ## Variables
 graphCodeTitle <- "Seurat_ClusterRound2.R"
-outGraph <- "../analysis/graphs/Seurat_ClusterRound2/DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/VarGenes/RegNumiLibBrain/PC1-40/Seurat_ClusterRound2_DS2-11_"
-outTable <- "../analysis/tables/Seurat_ClusterRound2/DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/VarGenes/RegNumiLibBrain/PC1-40/Seurat_ClusterRound2_DS2-11_"
-outData <- "../analysis/analyzed_data/Seurat_ClusterRound2/DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/VarGenes/RegNumiLibBrain/PC1-40/Seurat_ClusterRound2_DS2-11_"
+outGraph <- "../analysis/graphs/Seurat_ClusterRound2/ClusterRound2/DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/VarGenes/RegNumiLibBrain/PC1-40/Seurat_ClusterRound2_DS2-11_"
+outTable <- "../analysis/tables/Seurat_ClusterRound2/ClusterRound2/DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/VarGenes/RegNumiLibBrain/PC1-40/Seurat_ClusterRound2_DS2-11_"
+outData <- "../analysis/analyzed_data/Seurat_ClusterRound2/ClusterRound2/DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/VarGenes/RegNumiLibBrain/PC1-40/Seurat_ClusterRound2_DS2-11_"
 # outGraph <- "../analysis/graphs/Seurat_ClusterRound2_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/AllGenes/PC1-30/Seurat_ClusterRound2_DS2-11_"
 # outTable <- "../analysis/tables/Seurat_ClusterRound2_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/AllGenes/PC1-30/Seurat_ClusterRound2_DS2-11_"
 # outData <- "../analysis/Seurat_ClusterRound2_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/AllGenes/PC1-30/Seurat_ClusterRound2_DS2-11_"
 
 ## Output Directories
 dir.create(dirname(outGraph), recursive = TRUE)
-dir.create(dirname(outTable), recursive = TRUE)
 dir.create(dirname(outData), recursive = TRUE)
 
 ## Set ggplot2 theme
@@ -93,6 +87,7 @@ Create_Subset_Seurat_Object <- function(seuratO, clusterID){
   )
   so <- CreateSeuratObject(raw.data = exDF
     , min.cells = 0, min.genes = 0
+    # (ln (transcripts-per-10,000 + 1))
     , normalization.method = "LogNormalize", scale.factor = 10000
     , project = paste0("Cluster ", clusterID) , do.scale = FALSE, do.center = FALSE)
   # Add metadata
@@ -545,6 +540,8 @@ ggsave(paste0(outGraph, "cluster", clusterID, "_tSNE_PC1-40_covariates.png")
 ################################################################################
 
 ### Color 40k cell tSNE by sub-clustering
+
+load(paste0(outData, "Cluster", clusterID, "_seuratO.Robj"))
 
 # Collect tSNE values
 ggDF <- as.data.frame(centSO@dr$tsne@cell.embeddings)
