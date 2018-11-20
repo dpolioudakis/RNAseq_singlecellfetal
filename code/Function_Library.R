@@ -56,43 +56,45 @@ DE_Filters_ClustersAvsB_ExpMatrix <- function(
 # percent of cells in cluster gene is expressed in
 # fold change of gene in cluster versus all other cells
 DE_Filters_ExpMatrix <- function(
-  so
+  expr_m
   , minPercent = NULL
   , foldChange = NULL
   , clusterID = NULL
+  , cell_cluster_key
   , cellID = NULL) {
 
   if (! is.null(minPercent)) {
     # Expressed > 0 counts in > X% of cells in cluster
     if (! is.null(clusterID)) {
       # Subset expression matrix to cluster
-      cdf <- as.matrix(so@data)[ ,so@ident == clusterID]
+      cdf <- as.matrix(expr_m)[ ,cell_cluster_key == clusterID]
     }
     if (! is.null(cellID)) {
       # Subset expression matrix to cluster
-      cdf <- as.matrix(so@data)[ ,colnames(so@data) %in% cellID]
+      cdf <- as.matrix(expr_m)[ ,colnames(expr_m) %in% cellID]
     }
     # Expressed > 0 counts in > X% of cells in cluster
     idxp <- (rowSums(cdf > 0) / ncol(cdf)) > (minPercent / 100)
     print(paste0("Genes expressed in > ", minPercent, "% of cells in cluster"))
     print(table(idxp))
   } else {
-    idxp <- rep(TRUE, nrow(so@data))
+    idxp <- rep(TRUE, nrow(expr_m))
   }
 
+  ### not currently generalized outside of Seurat
   if (! is.null(foldChange)) {
     # Fold change > Y of gene in cluster versus all other cells
     if (! is.null(clusterID)) {
       # Subset expression matrix to cluster
-      cdf <- noCentExM[ ,so@ident == clusterID]
+      cdf <- noCentExM[ ,cell_cluster_key == clusterID]
       # Subset expression matrix to all other cells
-      ndf <- noCentExM[ , ! so@ident == clusterID]
+      ndf <- noCentExM[ , ! cell_cluster_key == clusterID]
     }
     if (! is.null(cellID)) {
       # Subset expression matrix to cluster
-      cdf <- noCentExM[ ,colnames(so@data) %in% cellID]
+      cdf <- noCentExM[ ,colnames(expr_m) %in% cellID]
       # Subset expression matrix to all other cells
-      ndf <- noCentExM[ , ! colnames(so@data) %in% cellID]
+      ndf <- noCentExM[ , ! colnames(expr_m) %in% cellID]
     }
     # Fold change
     v1 <- rowMeans(cdf) - rowMeans(ndf)
@@ -100,11 +102,11 @@ DE_Filters_ExpMatrix <- function(
     print(paste0("Genes > ", foldChange, " fold change in cluster versus all other cells"))
     print(table(idxf))
   } else {
-    idxf <- rep(TRUE, nrow(so@data))
+    idxf <- rep(TRUE, nrow(expr_m))
   }
 
   # Filter exDF
-  exDF <- as.matrix(so@data[idxp & idxf, ])
+  exDF <- as.matrix(expr_m[idxp & idxf, ])
   return(exDF)
 }
 
@@ -118,7 +120,7 @@ DE_Filters_ExpMatrix <- function(
 # 5            VZ   8.7  0.45139297  0.856908177
 # 6            VZ   9.1  0.27861748 -0.248868277
 # mod: "y~ExpCondition+RIN.y+Seq.PC1+Seq.PC2"
-DE_Linear_Model <- function (exDatDF, termsDF, mod) {
+DE_Linear_Model <- function(exDatDF, termsDF, mod) {
   print("DE_Linear_Model")
   lmmod <- apply(as.matrix(exDatDF), 1
     , function(y) {
@@ -142,7 +144,8 @@ DE_Linear_Model <- function (exDatDF, termsDF, mod) {
 }
 
 # Format output of linear model into data frame
-Format_DE <- function (deLM, so, clusterID) {
+Format_DE <- function(
+  deLM, expr_m, clusterID, cell_cluster_key, cluster_annot = NULL) {
   print("Format_DE")
   # Combine log2 fold changes, p-values
   deDF <- data.frame(Gene = row.names(deLM$coefmat)
@@ -150,14 +153,20 @@ Format_DE <- function (deLM, so, clusterID) {
     , Pvalue = deLM$pvalmat[ ,2])
   # Add cluster ID
   deDF$Cluster <- clusterID
+  # Add cluster annotation
+  if (! is.null(cluster_annot_tb)){
+    deDF$Cluster_Annot <- cluster_annot
+  }
   # Percent of cells in cluster expressing gene > 0 counts
-  cdf <- as.matrix(so@data)[
-    row.names(so@data) %in% deDF$Gene, so@ident == clusterID]
+  cdf <- expr_m[
+    row.names(expr_m) %in% deDF$Gene, cell_cluster_key == clusterID]
   deDF$Percent_Cluster <- (rowSums(cdf > 0) / ncol(cdf)) * 100
+  deDF$Percent_Cluster <- round(deDF$Percent_Cluster, 1)
   # Percent of all cells expressing gene > 0 counts
-  deDF$Percent_All <- (rowSums(as.matrix(so@data)[
-    row.names(so@data) %in% deDF$Gene, ] > 0)
-    / ncol(so@data[row.names(so@data) %in% deDF$Gene, ])) * 100
+  deDF$Percent_All <- (rowSums(expr_m[
+    row.names(expr_m) %in% deDF$Gene, ] > 0)
+    / ncol(expr_m[row.names(expr_m) %in% deDF$Gene, ])) * 100
+  deDF$Percent_All <- round(deDF$Percent_All, 1)
   # Order by log fold change
   deDF <- deDF[order(-deDF$Log2_Fold_Change), ]
   return(deDF)
@@ -615,7 +624,7 @@ Add_Gene_List_To_Binary_Matrix <- function(
   return(gene_binary_M)
 }
 
-Convert_Mixed_GeneSym_EnsID_To_EnsID <- function(ids){
+Convert_Mixed_GeneSym_EnsID_To_EnsID <- function(ids, bmDF = bmDF){
   # Converts vector of gene symbols and ensembl IDs to ensembl IDs
   # ids must be character format
   # Need to load:
@@ -631,12 +640,23 @@ Convert_Mixed_GeneSym_EnsID_To_EnsID <- function(ids){
 clean_variable_names <- function(data){
   cleaned <- data %>%
     rename_all(
-      funs(
-        gsub("* ", "_", .) %>%
-        gsub("*\\.", "_", .) %>%
-        tolower
-      )
+      funs(clean_strings)
     )
+  return(cleaned)
+}
+
+clean_strings <- function(string_vector){
+  print("clean_strings")
+  cleaned <- string_vector %>%
+    gsub("* ", "_", .) %>%
+    gsub("\\.", "_", .) %>%
+    gsub("\\(", "_", .) %>%
+    gsub("\\)", "_", .) %>%
+    gsub("\\+", "and", .) %>%
+    gsub("#", "_number", .) %>%
+    gsub("_$", "", .) %>%
+    gsub("__", "_", .) %>%
+    tolower
   return(cleaned)
 }
 

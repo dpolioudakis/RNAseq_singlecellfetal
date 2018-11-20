@@ -80,8 +80,9 @@ print(paste0(
 
 # Filter cells
 exDF <- DE_Filters_ExpMatrix(
-  so = centSO, minPercent = 10, clusterID = clusterID
-)
+  expr_m = centSO@data, minPercent = 10, clusterID = clusterID
+  , cell_cluster_key = centSO@ident
+  )
 
 # DE Linear model
 termsDF <- centSO@meta.data[c("nUMI", "librarylab", "individual")]
@@ -94,7 +95,9 @@ mod <- "y ~ cluster+nUMI+librarylab+individual"
 deLM <- DE_Linear_Model(exDatDF = exDF, termsDF = termsDF, mod = mod)
 
 # Format LM output into data frame
-deDF <- Format_DE(deLM, centSO, clusterID)
+deDF <- Format_DE(
+  deLM = deLM, expr_m = centSO@data, clusterID = clusterID
+  , cell_cluster_key = centSO@ident)
 
 # Add ensembl
 deDF$Ensembl <- Convert_Mixed_GeneSym_EnsID_To_EnsID(as.character(deDF$Gene))
