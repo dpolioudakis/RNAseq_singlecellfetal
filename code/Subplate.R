@@ -11,6 +11,8 @@ rm(list = ls())
 set.seed(27)
 sessionInfo()
 
+options(stringsAsFactors = FALSE)
+
 require(methods)
 require(Seurat)
 require(dplyr)
@@ -23,6 +25,7 @@ require(viridis)
 require(WGCNA)
 require(ggpubr)
 source("Function_Library.R")
+source("GGplot_Theme.R")
 
 ## Inputs
 
@@ -56,20 +59,14 @@ idx <- match(rownames(layer.max), millerLCM_row_annot_DF$gene_symbol)
 idx <- idx[! is.na(idx)]
 millerLCM_row_annot_DF <- millerLCM_row_annot_DF[idx, ]
 
-## Variables
-graphCodeTitle <- "Subplate.R"
-outGraph <- "../analysis/graphs/Subplate/Subplate_"
-
 ## Output Directories
-dir.create(dirname(outGraph), recursive = TRUE)
+out_graph <- "../analysis/graphs/Subplate/Subplate_"
+out_table <- "../analysis/tables/Subplate/Subplate_"
+dir.create(dirname(out_graph), recursive = TRUE)
+dir.create(dirname(out_table), recursive = TRUE)
 
-## Set ggplot2 theme
-theme_set(theme_bw())
-theme_set(theme_get() + theme(text = element_text(size = 10)))
-theme_update(plot.title = element_text(size = 10))
-theme_update(axis.line = element_line(colour = "black")
-  , panel.border = element_blank()
-)
+## Other variables
+script_name <- "Subplate.R"
 ################################################################################
 
 ### Functions
@@ -142,10 +139,10 @@ Plot_Subplate_Marker_Expression <- function(){
       panel.background = element_blank(),
       axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)) +
     # theme(axis.text.x = element_blank()) +
-    ggtitle(paste0(graphCodeTitle
+    ggtitle(paste0(script_name
       , "\n\nSubplate markers (Molnar) expression in miller LCM"
       , "\nExpression mean centered and variance scaled across all samples"))
-  ggsave(paste0(outGraph, "SPmolnarMarks_Miller_Heatmap.pdf")
+  ggsave(paste0(out_graph, "SPmolnarMarks_Miller_Heatmap.pdf")
     , width = 7, height = 5)
 
   ## Refined list
@@ -170,10 +167,10 @@ Plot_Subplate_Marker_Expression <- function(){
       panel.background = element_blank(),
       axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)) +
     # theme(axis.text.x = element_blank()) +
-    ggtitle(paste0(graphCodeTitle
+    ggtitle(paste0(script_name
       , "\n\nSubplate markers (Molnar) expression in miller LCM"
       , "\nExpression mean centered and variance scaled across all samples"))
-  ggsave(paste0(outGraph, "SPmolnarMarksRefined_Miller_Heatmap.pdf")
+  ggsave(paste0(out_graph, "SPmolnarMarksRefined_Miller_Heatmap.pdf")
     , width = 7, height = 5)
 
   ## Miller LCM derived subplate markers
@@ -199,10 +196,10 @@ Plot_Subplate_Marker_Expression <- function(){
       panel.background = element_blank(),
       axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)) +
     # theme(axis.text.x = element_blank()) +
-    ggtitle(paste0(graphCodeTitle
+    ggtitle(paste0(script_name
       , "\n\nExpression of subplate markers derived from Miller LCM in Miller LCM"
       , "\nExpression mean centered and variance scaled across all samples"))
-  ggsave(paste0(outGraph, "SPmillerLCMmarks_Miller_Heatmap.pdf")
+  ggsave(paste0(out_graph, "SPmillerLCMmarks_Miller_Heatmap.pdf")
     , width = 7, height = 5)
 
 
@@ -221,12 +218,12 @@ Plot_Subplate_Marker_Expression <- function(){
     , centScale = TRUE
   )
   Plot_Grid(ggL, ncol = 3, align = 'v', axis = 'r', rel_height = c(0.4)
-    , title = paste0(graphCodeTitle
+    , title = paste0(script_name
       , "\n\nExpression of refined subplate marker list"
       , "\nNormalized expression, mean centered and variance scaled"
       , "\n")
   )
-  ggsave(paste0(outGraph, "SPmarksRefined_FeaturePlot_NormalizedCenteredScaled.png")
+  ggsave(paste0(out_graph, "SPmarksRefined_FeaturePlot_NormalizedCenteredScaled.png")
     , width = 12, height = 4)
 
   # Feature plot normalized, mean centered scaled
@@ -241,12 +238,12 @@ Plot_Subplate_Marker_Expression <- function(){
     , centScale = TRUE
   )
   Plot_Grid(ggL, ncol = 3, align = 'v', axis = 'r', rel_height = c(0.3)
-    , title = paste0(graphCodeTitle
+    , title = paste0(script_name
       , "\n\nExpression of refined subplate marker list"
       , "\nNormalized expression, mean centered and variance scaled"
       , "\n")
   )
-  ggsave(paste0(outGraph, "SPmarksRefined_FeaturePlotIndividual_NormalizedCenteredScaled.png")
+  ggsave(paste0(out_graph, "SPmarksRefined_FeaturePlotIndividual_NormalizedCenteredScaled.png")
     , width = 12, height = 12)
 
   ## Subplate markers obtained from Miller LCM DE of SP vs CP, MZ, VZ, SVZ
@@ -263,12 +260,12 @@ Plot_Subplate_Marker_Expression <- function(){
     , centScale = TRUE
   )
   Plot_Grid(ggL, ncol = 3, align = 'v', axis = 'r', rel_height = c(0.1)
-    , title = paste0(graphCodeTitle
+    , title = paste0(script_name
       , "\n\nExpression of subplate markers derived from Miller LCM"
       , "\nNormalized expression, mean centered and variance scaled"
       , "\n")
   )
-  ggsave(paste0(outGraph, "SPmarksMillerLCM_FeaturePlotIndividual_NormalizedCenteredScaled.png")
+  ggsave(paste0(out_graph, "SPmarksMillerLCM_FeaturePlotIndividual_NormalizedCenteredScaled.png")
     , width = 12, height = 12)
   # Feature plot normalized
   # Individual expression
@@ -283,12 +280,12 @@ Plot_Subplate_Marker_Expression <- function(){
     , centScale = FALSE
   )
   Plot_Grid(ggL, ncol = 3, align = 'v', axis = 'r', rel_height = c(0.1)
-    , title = paste0(graphCodeTitle
+    , title = paste0(script_name
       , "\n\nExpression of subplate markers derived from Miller LCM"
       , "\nNormalized expression, mean centered and variance scaled"
       , "\n")
   )
-  ggsave(paste0(outGraph, "SPmarksMillerLCM_FeaturePlotIndividual_Normalized.png")
+  ggsave(paste0(out_graph, "SPmarksMillerLCM_FeaturePlotIndividual_Normalized.png")
     , width = 12, height = 12)
 
   # ST18
@@ -304,12 +301,12 @@ Plot_Subplate_Marker_Expression <- function(){
     , centScale = TRUE
   )
   Plot_Grid(ggL, ncol = 3, align = 'v', axis = 'r', rel_height = c(0.3)
-    , title = paste0(graphCodeTitle
+    , title = paste0(script_name
       , "\n\nExpression of ST18"
       , "\nNormalized expression, mean centered and variance scaled"
       , "\n")
   )
-  ggsave(paste0(outGraph, "ST18_FeaturePlot_NormalizedCenteredScaled.png")
+  ggsave(paste0(out_graph, "ST18_FeaturePlot_NormalizedCenteredScaled.png")
     , width = 12, height = 4)
 
   # Markers and ST18
@@ -331,12 +328,12 @@ Plot_Subplate_Marker_Expression <- function(){
       , "ST18")
   )
   Plot_Grid(ggL, ncol = 3, align = 'v', axis = 'r', rel_height = c(0.3)
-    , title = paste0(graphCodeTitle
+    , title = paste0(script_name
       , "\n\nExpression of markers and ST18"
       , "\nNormalized expression, mean centered and variance scaled"
       , "\n")
   )
-  ggsave(paste0(outGraph, "Marks_ST18_FeaturePlot_NormalizedCenteredScaled.png")
+  ggsave(paste0(out_graph, "Marks_ST18_FeaturePlot_NormalizedCenteredScaled.png")
     , width = 12, height = 7)
 
   # Sub-clustering feature plot of markers and ST18
@@ -358,12 +355,12 @@ Plot_Subplate_Marker_Expression <- function(){
       , "ST18")
   )
   Plot_Grid(ggL, ncol = 3, align = 'v', axis = 'r', rel_height = c(0.3)
-    , title = paste0(graphCodeTitle
+    , title = paste0(script_name
       , "\n\nExpression of markers and ST18"
       , "\nNormalized expression, mean centered and variance scaled"
       , "\n")
   )
-  ggsave(paste0(outGraph
+  ggsave(paste0(out_graph
     , "Marks_ST18_Subcluster_FeaturePlot_NormalizedCenteredScaled.png")
     , width = 12, height = 7)
 
@@ -381,12 +378,12 @@ Plot_Subplate_Marker_Expression <- function(){
     , centScale = TRUE
   )
   Plot_Grid(ggL, ncol = 3, align = 'v', axis = 'r', rel_height = c(0.1)
-    , title = paste0(graphCodeTitle
+    , title = paste0(script_name
       , "\n\nExpression of temporal CP DE genes obtained from Miller LCM"
       , "\nNormalized expression, mean centered and variance scaled"
       , "\n")
   )
-  ggsave(paste0(outGraph, "TemporalCPtop10DE_FeaturePlot_NormalizedCenteredScaled.png")
+  ggsave(paste0(out_graph, "TemporalCPtop10DE_FeaturePlot_NormalizedCenteredScaled.png")
     , width = 12, height = 14)
 
   ## Temporal CP top 20 DE genes
@@ -413,12 +410,12 @@ Plot_Subplate_Marker_Expression <- function(){
     , centScale = TRUE
   )
   Plot_Grid(ggL, ncol = 3, align = 'v', axis = 'r', rel_height = c(0.1)
-    , title = paste0(graphCodeTitle
+    , title = paste0(script_name
       , "\n\nExpression of temporal CP DE genes obtained from Miller LCM"
       , "\nNormalized expression, mean centered and variance scaled"
       , "\n")
   )
-  ggsave(paste0(outGraph, "TemporalCPtop30DE_FeaturePlot_NormalizedCenteredScaled.png")
+  ggsave(paste0(out_graph, "TemporalCPtop30DE_FeaturePlot_NormalizedCenteredScaled.png")
     , width = 12, height = 34)
 }
 ################################################################################
@@ -443,13 +440,13 @@ Plot_ST18_Expression <- function(){
   # plot_grid combine tSNE graphs
   pg <- plot_grid(plotlist = ggL, ncol = 3, align = 'v', axis = 'r')
   # now add the title
-  title <- ggdraw() + draw_label(paste0(graphCodeTitle
+  title <- ggdraw() + draw_label(paste0(script_name
     , "\n\nExpression of ST18"
     , "\nNormalized expression"
     , "\n"))
   # rel_heights values control title margins
   plot_grid(title, pg, ncol = 1, rel_heights = c(0.4, 1))
-  ggsave(paste0(outGraph, "ST18_FeaturePlot_Normalized.png")
+  ggsave(paste0(out_graph, "ST18_FeaturePlot_Normalized.png")
     , width = 12, height = 4)
 
   # Feature plot
@@ -468,13 +465,13 @@ Plot_ST18_Expression <- function(){
   # plot_grid combine tSNE graphs
   pg <- plot_grid(plotlist = ggL, ncol = 3, align = 'v', axis = 'r')
   # now add the title
-  title <- ggdraw() + draw_label(paste0(graphCodeTitle
+  title <- ggdraw() + draw_label(paste0(script_name
     , "\n\nExpression of ST18"
     , "\nCluster round 2 normalized expression, mean centered and variance scaled"
     , "\n"))
   # rel_heights values control title margins
   plot_grid(title, pg, ncol = 1, rel_heights = c(0.4, 1))
-  ggsave(paste0(outGraph
+  ggsave(paste0(out_graph
     , "ST18_FeaturePlot_Round2NormalizedCenteredScaled.png")
     , width = 12, height = 4)
 
@@ -494,13 +491,13 @@ Plot_ST18_Expression <- function(){
   # plot_grid combine tSNE graphs
   pg <- plot_grid(plotlist = ggL, ncol = 3, align = 'v', axis = 'r')
   # now add the title
-  title <- ggdraw() + draw_label(paste0(graphCodeTitle
+  title <- ggdraw() + draw_label(paste0(script_name
     , "\n\nExpression of ST18"
     , "\nCluster round 1 normalized expression, mean centered and variance scaled"
     , "\n"))
   # rel_heights values control title margins
   plot_grid(title, pg, ncol = 1, rel_heights = c(0.4, 1))
-  ggsave(paste0(outGraph, "ST18_FeaturePlot_Round1NormalizedCenteredScaled.png")
+  ggsave(paste0(out_graph, "ST18_FeaturePlot_Round1NormalizedCenteredScaled.png")
     , width = 12, height = 4)
 }
 ################################################################################
@@ -566,12 +563,12 @@ Plot_Expression_Levels_Violin <- function(){
     , clusterIDs = centSO@ident
     , grouping = kmDF$Grouping[kmDF$Grouping %in% "Subplate"]
   ) +
-    ggtitle(paste0(graphCodeTitle
+    ggtitle(paste0(script_name
       , "\n"
       , "\nMarker gene expression by cluster"
       , "\nNormalized expression"
       , "\n"))
-  ggsave(paste0(outGraph, "SPmarks_ViolinPlot_Normalized.png")
+  ggsave(paste0(out_graph, "SPmarks_ViolinPlot_Normalized.png")
     , width = 9, height = 5)
   # Normalized centered scaled
   Gene_Expression_By_Cluster_ViolinPlot(
@@ -580,12 +577,12 @@ Plot_Expression_Levels_Violin <- function(){
     , clusterIDs = centSO@ident
     , grouping = kmDF$Grouping[kmDF$Grouping %in% "Subplate"]
   ) +
-    ggtitle(paste0(graphCodeTitle
+    ggtitle(paste0(script_name
       , "\n"
       , "\nMarker gene expression by cluster"
       , "\nNormalized mean centered scaled expression"
       , "\n"))
-  ggsave(paste0(outGraph, "SPmarks_ViolinPlot_NormalizedCenteredScaled.png")
+  ggsave(paste0(out_graph, "SPmarks_ViolinPlot_NormalizedCenteredScaled.png")
     , width = 9, height = 5)
 
   # Subplate Miller LCM obtained markers
@@ -598,12 +595,12 @@ Plot_Expression_Levels_Violin <- function(){
     , clusterIDs = centSO@ident
     , grouping = rep("Subplate", length(subplate_marks))
   ) +
-    ggtitle(paste0(graphCodeTitle
+    ggtitle(paste0(script_name
       , "\n"
       , "\nSubplate marker genes obtained from Miller LCM DE expression by cluster"
       , "\nNormalized expression"
       , "\n"))
-  ggsave(paste0(outGraph, "SPmillerLCMmarks_ViolinPlot_Normalized.png")
+  ggsave(paste0(out_graph, "SPmillerLCMmarks_ViolinPlot_Normalized.png")
     , width = 9, height = 5)
   # Normalized centered scaled
   Gene_Expression_By_Cluster_ViolinPlot(
@@ -612,12 +609,12 @@ Plot_Expression_Levels_Violin <- function(){
     , clusterIDs = centSO@ident
     , grouping = rep("Subplate", length(subplate_marks))
   ) +
-    ggtitle(paste0(graphCodeTitle
+    ggtitle(paste0(script_name
       , "\n"
       , "\nSubplate marker genes obtained from Miller LCM DE expression by cluster"
       , "\nNormalized mean centered scaled expression"
       , "\n"))
-  ggsave(paste0(outGraph
+  ggsave(paste0(out_graph
     , "SPmillerLCMmarks_ViolinPlot_NormalizedCenteredScaled.png")
     , width = 9, height = 5)
 
@@ -629,12 +626,12 @@ Plot_Expression_Levels_Violin <- function(){
     , clusterIDs = centSO@ident
     , grouping = ""
   ) +
-    ggtitle(paste0(graphCodeTitle
+    ggtitle(paste0(script_name
       , "\n"
       , "\nST18 expression by cluster"
       , "\nNormalized expression"
       , "\n"))
-  ggsave(paste0(outGraph, "ST18_ViolinPlot_Normalized.png")
+  ggsave(paste0(out_graph, "ST18_ViolinPlot_Normalized.png")
     , width = 9, height = 5)
   # Normalized centered scaled
   Gene_Expression_By_Cluster_ViolinPlot(
@@ -643,12 +640,12 @@ Plot_Expression_Levels_Violin <- function(){
     , clusterIDs = centSO@ident
     , grouping = ""
   ) +
-    ggtitle(paste0(graphCodeTitle
+    ggtitle(paste0(script_name
       , "\n"
       , "\nST18 expression by cluster"
       , "\nNormalized mean centered scaled expression"
       , "\n"))
-  ggsave(paste0(outGraph, "ST18_ViolinPlot_NormalizedCenteredScaled.png")
+  ggsave(paste0(out_graph, "ST18_ViolinPlot_NormalizedCenteredScaled.png")
     , width = 9, height = 5)
 }
 
@@ -683,9 +680,9 @@ Plot_Intersection_ST18_SPmarks <- function(){
   ggplot(gg_DF, aes(x = Subplate_ST18, fill = Subplate_Cluster)) +
     geom_bar() +
     ggplot_set_theme_publication +
-    ggtitle(paste0(graphCodeTitle
+    ggtitle(paste0(script_name
       , "\n\nNumber of cells expressing ST18, subplate markers, or both"))
-  ggsave(paste0(outGraph, "express_ST18_SPmarks_barplot.pdf")
+  ggsave(paste0(out_graph, "express_ST18_SPmarks_barplot.pdf")
     , width = 5, height = 4)
 
   gg_DF <- cell_cat_DF[! is.na(cell_cat_DF$Subplate_ST18), ]
@@ -694,9 +691,9 @@ Plot_Intersection_ST18_SPmarks <- function(){
   ggplot(gg_DF, aes(x = Cluster, fill = Subplate_ST18)) +
     geom_bar() +
     ggplot_set_theme_publication +
-    ggtitle(paste0(graphCodeTitle
+    ggtitle(paste0(script_name
       , "\n\nNumber of cells expressing ST18, subplate markers, or both"))
-  ggsave(paste0(outGraph, "express_ST18_SPmarks_by_cluster_barplot.pdf")
+  ggsave(paste0(out_graph, "express_ST18_SPmarks_by_cluster_barplot.pdf")
     , width = 5, height = 4)
 
   gg_DF <- data.frame(
@@ -711,9 +708,9 @@ Plot_Intersection_ST18_SPmarks <- function(){
   ggplot(gg_DF, aes(x = Genes, y = value, fill = variable)) +
     geom_bar(stat = "identity") +
     ggplot_set_theme_publication +
-    ggtitle(paste0(graphCodeTitle
+    ggtitle(paste0(script_name
       , "\n\nNumber of cells expressing ST18, subplate markers, or both"))
-  ggsave(paste0(outGraph, "express_ST18_SPmarks_barplot2.pdf")
+  ggsave(paste0(out_graph, "express_ST18_SPmarks_barplot2.pdf")
     , width = 5, height = 4)
 }
 ################################################################################
@@ -775,7 +772,12 @@ DE_SPcluster_Versus_Allcells <- function(){
 DE_SP_Cluster_Versus_Other_Deep_Layer_Cluster_Cells <- function(){
   print("DE_SP_Cluster_Versus_Other_Deep_Layer_Cluster_Cells")
   # SP cluster cells versus deep layer cluster cells
-  sp_cluster_ids <- names(so@ident)[so@ident %in% 2]
+  # SP cells: subcluster 3:2 and cluster 13
+  # sp_cluster_ids <- names(so@ident)[so@ident %in% 2]
+  sp_cluster_ids <- c(
+    names(so@ident)[so@ident %in% c(2)]
+    , names(centSO@ident)[centSO@ident %in% 13]
+  )
   all_other_cluster3_ids <- names(so@ident)[! names(so@ident) %in% sp_cluster_ids]
   de_sp_vs_cluster3_DF <- DE_By_CellIDs(
     cell_IDs_1 = sp_cluster_ids, cell_IDs_2 = all_other_cluster3_ids)
@@ -824,6 +826,11 @@ Compile_Gene_Lists <- function(
   return(gene_group_DF)
 }
 
+Output_Compiled_Gene_Lists <- function(){
+  write.csv(gene_group_DF, file = paste0(out_table, "Marker_Lists.csv")
+  , quote = FALSE, header = TRUE, row.names = FALSE)
+}
+
 Plot_DE_genes_Feature_Plot <- function(gene_group_DF){
   print("Plot_DE_genes_Feature_Plot")
   ## Feature plots of DE genes
@@ -843,10 +850,10 @@ Plot_DE_genes_Feature_Plot <- function(gene_group_DF){
   ggL[[1]] <- ggL[[1]] + theme(legend.position = "none")
   ggL[[2]] <- ggL[[2]] + theme(legend.position = "none")
   Plot_Grid(ggL, ncol = 2, rel_height = 0.1, align = 'v', axis = 'r'
-    , title = paste0(graphCodeTitle
+    , title = paste0(script_name
       , "\n\nMean expression of subplate cluster DE genes")
     )
-  ggsave(paste0(outGraph, "SPcluster_DE_genes_FeaturePlot.png"), height = 18)
+  ggsave(paste0(out_graph, "SPcluster_DE_genes_FeaturePlot.png"), height = 18)
 }
 
 Plot_SP_DE_Genes_In_Miller_LCM <- function(gene_group_DF){
@@ -879,10 +886,10 @@ Plot_SP_DE_Genes_In_Miller_LCM <- function(gene_group_DF){
       # theme(axis.text.x = element_blank()) +
       ggtitle(name)
   })
-  Plot_Grid(gg_L, ncol = 1, title = paste0(graphCodeTitle
+  Plot_Grid(gg_L, ncol = 1, title = paste0(script_name
     , "\n\nMiller LCM expression"
     , "\nExpression mean centered and variance scaled across all samples"))
-  ggsave(paste0(outGraph, "Miller_By_Area_Heatmap.pdf")
+  ggsave(paste0(out_graph, "Miller_By_Area_Heatmap.pdf")
     , width = 16, height = 26, dpi = 150)
 
   # By zone
@@ -908,10 +915,10 @@ Plot_SP_DE_Genes_In_Miller_LCM <- function(gene_group_DF){
       # theme(axis.text.x = element_blank()) +
       ggtitle(name)
   })
-  Plot_Grid(gg_L, ncol = 1, title = paste0(graphCodeTitle
+  Plot_Grid(gg_L, ncol = 1, title = paste0(script_name
     , "\n\nMiller LCM expression"
     , "\nExpression mean centered and variance scaled across all samples"))
-  ggsave(paste0(outGraph, "Miller_Heatmap.pdf")
+  ggsave(paste0(out_graph, "Miller_Heatmap.pdf")
     , width = 16, height = 26)
 }
 
@@ -951,10 +958,10 @@ Plot_Eigengene_SP_DE_Gene_Lists_In_MillerLCM <- function(me_DFL){
       ggplot_set_theme_publication +
       ggtitle(name)
   })
-  Plot_Grid(gg_L, ncol = 2, title = paste0(graphCodeTitle
+  Plot_Grid(gg_L, ncol = 2, title = paste0(script_name
     , "\n\nMiller LCM expression"
     , "\nEigengene of SP markers"))
-  ggsave(paste0(outGraph, "EG_Miller_Boxplot.pdf")
+  ggsave(paste0(out_graph, "EG_Miller_Boxplot.pdf")
     , width = 7, height = 15)
 }
 
@@ -968,6 +975,7 @@ Run_Analysis_SP_cluster_DE_genes <- function(cor_ST18_DF){
     de_sp_vs_all_DF = de_sp_vs_all_DF
     , de_sp_vs_cluster3_DF = de_sp_vs_cluster3_DF
     , cor_ST18_DF = cor_ST18_DF)
+  Output_Compiled_Gene_Lists()
   # Feature plot
   Plot_DE_genes_Feature_Plot(gene_group_DF = gene_group_DF)
   # Plot in Miller LCM
@@ -994,134 +1002,134 @@ Main_Function()
 ################################################################################
 
 
-
-
-
-intersect(
-  tail(de_sp_vs_all_DF$Gene, 50)
-  , tail(de_sp_vs_cluster3_DF$Gene, 50)
-)
-
-
-
-
-
-
-
-
-# Miller LCM from Allen
-in_millerLCM <- list.files("../allen_brain_data/miller_LCM", full.names = TRUE)
-in_millerLCM <- in_millerLCM[grep("lmd", in_millerLCM)]
-# Column annotations
-millerLCM_col_annot_DFL <- lapply(in_millerLCM, function(in_millerLCM){
-  millerLCM_col_annot_DF <- read.csv(paste0(in_millerLCM, "/columns_metadata.csv"))
-  millerLCM_col_annot_DF$Match_Key <- with(millerLCM_col_annot_DF
-    , paste(gsub(".*_", "", in_millerLCM), structure_id))
-  return(millerLCM_col_annot_DF)
-})
-millerLCM_col_annot_DF <- do.call("rbind", millerLCM_col_annot_DFL)
-millerLCM_col_annot_DF$Index <- c(1:nrow(millerLCM_col_annot_DF))
-# Expression matrices
-ex_DFL <- lapply(in_millerLCM, function(in_millerLCM){
-  read.csv(paste0(in_millerLCM, "/expression_matrix.csv"), header = FALSE)
-})
-millerLCM_ex_DF <- do.call("cbind", ex_DFL)
-# Row annotations
-millerLCM_row_annot_DF <- read.csv(
-  "../allen_brain_data/miller_LCM/lmd_matrix_12840/rows_metadata.csv")
-
-webtool_col_order <- read.csv("../allen_brain_data/miller_LCM/webtool_columns.csv")
-webtool_col_order$Match_Key <- with(webtool_col_order
-  , paste(donor_id, structure_id))
-
-# Reorder to webtool sample order
-webtool_col_order <- webtool_col_order[webtool_col_order$Match_Key %in% millerLCM_col_annot_DF$Match_Key, ]
-idx <- match(webtool_col_order$Match_Key, millerLCM_col_annot_DF$Match_Key)
-millerLCM_col_annot_DF <- millerLCM_col_annot_DF[idx, ]
-millerLCM_ex_DF <- millerLCM_ex_DF[ ,idx]
-
-# Get maximum expression probe
-genes <- unique(millerLCM_row_annot_DF$entrez_id)
-keepind <- matrix(nrow = 0, ncol = 0);
-for (ii in 1:length(genes)) {
-  genematchind <- which(millerLCM_row_annot_DF$entrez_id == genes[ii]);
-  if (length(genematchind) > 1) {
-    themeans <- rowMeans(millerLCM_ex_DF[genematchind, ]);
-    maxind <- which(themeans == max(themeans))[1];
-    keepind <- c(keepind, genematchind[maxind]);
-  } else {
-    keepind = c(keepind, genematchind);
-  }
-}
-millerLCM_ex_DF = millerLCM_ex_DF[keepind, ];
-rownames(millerLCM_ex_DF) <- millerLCM_row_annot_DF$entrez_id[
-  match(rownames(millerLCM_ex_DF), rownames(millerLCM_row_annot_DF))]
-millerLCM_row_annot_DF = millerLCM_row_annot_DF[keepind, ];
-
-# Convert entrez id to gene symbols
-# Remove genes with no hgnc symbol
-millerLCM_ex_DF <- millerLCM_ex_DF[
-  rownames(millerLCM_ex_DF) %in% bmDF$entrezgene, ]
-hgnc_symbol <- bmDF$hgnc_symbol[
-  match(rownames(millerLCM_ex_DF), bmDF$entrezgene)]
-millerLCM_ex_DF <- millerLCM_ex_DF[! duplicated(hgnc_symbol), ]
-rownames(millerLCM_ex_DF) <- hgnc_symbol[! duplicated(hgnc_symbol)]
-
-
-Format_Miller_LCM_For_GGplot <- function(
-  millerLCM_ex_DF
-  , genes
-  , millerLCM_col_annot_DF
-  , millerLCM_row_annot_DF){
-  # browser()
-  print("Format_Miller_LCM_For_GGplot")
-  colnames(millerLCM_ex_DF) <-
-    paste(as.character(millerLCM_col_annot_DF$structure_name)
-    , c(1:nrow(millerLCM_col_annot_DF)))
-  millerLCM_ex_DF <- millerLCM_ex_DF[rownames(millerLCM_ex_DF) %in% genes, ]
-  # Change outliers to NA
-  idx_M <- apply(millerLCM_ex_DF, 1, function(expr){
-    mn <- mean(expr)
-    stdev <- sd(expr)
-    idx <- expr > mn + stdev*2 | expr < mn - stdev*2
-    return(idx)
-  })
-  idx_M <- t(idx_M)
-  millerLCM_ex_DF[idx_M] <- NA
-  millerLCM_ex_DF <- as.data.frame(t(scale(t(millerLCM_ex_DF))))
-  millerLCM_ex_DF$Gene <- rownames(millerLCM_ex_DF)
-  millerLCM_ex_DF <- melt(millerLCM_ex_DF)
-  millerLCM_ex_DF$value[millerLCM_ex_DF$value > 1.5] <- 1.5
-  millerLCM_ex_DF$value[millerLCM_ex_DF$value < -1.5] <- -1.5
-  millerLCM_ex_DF$Gene <- factor(millerLCM_ex_DF$Gene
-    , levels = genes
-  )
-  millerLCM_ex_DF$variable <- factor(
-    millerLCM_ex_DF$variable
-    , levels = unique(millerLCM_ex_DF$variable))
-  return(millerLCM_ex_DF)
-}
-ggDF <- Format_Miller_LCM_For_GGplot(
-  millerLCM_ex_DF = millerLCM_ex_DF
-  , millerLCM_col_annot_DF = millerLCM_col_annot_DF
-  , millerLCM_row_annot_DF = millerLCM_row_annot_DF
-  , genes = tail(gene_group_DF$Gene))
-  # , genes = gene_group_DF$Gene[! duplicated(gene_group_DF$Gene)])
-
-ggplot(ggDF, aes(x = variable, y = Gene, fill = value)) +
-  geom_tile() +
-  scale_fill_distiller(name = "Normalized\nexpression", type = "div"
-      , palette = 5, direction = -1, limits = c(-1.5, 1.5)) +
-  xlab("Region") +
-  ylab("Gene") +
-  theme_bw() +
-  theme(axis.line = element_line(colour = "black"),
-    panel.grid.major = element_blank(),
-    panel.grid.minor = element_blank(),
-    panel.border = element_blank(),
-    panel.background = element_blank()) +
-  theme(axis.text.x = element_blank()) +
-  ggtitle(paste0(graphCodeTitle
-    , "\nAllen LCM expression"))
-ggsave(paste0(outGraph, "Miller_Heatmap.png")
-  , width = 8, height = 8, dpi = 150)
+#
+#
+#
+# intersect(
+#   tail(de_sp_vs_all_DF$Gene, 50)
+#   , tail(de_sp_vs_cluster3_DF$Gene, 50)
+# )
+#
+#
+#
+#
+#
+#
+#
+#
+# # Miller LCM from Allen
+# in_millerLCM <- list.files("../allen_brain_data/miller_LCM", full.names = TRUE)
+# in_millerLCM <- in_millerLCM[grep("lmd", in_millerLCM)]
+# # Column annotations
+# millerLCM_col_annot_DFL <- lapply(in_millerLCM, function(in_millerLCM){
+#   millerLCM_col_annot_DF <- read.csv(paste0(in_millerLCM, "/columns_metadata.csv"))
+#   millerLCM_col_annot_DF$Match_Key <- with(millerLCM_col_annot_DF
+#     , paste(gsub(".*_", "", in_millerLCM), structure_id))
+#   return(millerLCM_col_annot_DF)
+# })
+# millerLCM_col_annot_DF <- do.call("rbind", millerLCM_col_annot_DFL)
+# millerLCM_col_annot_DF$Index <- c(1:nrow(millerLCM_col_annot_DF))
+# # Expression matrices
+# ex_DFL <- lapply(in_millerLCM, function(in_millerLCM){
+#   read.csv(paste0(in_millerLCM, "/expression_matrix.csv"), header = FALSE)
+# })
+# millerLCM_ex_DF <- do.call("cbind", ex_DFL)
+# # Row annotations
+# millerLCM_row_annot_DF <- read.csv(
+#   "../allen_brain_data/miller_LCM/lmd_matrix_12840/rows_metadata.csv")
+#
+# webtool_col_order <- read.csv("../allen_brain_data/miller_LCM/webtool_columns.csv")
+# webtool_col_order$Match_Key <- with(webtool_col_order
+#   , paste(donor_id, structure_id))
+#
+# # Reorder to webtool sample order
+# webtool_col_order <- webtool_col_order[webtool_col_order$Match_Key %in% millerLCM_col_annot_DF$Match_Key, ]
+# idx <- match(webtool_col_order$Match_Key, millerLCM_col_annot_DF$Match_Key)
+# millerLCM_col_annot_DF <- millerLCM_col_annot_DF[idx, ]
+# millerLCM_ex_DF <- millerLCM_ex_DF[ ,idx]
+#
+# # Get maximum expression probe
+# genes <- unique(millerLCM_row_annot_DF$entrez_id)
+# keepind <- matrix(nrow = 0, ncol = 0);
+# for (ii in 1:length(genes)) {
+#   genematchind <- which(millerLCM_row_annot_DF$entrez_id == genes[ii]);
+#   if (length(genematchind) > 1) {
+#     themeans <- rowMeans(millerLCM_ex_DF[genematchind, ]);
+#     maxind <- which(themeans == max(themeans))[1];
+#     keepind <- c(keepind, genematchind[maxind]);
+#   } else {
+#     keepind = c(keepind, genematchind);
+#   }
+# }
+# millerLCM_ex_DF = millerLCM_ex_DF[keepind, ];
+# rownames(millerLCM_ex_DF) <- millerLCM_row_annot_DF$entrez_id[
+#   match(rownames(millerLCM_ex_DF), rownames(millerLCM_row_annot_DF))]
+# millerLCM_row_annot_DF = millerLCM_row_annot_DF[keepind, ];
+#
+# # Convert entrez id to gene symbols
+# # Remove genes with no hgnc symbol
+# millerLCM_ex_DF <- millerLCM_ex_DF[
+#   rownames(millerLCM_ex_DF) %in% bmDF$entrezgene, ]
+# hgnc_symbol <- bmDF$hgnc_symbol[
+#   match(rownames(millerLCM_ex_DF), bmDF$entrezgene)]
+# millerLCM_ex_DF <- millerLCM_ex_DF[! duplicated(hgnc_symbol), ]
+# rownames(millerLCM_ex_DF) <- hgnc_symbol[! duplicated(hgnc_symbol)]
+#
+#
+# Format_Miller_LCM_For_GGplot <- function(
+#   millerLCM_ex_DF
+#   , genes
+#   , millerLCM_col_annot_DF
+#   , millerLCM_row_annot_DF){
+#   # browser()
+#   print("Format_Miller_LCM_For_GGplot")
+#   colnames(millerLCM_ex_DF) <-
+#     paste(as.character(millerLCM_col_annot_DF$structure_name)
+#     , c(1:nrow(millerLCM_col_annot_DF)))
+#   millerLCM_ex_DF <- millerLCM_ex_DF[rownames(millerLCM_ex_DF) %in% genes, ]
+#   # Change outliers to NA
+#   idx_M <- apply(millerLCM_ex_DF, 1, function(expr){
+#     mn <- mean(expr)
+#     stdev <- sd(expr)
+#     idx <- expr > mn + stdev*2 | expr < mn - stdev*2
+#     return(idx)
+#   })
+#   idx_M <- t(idx_M)
+#   millerLCM_ex_DF[idx_M] <- NA
+#   millerLCM_ex_DF <- as.data.frame(t(scale(t(millerLCM_ex_DF))))
+#   millerLCM_ex_DF$Gene <- rownames(millerLCM_ex_DF)
+#   millerLCM_ex_DF <- melt(millerLCM_ex_DF)
+#   millerLCM_ex_DF$value[millerLCM_ex_DF$value > 1.5] <- 1.5
+#   millerLCM_ex_DF$value[millerLCM_ex_DF$value < -1.5] <- -1.5
+#   millerLCM_ex_DF$Gene <- factor(millerLCM_ex_DF$Gene
+#     , levels = genes
+#   )
+#   millerLCM_ex_DF$variable <- factor(
+#     millerLCM_ex_DF$variable
+#     , levels = unique(millerLCM_ex_DF$variable))
+#   return(millerLCM_ex_DF)
+# }
+# ggDF <- Format_Miller_LCM_For_GGplot(
+#   millerLCM_ex_DF = millerLCM_ex_DF
+#   , millerLCM_col_annot_DF = millerLCM_col_annot_DF
+#   , millerLCM_row_annot_DF = millerLCM_row_annot_DF
+#   , genes = tail(gene_group_DF$Gene))
+#   # , genes = gene_group_DF$Gene[! duplicated(gene_group_DF$Gene)])
+#
+# ggplot(ggDF, aes(x = variable, y = Gene, fill = value)) +
+#   geom_tile() +
+#   scale_fill_distiller(name = "Normalized\nexpression", type = "div"
+#       , palette = 5, direction = -1, limits = c(-1.5, 1.5)) +
+#   xlab("Region") +
+#   ylab("Gene") +
+#   theme_bw() +
+#   theme(axis.line = element_line(colour = "black"),
+#     panel.grid.major = element_blank(),
+#     panel.grid.minor = element_blank(),
+#     panel.border = element_blank(),
+#     panel.background = element_blank()) +
+#   theme(axis.text.x = element_blank()) +
+#   ggtitle(paste0(script_name
+#     , "\nAllen LCM expression"))
+# ggsave(paste0(out_graph, "Miller_Heatmap.png")
+#   , width = 8, height = 8, dpi = 150)
