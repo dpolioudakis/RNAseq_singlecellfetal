@@ -31,6 +31,10 @@ load("../analysis/analyzed_data/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegN
 cluster_de_df <- read.table(
   "../analysis/tables/Seurat_ClusterDE/DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/res054/Seurat_ClusterDE_ClusterX_Vs_All_Clusters.txt"
   , header = TRUE)
+# Subcluster DE genes
+subcluster_de_df <- read.csv(
+  "../analysis/tables/Seurat_ClusterRound2_DE_vs_40k/20181124/Seurat_ClusterRound2_DE_vs_40k_ClusterX_Vs_All_Clusters.csv"
+  , header = TRUE)
 
 # Cell type specific genes
 celltype_specific_df <- read.csv("../analysis/tables/Seurat_ClassMarkers/DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/res054/Seurat_ClassMarkers_Markers_Class.csv")
@@ -65,9 +69,10 @@ hk_genes_tb <- read_tsv("../source/Gene_Lists/hk_gene_list.txt")
 
 ## Variables
 script_name <- "ATAC_REs.R"
-out_graph <- "../analysis/graphs/ATAC_REs/20181031/ATAC_REs_"
-out_table <- "../analysis/tables/ATAC_REs/20181031/ATAC_REs_"
-out_data <- "../analysis/analyzed_data/20181031/ATAC_REs/ATAC_REs_"
+date <- format(Sys.Date(), "%Y%m%d")
+out_graph <- paste0("../analysis/graphs/ATAC_REs/", date, "/ATAC_REs_")
+out_table <- paste0("../analysis/tables/ATAC_REs/", date, "/ATAC_REs_")
+out_data <- paste0("../analysis/analyzed_data/", date, "/ATAC_REs/ATAC_REs_")
 
 ## Output Directories
 dir.create(dirname(out_graph), recursive = TRUE)
@@ -133,12 +138,21 @@ atac_only_re_cluster_df <- merge(
   atac_nohic_re_df, cluster_de_df
   , by.x = "ENSGID", by.y = "Ensembl"
 )
+# Merge ATAC without HiC enhancers table and cell type enriched genes table by ensid
+atac_only_re_subcluster_df <- merge(
+  atac_nohic_re_df, subcluster_de_df
+  , by.x = "ENSGID", by.y = "Ensembl"
+)
 write.csv(atac_hic_re_cluster_df
   , file = paste0(out_table, "ATACandHiC_CellTypeEnrichment.csv")
   , quote = FALSE
 )
 write.csv(atac_only_re_cluster_df
   , file = paste0(out_table, "ATAConly_CellTypeEnrichment.csv")
+  , quote = FALSE
+)
+write.csv(atac_only_re_subcluster_df
+  , file = paste0(out_table, "ATAConly_SubClusterEnrichment.csv")
   , quote = FALSE
 )
 # Format for paper
