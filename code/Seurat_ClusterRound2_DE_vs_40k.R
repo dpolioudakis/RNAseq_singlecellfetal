@@ -67,7 +67,8 @@ cluster_annot_tb <- tribble(
 
 # outputs
 out_table <- paste0(
-  "../analysis/tables/Seurat_ClusterRound2_DE_vs_40k/", date, "/")
+  "../analysis/tables/Seurat_ClusterRound2_DE_vs_40k/", date
+  , "/Seurat_ClusterRound2_DE_vs_40k_")
 
 # make output directories
 dir.create(dirname(out_table), recursive = TRUE)
@@ -176,4 +177,37 @@ print("Writing DE table to text file")
 write.csv(x = de_df
   , file = paste0(out_table, "Cluster", cluster_id, "_Vs_All_Clusters.csv")
   , quote = FALSE, row.names = FALSE)
+################################################################################
+
+### Compile DE tables
+
+# DE of clusters file paths
+in_de_tables <- list.files(dirname(out_table), full.names = TRUE)
+in_de_tables <- in_de_tables[grep("Cluster\\d", in_de_tables, perl = TRUE)]
+
+# Loop through DE text files and compile into one table
+ldf <- lapply(in_de_tables, function(in_de_table) {
+  df <- read.csv(in_de_table, header = TRUE)
+  # Filter FDR < 0.05 and log2 fold change > 0.2
+  df <- df[with(df, FDR < 0.05 & Log2_Fold_Change > 0.2), ]
+  df <- df[order(-df$Log2_Fold_Change), ]
+  # Add ensembl IDs
+  # df$Ensembl <- Convert_Mixed_GeneSym_EnsID_To_EnsID(as.character(df$Gene))
+  return(df)
+})
+cluster_de_df <- do.call("rbind", ldf)
+# Round percentages
+cluster_de_df$Percent_Cluster <- round(cluster_de_df$Percent_Cluster, 1)
+cluster_de_df$Percent_All <- round(cluster_de_df$Percent_All, 1)
+# Check
+head(cluster_de_df)
+tail(cluster_de_df)
+dim(cluster_de_df)
+length(grep("ENSG", cluster_de_df$Ensembl))
+head(cluster_de_df[order(cluster_de_df$Cluster, cluster_de_df$Gene), ], 20)
+# Write out as tab delimited
+write.csv(x = cluster_de_df
+  , file = paste0(out_table, "ClusterX_Vs_All_Clusters.csv")
+  , quote = FALSE, row.names = FALSE
+)
 ################################################################################
