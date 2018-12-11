@@ -26,7 +26,8 @@ print(paste0("Cluster ID: ", cluster_id))
 ## Inputs
 # Seurat
 # Seurat cluster round 2
-load("../analysis/analyzed_data/Seurat_ClusterRound2/ClusterRound2/DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/VarGenes/RegNumiLibBrain/PC1-40/Seurat_ClusterRound2_DS2-11_Cluster3_seuratO.Robj")
+load(paste0("../analysis/analyzed_data/Seurat_ClusterRound2/ClusterRound2/20180907/Seurat_ClusterRound2_Cluster"
+  , cluster_id, "_seuratO.Robj"))
 
 # Seurat
 load("../analysis/analyzed_data/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_seuratO.Robj")
@@ -67,15 +68,19 @@ cluster_annot_tb <- tribble(
 
 # outputs
 out_table <- paste0(
-  "../analysis/tables/Seurat_ClusterRound2_DE_vs_40k/", date
+  "../analysis/tables/Seurat_ClusterRound2/DE_vs_40k/", date
   , "/Seurat_ClusterRound2_DE_vs_40k_")
 
 # make output directories
 dir.create(dirname(out_table), recursive = TRUE)
 ################################################################################
 
-### Functions
+### main
 
+main_function <- function(){
+  run_de_for_subclusters()
+  compile_de_tables()
+}
 ################################################################################
 
 ### Differentially expressed genes for each cluster versus all other cells
@@ -124,7 +129,7 @@ de_cell_clusters <- function(
     return(de_df)
 }
 
-make_cell_id_cluster_id_key <- function(){
+make_cell_id_cluster_id_key_for_subplate <- function(){
   print("make_cell_id_cluster_id_key")
   # Gather cell IDs and cluster IDs (including SP subcluster) for heatmap
   cellid_clusterid <- ds_so@ident %>% enframe(
@@ -145,7 +150,23 @@ make_cell_id_cluster_id_key <- function(){
   return(cellid_clusterid)
 }
 
-make_design_matrix <- function(){
+make_cell_id_cluster_id_key <- function(){
+  print("make_cell_id_cluster_id_key")
+  # Gather cell IDs and cluster IDs (including SP subcluster) for heatmap
+  cellid_clusterid <- ds_so@ident %>% enframe(
+    name = "cell_id", value = "cluster_id") %>%
+    left_join(
+      (so@ident %>% enframe(name = "cell_id", value = "sub_cluster_id"))
+      , by = "cell_id") %>%
+    mutate_if(is.factor, as.character) %>%
+    mutate(cluster_id = paste0(.$cluster_id, "_", .$sub_cluster_id)) %>%
+    left_join(cluster_annot_tb
+      , by = c("cluster_id" = "cluster_number")) %>%
+      select(cell_id, cluster_id) %>% deframe
+  return(cellid_clusterid)
+}
+
+make_design_matrix <- function(cluster_id){
   print("make_design_matrix")
   design_matrix <- ds_so@meta.data[c("nUMI", "librarylab", "individual")]
   # Add term TRUE/FALSE cell is in cluster
@@ -154,60 +175,100 @@ make_design_matrix <- function(){
   return(design_matrix)
 }
 
-cluster_annot <- cluster_annot_tb %>%
-  filter(cluster_number == cluster_id) %>%
-  pull(cluster_annot)
+run_de_for_subclusters <- function(){
 
-de_df <- de_cell_clusters(
-  expr_m = ds_so@data
-  , cluster_id = cluster_id
-  , cell_cluster_key = make_cell_id_cluster_id_key()
-  , design_matrix = make_design_matrix()
-  , mod = "y ~ cluster+nUMI+librarylab+individual"
-  , min_percent_expr = 10
-  , cluster_annot = cluster_annot
-)
+  print("run_de_for_subclusters")
 
-# Check
-table(de_df$Pvalue < 0.05)
-table(de_df$FDR < 0.05)
+  # cluster annotation
+  cluster_annot <- cluster_annot_tb %>%
+    filter(cluster_number == cluster_id) %>%
+    pull(cluster_annot)
 
-# Write to tab delimited table
-print("Writing DE table to text file")
-write.csv(x = de_df
-  , file = paste0(out_table, "Cluster", cluster_id, "_Vs_All_Clusters.csv")
-  , quote = FALSE, row.names = FALSE)
+  # run de
+  cluster_subcluster_ids <- paste0(cluster_id, "_", unique(so@ident))
+  de_df <- map(cluster_subcluster_ids, function(cluster_subcluster_id){
+    print(cluster_subcluster_id)
+    de_cell_clusters(
+      expr_m = ds_so@data
+      , cluster_id = cluster_subcluster_id
+      , cell_cluster_key = make_cell_id_cluster_id_key()
+      , design_matrix = make_design_matrix(cluster_id = cluster_subcluster_id)
+      , mod = "y ~ cluster+nUMI+librarylab+individual"
+      , min_percent_expr = 10
+      , cluster_annot = cluster_annot
+    ) %>%
+    mutate(Gene = as.character(Gene))
+    }) %>%
+    bind_rows
+
+  # format
+  # decided to change my column formatting after I wrote the DE function...
+  de_df <- de_df %>%
+    mutate(Subcluster = gsub("*._", "", Cluster)) %>%
+    mutate(Cluster_Subcluster = Cluster) %>%
+    mutate(Cluster = gsub("_.*", "", Cluster)) %>% data.frame
+
+  # de_df <- de_cell_clusters(
+  #   expr_m = ds_so@data
+  #   , cluster_id = cluster_id
+  #   , cell_cluster_key = make_cell_id_cluster_id_key()
+  #   , design_matrix = make_design_matrix()
+  #   , mod = "y ~ cluster+nUMI+librarylab+individual"
+  #   , min_percent_expr = 10
+  #   , cluster_annot = cluster_annot
+  # )
+
+  # Check
+  table(de_df$Pvalue < 0.05)
+  table(de_df$FDR < 0.05)
+
+  # Write to tab delimited table
+  print("Writing DE table to text file")
+  write.csv(x = de_df
+    , file = paste0(out_table, "Cluster", cluster_id, "_Vs_All_Clusters.csv")
+    , quote = FALSE, row.names = FALSE)
+}
 ################################################################################
 
 ### Compile DE tables
 
-# DE of clusters file paths
-in_de_tables <- list.files(dirname(out_table), full.names = TRUE)
-in_de_tables <- in_de_tables[grep("Cluster\\d", in_de_tables, perl = TRUE)]
+compile_de_tables <- function(){
 
-# Loop through DE text files and compile into one table
-ldf <- lapply(in_de_tables, function(in_de_table) {
-  df <- read.csv(in_de_table, header = TRUE)
-  # Filter FDR < 0.05 and log2 fold change > 0.2
-  df <- df[with(df, FDR < 0.05 & Log2_Fold_Change > 0.2), ]
-  df <- df[order(-df$Log2_Fold_Change), ]
-  # Add ensembl IDs
-  # df$Ensembl <- Convert_Mixed_GeneSym_EnsID_To_EnsID(as.character(df$Gene))
-  return(df)
-})
-cluster_de_df <- do.call("rbind", ldf)
-# Round percentages
-cluster_de_df$Percent_Cluster <- round(cluster_de_df$Percent_Cluster, 1)
-cluster_de_df$Percent_All <- round(cluster_de_df$Percent_All, 1)
-# Check
-head(cluster_de_df)
-tail(cluster_de_df)
-dim(cluster_de_df)
-length(grep("ENSG", cluster_de_df$Ensembl))
-head(cluster_de_df[order(cluster_de_df$Cluster, cluster_de_df$Gene), ], 20)
-# Write out as tab delimited
-write.csv(x = cluster_de_df
-  , file = paste0(out_table, "ClusterX_Vs_All_Clusters.csv")
-  , quote = FALSE, row.names = FALSE
-)
+  print("compile_de_tables")
+
+  # DE of clusters file paths
+  in_de_tables <- list.files(dirname(out_table), full.names = TRUE)
+  in_de_tables <- in_de_tables[grep("Cluster\\d", in_de_tables, perl = TRUE)]
+
+  # Loop through DE text files and compile into one table
+  ldf <- lapply(in_de_tables, function(in_de_table) {
+    df <- read.csv(in_de_table, header = TRUE)
+    # Filter FDR < 0.05 and log2 fold change > 0.2
+    df <- df[with(df, FDR < 0.05 & Log2_Fold_Change > 0.2), ]
+    df <- df[order(-df$Log2_Fold_Change), ]
+    # Add ensembl IDs
+    # df$Ensembl <- Convert_Mixed_GeneSym_EnsID_To_EnsID(as.character(df$Gene))
+    return(df)
+  })
+  cluster_de_df <- do.call("rbind", ldf)
+  # Round percentages
+  cluster_de_df$Percent_Cluster <- round(cluster_de_df$Percent_Cluster, 1)
+  cluster_de_df$Percent_All <- round(cluster_de_df$Percent_All, 1)
+  # Check
+  head(cluster_de_df)
+  tail(cluster_de_df)
+  dim(cluster_de_df)
+  length(grep("ENSG", cluster_de_df$Ensembl))
+  head(cluster_de_df[order(cluster_de_df$Cluster, cluster_de_df$Gene), ], 20)
+  # Write out as tab delimited
+  write.csv(x = cluster_de_df
+    , file = paste0(out_table, "ClusterX_Vs_All_Clusters.csv")
+    , quote = FALSE, row.names = FALSE
+  )
+}
+################################################################################
+
+### run
+
+main_function()
 ################################################################################
