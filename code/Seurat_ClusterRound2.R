@@ -37,15 +37,19 @@ load("../analysis/analyzed_data/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegN
 # load("../analysis/analyzed_data/Seurat_Cluster_DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/Seurat_Cluster_DS2-11_TEST_seuratO.Robj")
 # centSO <- ssCentSO
 # noCentExM <- ssNoCentExM
+clustersL <- sort(as.numeric(as.character(unique(centSO@ident))))
+clusterID <- clustersL[[as.numeric(args[1])]]
+print(paste0("Cluster ID: ", clusterID))
 
 ## Variables
 graphCodeTitle <- "Seurat_ClusterRound2.R"
 date <- format(Sys.Date(), "%Y%m%d")
+date <- "20181222"
 outGraph <- paste0("../analysis/graphs/Seurat_ClusterRound2/ClusterRound2/"
-  , date, "_PC110/Seurat_ClusterRound2_")
+  , date, "/Seurat_ClusterRound2_")
 outData <- paste0(
   "../analysis/analyzed_data/Seurat_ClusterRound2/ClusterRound2/"
-  , date, "_PC110/Seurat_ClusterRound2_")
+  , date, "/Seurat_ClusterRound2_")
 
 ## Output Directories
 dir.create(dirname(outGraph), recursive = TRUE)
@@ -63,7 +67,7 @@ main_function <- function(){
   rd1CentExM <- so_and_reg_exm_l[[3]]
   rm(so_and_reg_exm_l)
   so <- seurat_cluster_and_tsne(
-    so = so, pcs = list(c(1:5), c(1:10))
+    so = so, pcs = list(c(1:5), c(1:8), c(1:10), c(1:15), c(1:40))
     , resolutions = c(0.4, 0.5, 0.54, 0.6, 0.7, 0.8))
   save(so, noCentExM, rd1CentExM
     , file = paste0(outData, "Cluster", clusterID, "_seuratO.Robj"))
@@ -71,13 +75,12 @@ main_function <- function(){
 
 main_plotting_function <- function(){
   load(paste0(outData, "Cluster", clusterID, "_seuratO.Robj"))
-  plot_pcs_variance()
-  plot_genes_with_highest_pc_loadings()
-  plot_seurat_pcs_tsne_cluster_tests()
-  plot_seurat_resolution_tests_tsnes(
-    resolutions = c(0.4, 0.5, 0.54, 0.6, 0.7, 0.8))
-  plot_tsnes_colored_by_covariates()
-  plot_40k_cell_tsne_colored_by_subclustering()
+  plot_pcs_variance(so = so)
+  plot_genes_with_highest_pc_loadings(so = so)
+  plot_seurat_pcs_tsne_cluster_tests(so = so)
+  plot_tsnes_colored_by_covariates(so = so)
+  plot_40k_cell_tsne_colored_by_subclustering(so = so)
+  plot_40k_cell_tsne_subclustered(so = so)
 }
 ################################################################################
 
@@ -92,9 +95,9 @@ run_seurat <- function(){
   # List of cluster IDs
   # clustersL <- append(list(c(0, 1, 4), c(0, 1), c(3, 13), c(5, 6), c(7, 9))
   #   , sort(as.numeric(as.character(unique(centSO@ident)))))
-  clustersL <- sort(as.numeric(as.character(unique(centSO@ident))))
-  clusterID <- clustersL[[as.numeric(args[1])]]
-  print(paste0("Cluster ID: ", clusterID))
+  # clustersL <- sort(as.numeric(as.character(unique(centSO@ident))))
+  # clusterID <- clustersL[[as.numeric(args[1])]]
+  # print(paste0("Cluster ID: ", clusterID))
 
   Subset_Seurat_Raw_Counts_By_Cluster <- function(clusterID, seuratO){
     print("Subset_Seurat_Raw_Counts_By_Cluster")
@@ -233,12 +236,12 @@ run_seurat <- function(){
 ### Add clustering and tsne with other parameters
 
 seurat_cluster <- function(
-  so, resolutions, pcs, cluster_col_name = "cluster_"){
+  so, resolutions, pcs, cluster_col_name_pfx = "cluster_"){
   print("seurat_cluster")
   for (i in resolutions){
-    print(paste0("resolution", i))
-    cluster_col_name <- paste0(cluster_col_name, "res_", i)
-    default_cluster_col_name <- paste0("res.", resolution)
+    print(paste0("resolution ", i))
+    cluster_col_name <- paste0(cluster_col_name_pfx, "res_", i)
+    default_cluster_col_name <- paste0("res.", i)
     #  cluster
     so <- FindClusters(object = so, dims.use = pcs, resolution = i
       , print.output = 0, save.SNN = TRUE)
@@ -263,17 +266,17 @@ seurat_cluster_and_tsne <- function(
     so <- RunTSNE(
       object = so, dims.use = i, do.fast = TRUE
       , reduction.name = reduction_name)
-    so <- cluster_with_multiple_resolutions(so = so
-      , resolutions = resolutions, pcs = i, cluster_col_name = cluster_col_name)
-
-  return(so)
+    so <- seurat_cluster(
+      so = so, resolutions = resolutions, pcs = i
+      , cluster_col_name_pfx = cluster_col_name)
   }
+  return(so)
 }
 ################################################################################
 
 ### PCs variance plot
 
-plot_pcs_variance <- function(){
+plot_pcs_variance <- function(so){
   print("plot_pcs_variance")
   # PC variance plot
   gg <- DimElbowPlot(so, reduction.type = "pca", dims.plot = 50)
@@ -291,200 +294,193 @@ plot_pcs_variance <- function(){
 
 ### PCs tests tSNE plots
 
-plot_seurat_pcs_tsne_cluster_tests <- function(){
+plot_seurat_pcs_tsne_cluster_tests <- function(so){
 
   print("plot_seurat_pcs_tsne_cluster_tests")
 
-  ## PCs test
-  Seurat_PCs_Test <- function(seuratO, resolution, dims_use, title){
-    print("Seurat_PCs_Test")
-    ggL <- lapply(dims_use, function(dims_use) {
-      tryCatch({
-        print(paste0("Dimensions: ", dims_use[1], "-", dims_use[length(dims_use)]))
-        seuratO <- RunTSNE(seuratO, dims.use = dims_use, do.fast = TRUE)
-        seuratO <- FindClusters(
-          seuratO, dims.use = dims_use, resolution = resolution
-          , print.output = 0, save.SNN = TRUE)
-        gg <- TSNEPlot(seuratO, pt.size = 0.01, do.return = TRUE, do.label = TRUE)
-        gg <- gg + ggplot_set_theme_publication
-        gg <- gg + ggtitle(paste0(
-          "PCs: ", dims_use[1], "-", dims_use[length(dims_use)]
-          , "\nResolution: ", resolution
-        ))
-        return(gg)
-        } ,
-        error = function(cond) {
-          print(paste0("Error for dimensions: ", dims_use[1], "-", dims_use[length(dims_use)]))
-          message(cond)
-          # Choose a return value in case of error
-          return(NA)
-        }
-      )
+  clusterings_df <- data.frame(clusterings = colnames(so@meta.data)[
+    grep("clusters_", colnames(so@meta.data))])
+  clusterings_df$tsnes <- clusterings_df$clusterings
+  clusterings_df$tsnes <- gsub("clusters_", "tsne_", clusterings_df$tsnes)
+  clusterings_df$tsnes <- gsub("_res_.*", "", clusterings_df$tsnes)
+  clusterings_df <- clusterings_df
 
-    })
-    return(ggL)
-  }
-  # Plot
-  ggL <- Seurat_PCs_Test(
-    seuratO = so
-    , title = name
-    , dims_use = list(c(1:5), c(1:10), c(1:15), c(1:20), c(1:30), c(1:40))
-    # , dims_use = list(c(1:10), c(1:20))
-    , resolution = 0.4
-  )
-  ggL <- ggL[! is.na(ggL)]
+  gg_l <- apply(clusterings_df, 1, function(x){
+    clustering <- x[["clusterings"]]
+    tsne <- x[["tsnes"]]
+    tryCatch(
+      {
+        so@dr$tsne <- so@dr[[tsne]]
+        cluster_ids <- factor(so@meta.data[[clustering]])
+        names(cluster_ids) <- rownames(so@meta.data)
+        so@ident <- cluster_ids
+        gg <- TSNEPlot(so, pt.size = 0.01, do.return = TRUE, do.label = TRUE)
+        gg <- gg + ggplot_set_theme_publication
+        gg <- gg + ggtitle(clustering)
+        return(gg)
+      }
+      , error = function(cond) {
+        print(paste0("Error for dimensions: ", tsne, " ", clustering))
+        message(cond)
+        # Choose a return value in case of error
+        return(NA)
+      }
+    )
+  })
+
+  gg_l <- gg_l[! is.na(gg_l)]
   # Combine tSNE graphs
-  pg <- Plot_Grid(ggL, ncol = 3, rel_height = 0.3
+  Plot_Grid(gg_l, ncol = 3, rel_height = 0.1
     , title = paste0(graphCodeTitle
       , "\n\nSeurat cluster and tSNE with different PCs used"
       , "\nCluster: ", clusterID)
   )
-  ggsave(paste0(outGraph, "Cluster", clusterID, "_tSNE_PCsTest.png")
-    , width = 12, height = 7)
+  ggsave(paste0(outGraph, "cluster", clusterID, "_tSNE_ClusterTests.png")
+    , width = 12, height = 4+1.75*nrow(clusterings_df), limitsize = FALSE)
 }
 ################################################################################
-
-### Clustering tests tsne plots
-
-plot_seurat_resolution_tests_tsnes <- function(
-  resolutions = c(0.3, 0.4, 0.5, 0.54, 0.6, 0.7)){
-
-  print("plot_seurat_resolution_tests_tsnes")
-
-  ## Resolution test
-  Seurat_Resolution_Test <- function(seuratO, resolutions, dims_use){
-    print("Seurat_Resolution_Test")
-    so <- tryCatch({
-      RunTSNE(seuratO, dims.use = dims_use, do.fast = TRUE)
-      } ,
-      error = function(cond) {
-        print(paste0("Error for dimensions: ", dims_use))
-        message(cond)
-        # Choose a return value in case of error
-        return(NA)
-      }
-    )
-    ggL <- lapply(resolutions, function(resolution) {
-      tryCatch({
-        print(paste0("Resolution: ", resolution))
-        # so <- FindClusters(so, dims.use = dims_use, resolution = resolution
-        #   , print.output = 0, save.SNN = TRUE)
-        res_col_name <- paste0("res.", resolution)
-        cluster_ids <- as.factor(so@meta.data[[res_col_name]])
-        names(cluster_ids) <- rownames(so@meta.data)
-        so@ident <- cluster_ids
-        gg <- TSNEPlot(so, pt.size = 0.01, do.return = TRUE, do.label = TRUE)
-        gg <- gg + ggtitle(paste0("Resolution: ", resolution))
-        gg <- gg + ggplot_set_theme_publication
-        return(gg)
-      } ,
-      error = function(cond) {
-        print(paste0("Error for resolution: ", resolution))
-        message(cond)
-        # Choose a return value in case of error
-        return(NA)
-      }
-    )
-    })
-    return(ggL)
-  }
-
-  # Plot using PC1-40
-  ggL <- Seurat_Resolution_Test(
-    seuratO = so
-    , dims_use = 1:40
-    , resolutions = resolutions
-  )
-  ggL <- ggL[! is.na(ggL)]
-  # Combine tSNE graphs
-  pg <- Plot_Grid(ggL, ncol = 3, rel_height = 0.3
-    , title = paste0(graphCodeTitle
-      , "\n\nSeurat cluster and tSNE with different resolutions"
-      , "\nCluster: ", clusterID
-      , "\nPC 1-40"
-    )
-  )
-  ggsave(paste0(outGraph, "Cluster", clusterID, "_tSNE_PC1-40_ResolutionTest.png")
-    , width = 12, height = 7)
-
-  # Plot using PC1-15
-  ggL <- Seurat_Resolution_Test(
-    seuratO = so
-    , dims_use = 1:15
-    , resolutions = resolutions
-  )
-  ggL <- ggL[! is.na(ggL)]
-  # Combine tSNE graphs
-  pg <- Plot_Grid(ggL, ncol = 3, rel_height = 0.3
-    , title = paste0(graphCodeTitle
-      , "\n\nSeurat cluster and tSNE with different resolutions"
-      , "\nCluster: ", clusterID
-      , "\nPC 1-10"
-    )
-  )
-  ggsave(paste0(outGraph, "Cluster", clusterID, "_tSNE_PC1-15_ResolutionTest.png")
-    , width = 12, height = 7)
-
-  # Plot using PC1-10
-  ggL <- Seurat_Resolution_Test(
-    seuratO = so
-    , dims_use = 1:10
-    , resolutions = resolutions
-  )
-  ggL <- ggL[! is.na(ggL)]
-  # Combine tSNE graphs
-  pg <- Plot_Grid(ggL, ncol = 3, rel_height = 0.3
-    , title = paste0(graphCodeTitle
-      , "\n\nSeurat cluster and tSNE with different resolutions"
-      , "\nCluster: ", clusterID
-      , "\nPC 1-10"
-    )
-  )
-  ggsave(paste0(outGraph, "Cluster", clusterID, "_tSNE_PC1-10_ResolutionTest.png")
-    , width = 12, height = 7)
-
-  # Plot using PC1-8
-  ggL <- Seurat_Resolution_Test(
-    seuratO = so
-    , dims_use = 1:8
-    , resolutions = resolutions
-  )
-  ggL <- ggL[! is.na(ggL)]
-  # Combine tSNE graphs
-  pg <- Plot_Grid(ggL, ncol = 3, rel_height = 0.3
-    , title = paste0(graphCodeTitle
-      , "\n\nSeurat cluster and tSNE with different resolutions"
-      , "\nCluster: ", clusterID
-      , "\nPC 1-10"
-    )
-  )
-  ggsave(paste0(outGraph, "Cluster", clusterID, "_tSNE_PC1-8_ResolutionTest.png")
-    , width = 12, height = 7)
-
-  # Plot using PC1-5
-  ggL <- Seurat_Resolution_Test(
-    seuratO = so
-    , dims_use = 1:5
-    , resolutions = resolutions
-  )
-  ggL <- ggL[! is.na(ggL)]
-  # Combine tSNE graphs
-  pg <- Plot_Grid(ggL, ncol = 3, rel_height = 0.3
-    , title = paste0(graphCodeTitle
-      , "\n\nSeurat cluster and tSNE with different resolutions"
-      , "\nCluster: ", clusterID
-      , "\nPC 1-5"
-    )
-  )
-  ggsave(paste0(outGraph, "Cluster", clusterID, "_tSNE_PC1-5_ResolutionTest.png")
-    , width = 12, height = 7)
-
-}
+#
+# ### Clustering tests tsne plots
+#
+# plot_seurat_resolution_tests_tsnes <- function(
+#   resolutions = c(0.3, 0.4, 0.5, 0.54, 0.6, 0.7)){
+#
+#   print("plot_seurat_resolution_tests_tsnes")
+#
+#   ## Resolution test
+#   Seurat_Resolution_Test <- function(seuratO, resolutions, dims_use){
+#     print("Seurat_Resolution_Test")
+#     so <- tryCatch({
+#       RunTSNE(seuratO, dims.use = dims_use, do.fast = TRUE)
+#       } ,
+#       error = function(cond) {
+#         print(paste0("Error for dimensions: ", dims_use))
+#         message(cond)
+#         # Choose a return value in case of error
+#         return(NA)
+#       }
+#     )
+#     ggL <- lapply(resolutions, function(resolution) {
+#       tryCatch({
+#         print(paste0("Resolution: ", resolution))
+#         # so <- FindClusters(so, dims.use = dims_use, resolution = resolution
+#         #   , print.output = 0, save.SNN = TRUE)
+#         res_col_name <- paste0("res.", resolution)
+#         cluster_ids <- as.factor(so@meta.data[[res_col_name]])
+#         names(cluster_ids) <- rownames(so@meta.data)
+#         so@ident <- cluster_ids
+#         gg <- TSNEPlot(so, pt.size = 0.01, do.return = TRUE, do.label = TRUE)
+#         gg <- gg + ggtitle(paste0("Resolution: ", resolution))
+#         gg <- gg + ggplot_set_theme_publication
+#         return(gg)
+#       } ,
+#       error = function(cond) {
+#         print(paste0("Error for resolution: ", resolution))
+#         message(cond)
+#         # Choose a return value in case of error
+#         return(NA)
+#       }
+#     )
+#     })
+#     return(ggL)
+#   }
+#
+#   # Plot using PC1-40
+#   ggL <- Seurat_Resolution_Test(
+#     seuratO = so
+#     , dims_use = 1:40
+#     , resolutions = resolutions
+#   )
+#   ggL <- ggL[! is.na(ggL)]
+#   # Combine tSNE graphs
+#   pg <- Plot_Grid(ggL, ncol = 3, rel_height = 0.3
+#     , title = paste0(graphCodeTitle
+#       , "\n\nSeurat cluster and tSNE with different resolutions"
+#       , "\nCluster: ", clusterID
+#       , "\nPC 1-40"
+#     )
+#   )
+#   ggsave(paste0(outGraph, "Cluster", clusterID, "_tSNE_PC1-40_ResolutionTest.png")
+#     , width = 12, height = 7)
+#
+#   # Plot using PC1-15
+#   ggL <- Seurat_Resolution_Test(
+#     seuratO = so
+#     , dims_use = 1:15
+#     , resolutions = resolutions
+#   )
+#   ggL <- ggL[! is.na(ggL)]
+#   # Combine tSNE graphs
+#   pg <- Plot_Grid(ggL, ncol = 3, rel_height = 0.3
+#     , title = paste0(graphCodeTitle
+#       , "\n\nSeurat cluster and tSNE with different resolutions"
+#       , "\nCluster: ", clusterID
+#       , "\nPC 1-10"
+#     )
+#   )
+#   ggsave(paste0(outGraph, "Cluster", clusterID, "_tSNE_PC1-15_ResolutionTest.png")
+#     , width = 12, height = 7)
+#
+#   # Plot using PC1-10
+#   ggL <- Seurat_Resolution_Test(
+#     seuratO = so
+#     , dims_use = 1:10
+#     , resolutions = resolutions
+#   )
+#   ggL <- ggL[! is.na(ggL)]
+#   # Combine tSNE graphs
+#   pg <- Plot_Grid(ggL, ncol = 3, rel_height = 0.3
+#     , title = paste0(graphCodeTitle
+#       , "\n\nSeurat cluster and tSNE with different resolutions"
+#       , "\nCluster: ", clusterID
+#       , "\nPC 1-10"
+#     )
+#   )
+#   ggsave(paste0(outGraph, "Cluster", clusterID, "_tSNE_PC1-10_ResolutionTest.png")
+#     , width = 12, height = 7)
+#
+#   # Plot using PC1-8
+#   ggL <- Seurat_Resolution_Test(
+#     seuratO = so
+#     , dims_use = 1:8
+#     , resolutions = resolutions
+#   )
+#   ggL <- ggL[! is.na(ggL)]
+#   # Combine tSNE graphs
+#   pg <- Plot_Grid(ggL, ncol = 3, rel_height = 0.3
+#     , title = paste0(graphCodeTitle
+#       , "\n\nSeurat cluster and tSNE with different resolutions"
+#       , "\nCluster: ", clusterID
+#       , "\nPC 1-10"
+#     )
+#   )
+#   ggsave(paste0(outGraph, "Cluster", clusterID, "_tSNE_PC1-8_ResolutionTest.png")
+#     , width = 12, height = 7)
+#
+#   # Plot using PC1-5
+#   ggL <- Seurat_Resolution_Test(
+#     seuratO = so
+#     , dims_use = 1:5
+#     , resolutions = resolutions
+#   )
+#   ggL <- ggL[! is.na(ggL)]
+#   # Combine tSNE graphs
+#   pg <- Plot_Grid(ggL, ncol = 3, rel_height = 0.3
+#     , title = paste0(graphCodeTitle
+#       , "\n\nSeurat cluster and tSNE with different resolutions"
+#       , "\nCluster: ", clusterID
+#       , "\nPC 1-5"
+#     )
+#   )
+#   ggsave(paste0(outGraph, "Cluster", clusterID, "_tSNE_PC1-5_ResolutionTest.png")
+#     , width = 12, height = 7)
+#
+# }
 ################################################################################
 
 ### Feature plot of covariates
 
-plot_tsnes_colored_by_covariates <- function(){
+plot_tsnes_colored_by_covariates <- function(so){
 
   print("plot_tsnes_colored_by_covariates")
 
@@ -619,7 +615,7 @@ plot_tsnes_colored_by_covariates <- function(){
 
 ### Plot genes with highest PC loadings
 
-plot_genes_with_highest_pc_loadings <- function(){
+plot_genes_with_highest_pc_loadings <- function(so){
 
   print("plot_genes_with_highest_pc_loadings")
 
@@ -641,119 +637,110 @@ plot_genes_with_highest_pc_loadings <- function(){
       , "\n\nGenes with highest PC loadings"
       , "\nCluster: ", clusterID)
   )
-  ggsave(paste0(outGraph, "Cluster", clusterID, "_PCAplots.pdf"), width = 13
+  ggsave(paste0(outGraph, "cluster", clusterID, "_PCAplots.pdf"), width = 13
     , height = 14, limitsize = FALSE)
 }
 ################################################################################
 
 ### Color 40k cell tSNE by sub-clustering
 
-plot_40k_cell_tsne_colored_by_subclustering <- function(){
+plot_40k_cell_tsne_colored_by_subclustering <- function(so){
 
   print("plot_40k_cell_tsne_colored_by_subclustering")
-
-  load(paste0(outData, "Cluster", clusterID, "_seuratO.Robj"))
 
   # Collect tSNE values
   ggDF <- as.data.frame(centSO@dr$tsne@cell.embeddings)
   # Add round 1 cluster identity
   ggDF$Cluster <- centSO@ident
-  # Add round 2 cluster identity
-  idx <- match(rownames(ggDF), names(so@ident))
-  ggDF$Cluster_Round2 <- so@ident[idx]
-  # Plot
-  gg1 <- ggplot(ggDF, aes(x = tSNE_1, y = tSNE_2, col = ggDF$Cluster)) +
+
+  # plot round 2 clusters
+  clusterings <- names(so@meta.data)[grep("clusters_pc", names(so@meta.data))]
+  gg_l <- lapply(clusterings, function(clustering){
+    # Add round 2 cluster identity
+    idx <- match(rownames(ggDF), rownames(so@meta.data))
+    ggDF$Cluster_Round2 <- so@meta.data[[clustering]][idx]
+    # Plot
+    ggplot(ggDF, aes(x = tSNE_1, y = tSNE_2, col = ggDF$Cluster_Round2)) +
+      geom_point(size = 0.02, alpha = 0.5) +
+      guides(colour = guide_legend(override.aes = list(size = 3)
+        , title = "Cluster")) +
+      ggplot_set_theme_publication +
+      ggtitle(clustering)
+  })
+
+  # plot round 1 clusters
+  tnse_r1_gg <- ggplot(ggDF, aes(x = tSNE_1, y = tSNE_2, col = ggDF$Cluster)) +
     geom_point(size = 0.02, alpha = 0.5) +
     guides(colour = guide_legend(override.aes = list(size = 3), ncol = 2
       , title = "Cluster")) +
     ggplot_set_theme_publication +
     ggtitle("Clustering round 1")
-  gg2 <- ggplot(ggDF, aes(x = tSNE_1, y = tSNE_2, col = ggDF$Cluster_Round2)) +
-    geom_point(size = 0.02, alpha = 0.5) +
-    guides(colour = guide_legend(override.aes = list(size = 3)
-      , title = "Cluster")) +
-    ggplot_set_theme_publication +
-    ggtitle("Clustering round 2")
-  Plot_Grid(list(gg1, gg2), ncol = 2, rel_height = 0.4, align = 'v', axis = 'r'
+
+  # add tsne colored by round 1 to round 2 clusterings
+  Plot_Grid(append(list(tnse_r1_gg), gg_l)
+    , ncol = 2, rel_height = 0.1, align = 'v', axis = 'r'
     , title = paste0(graphCodeTitle
-      , "\n\nSeurat clustering round 2 and covariates"
+      , "\n\nSeurat tSNE round 1 colored by round 2 clustering"
       , "\nCluster: ", clusterID
-      , "\nSeurat variable genes used for clustering"
-      , "\ntSNE PC 1-40, cluster round 2 tSNE PC 1-10 resolution 0.5"
       , "\n")
   )
-  ggsave(paste0(outGraph, "cluster", clusterID, "_tSNE_ClusterRound1.png")
-    , width = 10, height = 5, limitsize = FALSE)
+  ggsave(paste0(outGraph, "cluster", clusterID, "_tSNE_R1_Cluster_R1.png")
+    , width = 14, height = 4+2.5*length(clusterings), limitsize = FALSE)
 }
 ################################################################################
 
-# ##### WIP
-# ## Resolution test 40k cell tSNE by sub-clustering
-# ### Does seurat clustering save each time someplace in seurat object?
-#
-# Seurat_Resolution_Test <- function(seuratO, resolutions, dims_use){
-#   print("Seurat_Resolution_Test")
-#
-#   load(paste0(outData, "Cluster", clusterID, "_seuratO.Robj"))
-#
-#   ggL <- lapply(resolutions, function(resolution) {
-#     tryCatch({
-#       print(paste0("Resolution: ", resolution))
-#       so <- FindClusters(so, dims.use = dims_use, resolution = resolution
-#         , print.output = 0, save.SNN = TRUE)
-#       return(so)
-#     } ,
-#     error = function(cond) {
-#       print(paste0("Error for resolution: ", resolution))
-#       message(cond)
-#       # Choose a return value in case of error
-#       return(NA)
-#     }
-#   )
-#   })
-#
-#   ggL <- lapply(resolutions, function(resolution) {
-#     tryCatch({
-#       print(paste0("Resolution: ", resolution))
-#       so <- FindClusters(so, dims.use = dims_use, resolution = resolution
-#         , print.output = 0, save.SNN = TRUE)
-#       gg <- TSNEPlot(so, pt.size = 0.01, do.return = TRUE, do.label = TRUE)
-#       gg <- gg + ggtitle(paste0("Resolution: ", resolution))
-#       gg <- gg + ggplot_set_theme_publication
-#       return(gg)
-#     } ,
-#     error = function(cond) {
-#       print(paste0("Error for resolution: ", resolution))
-#       message(cond)
-#       # Choose a return value in case of error
-#       return(NA)
-#     }
-#   )
-#   })
-#   return(ggL)
-# }
-# # Plot using PC1-40
-# ggL <- Seurat_Resolution_Test(
-#   seuratO = so
-#   , dims_use = 1:40
-#   # , resolutions = c(0.1, 0.2)
-#   , resolutions = c(0.3, 0.4, 0.5, 0.54, 0.6, 0.7)
-# )
-# ggL <- ggL[! is.na(ggL)]
-# # Combine tSNE graphs
-# pg <- Plot_Grid(ggL, ncol = 3, rel_height = 0.3
-#   , title = paste0(graphCodeTitle
-#     , "\n\nSeurat cluster and tSNE with different resolutions"
-#     , "\nCluster: ", clusterID
-#     , "\nPC 1-40"
-#   )
-# )
-# ggsave(paste0(outGraph, "Cluster", clusterID, "_tSNE_PC1-40_ResolutionTest.png")
-#   , width = 12, height = 7)
+### Plot 40k cell tSNE sub-clustered
+
+plot_40k_cell_tsne_subclustered <- function(so){
+
+  print("plot_40k_cell_tsne_subclustered")
+
+  # Collect tSNE values
+  ggDF <- as.data.frame(centSO@dr$tsne@cell.embeddings)
+  # Add round 1 cluster identity
+  ggDF$Cluster <- centSO@ident
+
+  # plot round 2 clusters
+  clusterings <- names(so@meta.data)[grep("clusters_pc", names(so@meta.data))]
+  gg_l <- lapply(clusterings, function(clustering){
+    # Add round 2 cluster identity
+    idx <- match(rownames(ggDF), rownames(so@meta.data))
+    ggDF$Cluster_Round2 <- so@meta.data[[clustering]][idx]
+    # Remove cells not in cluster
+    ggDF <- ggDF[! is.na(ggDF$Cluster_Round2), ]
+    # Plot
+    ggplot(ggDF, aes(x = tSNE_1, y = tSNE_2, col = ggDF$Cluster_Round2)) +
+      geom_point(size = 0.02, alpha = 0.5) +
+      guides(colour = guide_legend(override.aes = list(size = 3)
+        , title = "Cluster")) +
+      ggplot_set_theme_publication +
+      ggtitle(clustering)
+  })
+
+  # plot round 1 clusters
+  tnse_r1_gg <- ggplot(ggDF, aes(x = tSNE_1, y = tSNE_2, col = ggDF$Cluster)) +
+    geom_point(size = 0.02, alpha = 0.5) +
+    guides(colour = guide_legend(override.aes = list(size = 3), ncol = 2
+      , title = "Cluster")) +
+    ggplot_set_theme_publication +
+    ggtitle("Clustering round 1")
+
+  # add tsne colored by round 1 to round 2 clusterings
+  Plot_Grid(append(list(tnse_r1_gg), gg_l)
+    , ncol = 2, rel_height = 0.1, align = 'v', axis = 'r'
+    , title = paste0(graphCodeTitle
+      , "\n\nSeurat tSNE round 1 colored by round 2 clustering"
+      , "\nCluster: ", clusterID
+      , "\n")
+  )
+  ggsave(paste0(
+      outGraph, "cluster", clusterID, "_tSNE_R1_subcluster_subset.png")
+    , width = 10, height = 4+1.75*length(clusterings), limitsize = FALSE)
+}
 ################################################################################
 
 ### Run
 
-main_function()
-# main_plotting_function()
+# main_function()
+main_plotting_function()
 ################################################################################
