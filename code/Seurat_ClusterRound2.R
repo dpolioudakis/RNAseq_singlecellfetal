@@ -336,7 +336,7 @@ plot_seurat_pcs_tsne_cluster_tests <- function(so){
       , "\nCluster: ", clusterID)
   )
   ggsave(paste0(outGraph, "cluster", clusterID, "_tSNE_ClusterTests.png")
-    , width = 12, height = 4+1.75*nrow(clusterings_df), limitsize = FALSE)
+    , width = 12, height = 4+1*nrow(clusterings_df), limitsize = FALSE)
 }
 ################################################################################
 #
