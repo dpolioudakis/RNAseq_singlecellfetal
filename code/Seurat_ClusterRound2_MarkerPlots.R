@@ -21,15 +21,18 @@ require(ggplot2)
 require(cowplot)
 require(viridis)
 source("Function_Library.R")
+source("GGplot_Theme.R")
 
 ## Command args to input cluster ID
 args <- commandArgs(trailingOnly = TRUE)
+args <- 10
 print(args)
 
 ## Inputs
 
 # Seurat
-in_Seurat <- list.files("../analysis/analyzed_data/Seurat_ClusterRound2/DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/VarGenes/RegNumiLibBrain/PC1-40/", full.names = TRUE)
+in_Seurat <- list.files("../analysis/analyzed_data/Seurat_ClusterRound2/ClusterRound2/20181222/", full.names = TRUE)
+print(in_Seurat[as.numeric(args[[1]])])
 load(in_Seurat[as.numeric(args[[1]])])
 # load(in_Seurat[9])
 centSO <- so
@@ -57,7 +60,7 @@ lake_DE_DF <- read.csv(
 
 # Lake 2017 expression matrix
 lake_ex_DF <- read.table(
-  "../lake_2017/GSE97930_FrontalCortex_snDrop-seq_UMI_Count_Matrix_08-01-2017.txt", header = TRUE
+  "../data/lake_2017/GSE97930_FrontalCortex_snDrop-seq_UMI_Count_Matrix_08-01-2017.txt", header = TRUE
 )
 
 # Luis metaMat results
@@ -65,27 +68,38 @@ mmapDF <- read.csv("../source/Gene_Lists/Overlapped-Genes.csv", header = TRUE)
 
 # Nowakowski cluster DE table
 nowakowski_DE_DF <- read.csv(
-  "../nowakowski_2017/Nowakowski_Table_S5_Clustermarkers.csv", header = TRUE
+  "../data/nowakowski_2017/Nowakowski_Table_S5_Clustermarkers.csv", header = TRUE
 )
 
 ## Variables
+date <- format(Sys.Date(), "%Y%m%d")
 graphCodeTitle <- paste0("MarkerPlots.R\n", centSO@project.name)
-outGraph <- paste0( "../analysis/graphs/Seurat_ClusterRound2/MarkerPlots/DS2-11/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40/VarGenes/RegNumiLibBrain/PC1-40/MarkerPlots_"
-, gsub(" ", "", centSO@project.name), "_")
+outGraph <- paste0( "../analysis/graphs/Seurat_ClusterRound2/MarkerPlots/"
+  , date, "/MarkerPlots_"
+  , gsub(" ", "", centSO@project.name), "_")
 
 ## Output Directories
 dir.create(dirname(outGraph), recursive = TRUE)
-
-## Set ggplot2 theme
-theme_set(theme_bw())
-theme_set(theme_get() + theme(text = element_text(size = 10)))
-theme_update(plot.title = element_text(size = 10))
-theme_update(axis.line = element_line(colour = "black")
-  , panel.border = element_blank()
-)
 ################################################################################
 
 ### Functions
+
+Main_Function <- function(){
+  Plot_Luis_Markers()
+  Plot_Cell_Cycle_Genes()
+  Plot_Lake2017_Enriched()
+  Plot_Nowakowski_Enriched()
+}
+
+Plot_Luis_Markers <- function(){
+  Plot_Luis_Markers_tSNE(tsne_slot_name = "tsne_pc1to5")
+  Plot_Luis_Markers_tSNE(tsne_slot_name = "tsne_pc1to8")
+  Plot_Luis_Markers_tSNE(tsne_slot_name = "tsne_pc1to10")
+  Plot_Luis_Markers_tSNE(tsne_slot_name = "tsne_pc1to15")
+  Plot_Luis_Markers_tSNE(tsne_slot_name = "tsne_pc1to40")
+  Plot_Luis_Markers_Violin()
+  Plot_Luis_Markers_Heatmap()
+}
 
 Format_Cell_Cycle_Genes_Table <- function(){
   print("Format_Cell_Cycle_Genes_Table")
@@ -126,7 +140,13 @@ nowakowski_DE_DF <- nowakowski_DE_DF[
 
 ### Luis marker genes
 
-Plot_Luis_Markers <- function(){
+Plot_Luis_Markers_tSNE <- function(tsne_slot_name = tsne_slot_name){
+
+  print("Plot_Luis_Markers_tSNE")
+  print(tsne_slot_name)
+
+  # Select tSNE to use
+  centSO@dr$tsne <- centSO@dr[[tsne_slot_name]]
 
   # Feature plot
   # Normalized, no mean centering scaling
@@ -135,8 +155,8 @@ Plot_Luis_Markers <- function(){
     , tsneDF = as.data.frame(centSO@dr$tsne@cell.embeddings)
     , seuratO = centSO
     , exM = noCentExM
-    , limLow = -0.5
-    , limHigh = 2
+    , limLow = 0
+    , limHigh = 3
     , geneGrouping = kmDF$Grouping
     , centScale = FALSE
     , size = (400/nrow(centSO@scale.data))^(1/3)
@@ -147,10 +167,12 @@ Plot_Luis_Markers <- function(){
   title <- ggdraw() + draw_label(paste0(graphCodeTitle
     , "\n\nExpression of known marker genes"
     , "\nNormalized expression"
+    , "\n", tsne_slot_name
     , "\n"))
   # rel_heights values control title margins
   plot_grid(title, pg, ncol = 1, rel_heights = c(0.05, 1))
-  ggsave(paste0(outGraph, "KnownMarks_FeaturePlot_Normalized.png")
+  ggsave(paste0(
+    outGraph, "KnownMarks_FeaturePlot_Normalized_", tsne_slot_name, ".png")
     , width = 12, height = length(ggL)*1)
 
   # Feature plot
@@ -173,11 +195,13 @@ Plot_Luis_Markers <- function(){
   title <- ggdraw() + draw_label(paste0(graphCodeTitle
     , "\n\nExpression of known marker genes"
     , "\nCluster round 2 normalized expression, mean centered and variance scaled"
+    , "\n", tsne_slot_name
     , "\n"))
   # rel_heights values control title margins
   plot_grid(title, pg, ncol = 1, rel_heights = c(0.05, 1))
   ggsave(paste0(outGraph
-    , "KnownMarks_FeaturePlot_Round2NormalizedCenteredScaled.png")
+      , "KnownMarks_FeaturePlot_Round2NormCenterScale_"
+      , tsne_slot_name, ".png")
     , width = 12, height = length(ggL)*1)
 
   # Feature plot
@@ -200,12 +224,20 @@ Plot_Luis_Markers <- function(){
   title <- ggdraw() + draw_label(paste0(graphCodeTitle
     , "\n\nExpression of known marker genes"
     , "\nCluster round 1 normalized expression, mean centered and variance scaled"
+    , "\n", tsne_slot_name
     , "\n"))
   # rel_heights values control title margins
   plot_grid(title, pg, ncol = 1, rel_heights = c(0.05, 1))
-  ggsave(paste0(outGraph, "KnownMarks_FeaturePlot_Round1NormalizedCenteredScaled.png")
+  ggsave(paste0(
+      outGraph, "KnownMarks_FeaturePlot_Round1NormCenterScale_"
+      , tsne_slot_name, ".png")
     , width = 12, height = length(ggL)*1)
 
+}
+
+Plot_Luis_Markers_Violin <- function(){
+
+  print("Plot_Luis_Markers_Violin")
 
   ## Violin plots of genes by cluster
 
@@ -254,7 +286,11 @@ Plot_Luis_Markers <- function(){
       , "\n"))
   ggsave(paste0(outGraph, "KnownMarks_ViolinPlot_Normalized.png")
     , width = 13, height = 26)
+}
 
+Plot_Luis_Markers_Heatmap <- function(){
+
+  print("Plot_Luis_Markers_Heatmap")
 
   # Heatmap
   # Normalized, no mean centering scaling
@@ -950,13 +986,6 @@ Plot_Nowakowski_Enriched <- function(){
 ################################################################################
 
 ### Run
-
-Main_Function <- function(){
-  Plot_Luis_Markers()
-  Plot_Cell_Cycle_Genes()
-  Plot_Lake2017_Enriched()
-  Plot_Nowakowski_Enriched()
-}
 
 Main_Function()
 ################################################################################
