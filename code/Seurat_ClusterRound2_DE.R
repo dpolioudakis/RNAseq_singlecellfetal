@@ -21,9 +21,11 @@ require(gridExtra)
 require(fdrtool)
 require(cowplot)
 source("Function_Library.R")
+source("GGplot_Theme.R")
 
 ## Command args to input cluster ID
 args <- commandArgs(trailingOnly = TRUE)
+# args <- 6
 print(args)
 clusterID <- (as.numeric(args[1]) - 1)
 print(paste0("Cluster ID: ", clusterID))
@@ -31,10 +33,7 @@ print(paste0("Cluster ID: ", clusterID))
 ## Inputs
 
 # Seurat clustering round 2 object
-load(paste0("../analysis/analyzed_data/Seurat_ClusterRound2/DS2-11"
-  , "/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40"
-  , "/VarGenes/RegNumiLibBrain/PC1-40/Seurat_ClusterRound2_DS2-11_Cluster"
-  , clusterID, "_seuratO.Robj"))
+load(paste0("../analysis/analyzed_data/Seurat_ClusterRound2/ClusterRound2/20181222/Seurat_ClusterRound2_Cluster", clusterID, "_seuratO.Robj"))
 
 # Biomart to add ensembl IDs
 bmDF <- read.csv("../source/BiomaRt_Compile_GeneInfo_GRCh38_Ensembl87.csv"
@@ -42,35 +41,13 @@ bmDF <- read.csv("../source/BiomaRt_Compile_GeneInfo_GRCh38_Ensembl87.csv"
 
 ## Variables
 graphCodeTitle <- "Seurat_ClusterRound2_DE.R"
-out_sub_path <- paste0(
-  "Seurat_ClusterRound2"
-  , "/DE"
-  , "/DS2-11"
-  , "/FtMm250_200-3sdgd_Mt5_RegNumiLibBrain_KeepCC_PC1to40"
-  , "/VarGenes"
-  , "/RegNumiLibBrain"
-  , "/PC1-40"
-)
-outGraph <- paste0(
-  "../analysis/graphs/", out_sub_path, "/Seurat_ClusterRound2_")
+date <- format(Sys.Date(), "%Y%m%d")
+out_sub_path <- paste0("Seurat_ClusterRound2/DE/", date)
 outTable <- paste0(
   "../analysis/tables/", out_sub_path, "/Seurat_ClusterRound2_")
-outData <- paste0(
-  "../analysis/analyzed_data/", out_sub_path, "/Seurat_ClusterRound2_")
 
 ## Output Directories
-dir.create(dirname(outGraph), recursive = TRUE)
 dir.create(dirname(outTable), recursive = TRUE)
-dir.create(dirname(outData), recursive = TRUE)
-
-## Set ggplot2 theme
-theme_set(theme_bw())
-theme_set(theme_get() + theme(text = element_text(size = 14)))
-theme_update(plot.title = element_text(size = 14))
-theme_update(axis.line = element_line(colour = "black")
-  , plot.background = element_blank()
-  , panel.border = element_blank()
-)
 ################################################################################
 
 ### Functions
@@ -83,6 +60,11 @@ print(paste0(
   "### Finding differentially expressed genes for cluster ", clusterID)
 )
 
+# select clustering
+cluster_ids <- factor(so@meta.data[["clusters_pc1to8_res_0.6"]])
+names(cluster_ids) <- rownames(so@meta.data)
+so@ident <- cluster_ids
+
 Run_DE <- function(sub_cluster_ID){
 
   print("Run_DE")
@@ -90,8 +72,12 @@ Run_DE <- function(sub_cluster_ID){
 
   # Filter cells
   exDF <- DE_Filters_ExpMatrix(
-    so = so, minPercent = 10, clusterID = sub_cluster_ID
-  )
+    expr_m = so@data
+    , minPercent = 10
+    , foldChange = NULL
+    , clusterID = sub_cluster_ID
+    , cell_cluster_key = so@ident
+    )
 
   # DE Linear model
   termsDF <- so@meta.data[c("nUMI", "librarylab", "individual")]
@@ -104,10 +90,16 @@ Run_DE <- function(sub_cluster_ID){
   deLM <- DE_Linear_Model(exDatDF = exDF, termsDF = termsDF, mod = mod)
 
   # Format LM output into data frame
-  deDF <- Format_DE(deLM, so, sub_cluster_ID)
+  deDF <- Format_DE(
+    deLM = deLM
+    , expr_m = exDF
+    , clusterID = sub_cluster_ID
+    , cell_cluster_key = so@ident)
 
   # Add ensembl
-  deDF$Ensembl <- Convert_Mixed_GeneSym_EnsID_To_EnsID(as.character(deDF$Gene))
+  deDF$Ensembl <- Convert_Mixed_GeneSym_EnsID_To_EnsID(
+    ids = as.character(deDF$Gene)
+    , bmDF = bmDF)
 
   # FDR correct
   deDF$FDR <- p.adjust(deDF$Pvalue, method = "BH")
