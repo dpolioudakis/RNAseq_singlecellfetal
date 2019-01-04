@@ -71,7 +71,7 @@ lake_cell_anno_DF <- read.csv(
 )
 
 # Luis metaMat results
-mmapDF <- read.csv("../source/metaMat/Overlapped-Genes.csv", header = TRUE)
+mmapDF <- read.csv("../source/Gene_Lists/Overlapped-Genes.csv", header = TRUE)
 
 # Allen Developmental Macaque human specific genes
 hsDF <- read.csv("../source/Bakken_2016_AllenDevMacaque_ST10_HumanSpecific.csv"
