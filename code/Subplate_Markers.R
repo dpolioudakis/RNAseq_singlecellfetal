@@ -68,12 +68,12 @@ id_genes_tb <- load_id_nejm_lancet_genes()
 # Miller LCM from Allen
 # Row annotations
 miller_lcm_row_annot_df <- read.csv(
-  "../allen_brain_data/miller_LCM/lmd_matrix_12840/rows_metadata.csv")
+  "../data/allen_brain_data/miller_LCM/lmd_matrix_12840/rows_metadata.csv")
 # Processed data from Luis
 # [26] "layer.exp"
 # [27] "layer.exp.sc"
 # [28] "layer.max"
-load("../allen_brain_data/miller_LCM/fetal_Ctx_layer_exp.Rdata")
+load("../data/allen_brain_data/miller_LCM/fetal_Ctx_layer_exp.Rdata")
 idx <- match(rownames(layer.max), miller_lcm_row_annot_df$gene_symbol)
 idx <- idx[! is.na(idx)]
 miller_lcm_row_annot_df <- miller_lcm_row_annot_df[idx, ]
@@ -300,7 +300,7 @@ calculate_jaccard_overlap_of_cells_expressing_two_genes_of_interest <-
   function(gene1, gene2){
 
   print("calculate_jaccard_overlap_of_cells_expressing_genes")
-  print(gene1, gene2)
+  print(paste(gene1, gene2))
 
   # tibble of gene1, gene2, cell IDs, and if gene is expressed in a given cell
   expressed_tb <- ds_ex_m %>% as_tibble(rownames = "gene") %>% filter(gene %in% c(gene1, gene2)) %>% gather(., key = "cell_id", value = "expression", -gene) %>%
@@ -781,6 +781,7 @@ plot_dropseq_expression_boxplots <- function(){
   sp_markers_tb %>%
     left_join(hs_tb, by = "gene") %>%
     filter(set %in% c("Human-specific")) %>%
+    pull(gene) %>%
     plot_expression_by_cluster_boxplot(
       genes = .
       , expr_m = ds_ex_m
@@ -797,6 +798,7 @@ plot_dropseq_expression_boxplots <- function(){
   gg_1 <- sp_markers_tb %>%
     inner_join(hge_tb, by = c("gene" = "hgnc")) %>%
     filter(gz_or_cp == "GZ>CP") %>%
+    pull(gene) %>%
     plot_expression_by_cluster_boxplot(
       genes = .
       , expr_m = ds_ex_m
@@ -807,6 +809,7 @@ plot_dropseq_expression_boxplots <- function(){
   gg_2 <- sp_markers_tb %>%
     inner_join(hge_tb, by = c("gene" = "hgnc")) %>%
     filter(gz_or_cp == "CP>GZ") %>%
+    pull(gene) %>%
     plot_expression_by_cluster_boxplot(
       genes = .
       , expr_m = ds_ex_m
@@ -825,6 +828,7 @@ plot_dropseq_expression_boxplots <- function(){
   # ASD Sanders
   sp_markers_tb %>%
     inner_join(asd_tada_tb, by = "gene") %>%
+    pull(gene) %>%
     plot_expression_by_cluster_boxplot(
       genes = .
       , expr_m = ds_ex_m
@@ -840,6 +844,7 @@ plot_dropseq_expression_boxplots <- function(){
   # ASD ihart
   sp_markers_tb %>%
     inner_join(asd_ihart_tb, by = c("gene" = "hgnc_gene_symbol")) %>%
+    pull(gene) %>%
     plot_expression_by_cluster_boxplot(
       genes = .
       , expr_m = ds_ex_m
@@ -855,6 +860,7 @@ plot_dropseq_expression_boxplots <- function(){
   # Epilepsy
   sp_markers_tb %>%
     inner_join(epilepsy_tb, by = "gene") %>%
+    pull(gene) %>%
     plot_expression_by_cluster_boxplot(
       genes = .
       , expr_m = ds_ex_m
@@ -870,6 +876,7 @@ plot_dropseq_expression_boxplots <- function(){
   # ID
   sp_markers_tb %>%
     inner_join(id_genes_tb, by = "gene") %>%
+    pull(gene) %>%
     plot_expression_by_cluster_boxplot(
       genes = .
       , expr_m = ds_ex_m
@@ -980,6 +987,7 @@ plot_deep_layer_marker_expression <- function(){
       , clusters = cluster_annot_key[cluster_annot_key != "NA"]
       , clusterOrder = cluster_annot_key[cluster_annot_key != "NA"]
     ) +
+      theme(strip.text.y = element_blank()) +
       ggtitle(paste0(script_name
         , "\n\nDeep layer markers"
         , "\nx-axis: Genes"
@@ -993,7 +1001,6 @@ plot_deep_layer_marker_expression <- function(){
       , width = 10, height = 5
     )
 
-  # TFs, chromatin remodelers, co-factors
   known_marker_tb %>%
     filter(grouping == "Excitatory Deep Layer Cortical") %>%
     select(gene_symbol, grouping) %>%
@@ -1015,9 +1022,9 @@ plot_deep_layer_marker_expression <- function(){
 ### Run
 
 main_function <- function(){
-  plot_miller_heatmaps()
-  plot_dropseq_expression_tsnes()
-  plot_dropseq_expression_heatmaps()
+  # plot_miller_heatmaps()
+  # plot_dropseq_expression_tsnes()
+  # plot_dropseq_expression_heatmaps()
   plot_dropseq_expression_boxplots()
   plot_cells_expressing_gene_combinations_heatmaps()
   plot_deep_layer_marker_expression()

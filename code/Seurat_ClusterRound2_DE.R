@@ -40,6 +40,9 @@ bmDF <- read.csv("../source/BiomaRt_Compile_GeneInfo_GRCh38_Ensembl87.csv"
   , header = TRUE)
 
 ## Variables
+# select clustering
+cluster_col <- "clusters_pc1to10_res_0.5"
+# outputs
 graphCodeTitle <- "Seurat_ClusterRound2_DE.R"
 date <- format(Sys.Date(), "%Y%m%d")
 out_sub_path <- paste0("Seurat_ClusterRound2/DE/", date)
@@ -61,7 +64,7 @@ print(paste0(
 )
 
 # select clustering
-cluster_ids <- factor(so@meta.data[["clusters_pc1to8_res_0.6"]])
+cluster_ids <- factor(so@meta.data[[cluster_col]])
 names(cluster_ids) <- rownames(so@meta.data)
 so@ident <- cluster_ids
 

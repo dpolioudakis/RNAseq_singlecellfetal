@@ -49,9 +49,13 @@ cluster_annot_tb <- tribble(
   )
 
 ## inputs
+# sub-clustering seurat dir
+in_subclust_so_dir <- "../analysis/analyzed_data/Seurat_ClusterRound2/ClusterRound2/20181222/"
+# clustering to use
+cluster_col <- "clusters_pc1to10_res_0.5"
 # sub-clustering DE enrichment tables
 # (DE sub-cluster vs other sub-clusters in the cluster)
-in_subclust_de_dir <- "../analysis/tables/Seurat_ClusterRound2/DE/20180910/"
+in_subclust_de_dir <- "../analysis/tables/Seurat_ClusterRound2/DE/20190102/"
 # sub-clustering DE enrichment vs full dataset tables
 # (DE sub-cluster vs all other cells in dataset)
 subclust_de_vs_40k_tb <- read_csv("../analysis/tables/Seurat_ClusterRound2/DE_vs_40k/20181210/Seurat_ClusterRound2_DE_vs_40k_ClusterX_Vs_All_Clusters.csv")
@@ -67,16 +71,16 @@ cluster_de_tb <- read_tsv(
 
 ## outputs
 out_graph <- paste0(
-  "../analysis/graphs/Seurat_ClusterRound2/DE/", date, "/Seurat_ClusterRound2_")
+  "../analysis/graphs/Seurat_ClusterRound2/DE/", date, "_pc1to10_res_0.5/Seurat_ClusterRound2_")
 ################################################################################
 
 ### main function
 
 main_function <- function(){
-  run_plot_de_vs_40k_expression_heatmaps()
-  run_plot_de_vs_subcluster_expression_heatmaps()
-  run_plot_subcluster_expression_heatmaps()
-  run_plot_enriched_gene_overlap_odds_ratio_heatmaps()
+  # run_plot_de_vs_40k_expression_heatmaps(cluster_col = cluster_col)
+  run_plot_de_vs_subcluster_expression_heatmaps(cluster_col = cluster_col)
+  run_plot_subcluster_expression_heatmaps(cluster_col = cluster_col)
+  run_plot_enriched_gene_overlap_odds_ratio_heatmaps(cluster_col = cluster_col)
 }
 ################################################################################
 
@@ -94,23 +98,30 @@ dir.create(dirname(out_graph), recursive = TRUE)
 
 ### differentially expressed genes for each cluster vs other cells in cluster
 
-plot_subcluster_expression_heatmaps <- function(subclust_de_tb, cluster_id){
+plot_subcluster_expression_heatmaps <- function(
+  subclust_de_tb, cluster_id, cluster_col){
 
   print("plot_subcluster_expression_heatmaps")
   print(paste0("cluster: ", cluster_id))
 
   # load seurat clustering round 2 object
   in_subclust_so <- paste0(
-    "../analysis/analyzed_data/Seurat_ClusterRound2/ClusterRound2/20180907/"
+    in_subclust_so_dir
     , "Seurat_ClusterRound2_Cluster", cluster_id, "_seuratO.Robj")
   # so, noCentExM, rd1CentExM
   load(in_subclust_so)
+
+  # set clustering to use
+  cluster_ids <- factor(so@meta.data[[cluster_col]])
+  names(cluster_ids) <- rownames(so@meta.data)
+  so@ident <- cluster_ids
 
   gene_group_df <-
     subclust_de_tb %>%
     filter(Cluster == cluster_id & FDR < 0.05 & Log2_Fold_Change > 0.2) %>%
     group_by(Subcluster) %>%
     top_n(n = 30, wt = Log2_Fold_Change) %>%
+    arrange(Subcluster, Log2_Fold_Change) %>%
     select(Gene = Gene, Group = Subcluster) %>%
     as.data.frame()
 
@@ -141,7 +152,7 @@ plot_subcluster_expression_heatmaps <- function(subclust_de_tb, cluster_id){
   ))
   ggsave(
     paste0(out_graph, "cluster", cluster_id, "_subclust_expression_heatmap_zscore.png")
-    , height = graph_height, width = 9)
+    , height = graph_height, width = 13)
 
   Plot_Marker_Genes_Heatmap_SetColWidths(
     geneGroupDF = gene_group_df
@@ -161,10 +172,10 @@ plot_subcluster_expression_heatmaps <- function(subclust_de_tb, cluster_id){
   ))
   ggsave(
     paste0(out_graph, "cluster", cluster_id, "_subclust_expression_heatmap.png")
-      , height = graph_height, width = 9)
+      , height = graph_height, width = 13)
 }
 
-run_plot_subcluster_expression_heatmaps <- function(){
+run_plot_subcluster_expression_heatmaps <- function(cluster_col){
 
   print("run_plot_subcluster_expression_heatmaps")
 
@@ -175,6 +186,7 @@ run_plot_subcluster_expression_heatmaps <- function(){
         subclust_de_tb = subclust_de_tb
         # , so = so
         , cluster_id = .
+        , cluster_col = cluster_col
           )
       }
         , error = function(cond){
@@ -189,17 +201,22 @@ run_plot_subcluster_expression_heatmaps <- function(){
 ### differentially expressed genes for each sub-cluster vs all other cells
 
 plot_expression_de_vs_40k_heatmaps <- function(
-  cluster_id, seurat_obj, noCent40kExM){
+  cluster_id, seurat_obj, noCent40kExM, cluster_col){
 
   print("plot_expression_de_vs_40k_heatmaps")
   print(paste0("cluster: ", cluster_id))
 
   # load seurat clustering round 2 object
   in_subclust_so <- paste0(
-    "../analysis/analyzed_data/Seurat_ClusterRound2/ClusterRound2/20180907/"
+    in_subclust_so_dir
     , "Seurat_ClusterRound2_Cluster", cluster_id, "_seuratO.Robj")
   # so, noCentExM, rd1CentExM
   load(in_subclust_so)
+
+  # set clustering to use
+  cluster_ids <- factor(so@meta.data[[cluster_col]])
+  names(cluster_ids) <- rownames(so@meta.data)
+  so@ident <- cluster_ids
 
   # Gather cell IDs and cluster IDs (including SP subcluster) for heatmap
   cellid_clusterid <- seurat_obj@ident %>% enframe(
@@ -268,7 +285,7 @@ plot_expression_de_vs_40k_heatmaps <- function(
   ))
   ggsave(
     paste0(out_graph, "cluster", cluster_id, "_de_vs_40k_expression_heatmap_zscore.png")
-    , height = graph_height, width = 9)
+    , height = graph_height, width = 13)
 
   Plot_Marker_Genes_Heatmap_SetColWidths(
     geneGroupDF = gene_group_df
@@ -290,10 +307,10 @@ plot_expression_de_vs_40k_heatmaps <- function(
   ))
   ggsave(
     paste0(out_graph, "cluster", cluster_id, "_de_vs_40k_expression_heatmap.png")
-      , height = graph_height, width = 9)
+      , height = graph_height, width = 13)
 }
 
-run_plot_de_vs_40k_expression_heatmaps <- function(){
+run_plot_de_vs_40k_expression_heatmaps <- function(cluster_col){
 
   print("run_plot_de_vs_40k_expression_heatmaps")
 
@@ -305,6 +322,7 @@ run_plot_de_vs_40k_expression_heatmaps <- function(){
             , noCent40kExM = noCentExM
             # , so = so
             , cluster_id = .
+            , cluster_col = cluster_col
             )
         }
           , error = function(cond){
@@ -318,18 +336,23 @@ run_plot_de_vs_40k_expression_heatmaps <- function(){
 
 ### differentially expressed genes for each sub-cluster vs all other cells
 
-plot_de_vs_subclust_expression_heatmaps <- function(
-  cluster_id, seurat_obj, noCent40kExM){
+plot_de_vs_subcluster_expression_heatmaps <- function(
+  cluster_id, seurat_obj, noCent40kExM, cluster_col){
 
-  print("plot_de_vs_subclust_expression_heatmaps")
+  print("plot_de_vs_subcluster_expression_heatmaps")
   print(paste0("cluster: ", cluster_id))
 
   # load seurat clustering round 2 object
   in_subclust_so <- paste0(
-    "../analysis/analyzed_data/Seurat_ClusterRound2/ClusterRound2/20180907/"
+    in_subclust_so_dir
     , "Seurat_ClusterRound2_Cluster", cluster_id, "_seuratO.Robj")
   # so, noCentExM, rd1CentExM
   load(in_subclust_so)
+
+  # set clustering to use
+  cluster_ids <- factor(so@meta.data[[cluster_col]])
+  names(cluster_ids) <- rownames(so@meta.data)
+  so@ident <- cluster_ids
 
   # Gather cell IDs and cluster IDs (including SP subcluster) for heatmap
   cellid_clusterid <- seurat_obj@ident %>% enframe(
@@ -398,7 +421,7 @@ plot_de_vs_subclust_expression_heatmaps <- function(
   ggsave(
     paste0(out_graph, "cluster", cluster_id
     , "_de_vs_subclust_expression_heatmap_zscore.png")
-    , height = graph_height, width = 9)
+    , height = graph_height, width = 13)
 
   Plot_Marker_Genes_Heatmap_SetColWidths(
     geneGroupDF = gene_group_df
@@ -421,20 +444,21 @@ plot_de_vs_subclust_expression_heatmaps <- function(
   ggsave(
     paste0(out_graph, "cluster", cluster_id,
      "_de_vs_subclust_expression_heatmap.png")
-      , height = graph_height, width = 9)
+      , height = graph_height, width = 13)
 }
 
-run_plot_de_vs_subclust_expression_heatmaps <- function(){
+run_plot_de_vs_subcluster_expression_heatmaps <- function(cluster_col){
 
-  print("run_plot_de_vs_subclust_expression_heatmaps")
+  print("run_plot_de_vs_subcluster_expression_heatmaps")
 
-  cluster_annot_tb$cluster_number[11] %>%
+  cluster_annot_tb$cluster_number %>%
     map(
       ~tryCatch({
-          plot_de_vs_subclust_expression_heatmaps(
+          plot_de_vs_subcluster_expression_heatmaps(
             seurat_obj = centSO
             , noCent40kExM = noCentExM
             , cluster_id = .
+            , cluster_col = cluster_col
           )
         }
           , error = function(cond){
@@ -605,7 +629,7 @@ run_plot_enriched_gene_overlap_odds_ratio_heatmaps <- function(){
   # background gene list
   # load seurat clustering round 2 object
   in_subclust_so <- paste0(
-    "../analysis/analyzed_data/Seurat_ClusterRound2/ClusterRound2/20180907/"
+    in_subclust_so_dir
     , "Seurat_ClusterRound2_Cluster", 9, "_seuratO.Robj")
   # so, noCentExM, rd1CentExM
   load(in_subclust_so)
@@ -654,7 +678,7 @@ run_plot_enriched_gene_overlap_odds_ratio_heatmaps <- function(){
   # background gene list
   # load seurat clustering round 2 object
   in_subclust_so <- paste0(
-    "../analysis/analyzed_data/Seurat_ClusterRound2/ClusterRound2/20180907/"
+    in_subclust_so_dir
     , "Seurat_ClusterRound2_Cluster", 9, "_seuratO.Robj")
   # so, noCentExM, rd1CentExM
   load(in_subclust_so)
@@ -699,7 +723,7 @@ run_plot_enriched_gene_overlap_odds_ratio_heatmaps <- function(){
   # background gene list
   # load seurat clustering round 2 object
   in_subclust_so <- paste0(
-    "../analysis/analyzed_data/Seurat_ClusterRound2/ClusterRound2/20180907/"
+    in_subclust_so_dir
     , "Seurat_ClusterRound2_Cluster", 9, "_seuratO.Robj")
   # so, noCentExM, rd1CentExM
   load(in_subclust_so)
@@ -736,7 +760,7 @@ run_plot_enriched_gene_overlap_odds_ratio_heatmaps <- function(){
   # background gene list
   # load seurat clustering round 2 object
   in_subclust_so <- paste0(
-    "../analysis/analyzed_data/Seurat_ClusterRound2/ClusterRound2/20180907/"
+    in_subclust_so_dir
     , "Seurat_ClusterRound2_Cluster", 9, "_seuratO.Robj")
   # so, noCentExM, rd1CentExM
   load(in_subclust_so)
@@ -756,6 +780,11 @@ run_plot_enriched_gene_overlap_odds_ratio_heatmaps <- function(){
       , height = 12, width = 16)
 
 }
+################################################################################
+
+subclust_de_tb %>%
+  filter(Cluster == 6) %>%
+  filter(Gene %in% c("DLX2", "DLX5", "DLX6"))
 ################################################################################
 
 ### Run

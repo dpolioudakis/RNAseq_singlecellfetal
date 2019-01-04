@@ -154,7 +154,7 @@ Format_DE <- function(
   # Add cluster ID
   deDF$Cluster <- clusterID
   # Add cluster annotation
-  if (! is.null(cluster_annot_tb)){
+  if (! is.null(cluster_annot)){
     deDF$Cluster_Annot <- cluster_annot
   }
   # Percent of cells in cluster expressing gene > 0 counts
@@ -464,9 +464,18 @@ FeaturePlot_Graph <- function(tsneDF, title, limLow, limHigh
     geom_point(size = size, alpha = alpha, stroke = 0.5, shape = 21) +
     # scale_color_distiller(name = "Normalized\nexpression", type = "div"
     #   , palette = 5, direction = -1, limits = c(limLow, limHigh)) +
-    scale_color_distiller(name = "Normalized\nexpression", type = "seq"
-      , palette = "BuPu", direction = 1, limits = c(limLow, limHigh)) +
+    # scale_color_distiller(name = "Normalized\nexpression", type = "seq"
+    #   , palette = "BuPu", direction = 1, limits = c(limLow, limHigh)) +
     # scale_color_viridis(option = "magma", limits = c(limLow, limHigh)) +
+    scale_color_gradientn(colours = c(
+        # color brewer orange red
+        # "#f0f0f0", "#fdd49e", "#fdbb84", "#fc8d59", "#ef6548"
+        # , "#d7301f", "#b30000", "#7f0000")
+        # color brewer purple red
+        "#f0f0f0", "#d4b9da", "#c994c7", "#df65b0", "#e7298a", "#ce1256"
+        , "#980043", "#67001f")
+      , limits = c(limLow, limHigh)
+    ) +
     ggtitle(title)
   return(ggFp)
 }

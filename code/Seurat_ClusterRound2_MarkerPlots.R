@@ -25,7 +25,7 @@ source("GGplot_Theme.R")
 
 ## Command args to input cluster ID
 args <- commandArgs(trailingOnly = TRUE)
-args <- 10
+# args <- 12
 print(args)
 
 ## Inputs
@@ -39,8 +39,8 @@ centSO <- so
 rm(so)
 
 # Known cell type markers from Luis
-kmDF <- read.csv("../source/MarkersforSingleCell_2017-10-11_Markers.csv", header = TRUE
-  , fill = TRUE)
+kmDF <- read.csv("../source/MarkersforSingleCell_2017-10-11_Markers.csv"
+  , header = TRUE, fill = TRUE)
 
 # Cell cycle markers from Macosko 2015 Table S2
 ccDF <- read.csv("../source/Macosko_2015_ST2_CellCycle.csv", header = TRUE
@@ -74,7 +74,7 @@ nowakowski_DE_DF <- read.csv(
 ## Variables
 date <- format(Sys.Date(), "%Y%m%d")
 graphCodeTitle <- paste0("MarkerPlots.R\n", centSO@project.name)
-outGraph <- paste0( "../analysis/graphs/Seurat_ClusterRound2/MarkerPlots/"
+outGraph <- paste0("../analysis/graphs/Seurat_ClusterRound2/MarkerPlots/"
   , date, "/MarkerPlots_"
   , gsub(" ", "", centSO@project.name), "_")
 
@@ -93,24 +93,18 @@ Main_Function <- function(){
 
 Plot_Luis_Markers <- function(){
   Plot_Luis_Markers_tSNE(tsne_slot_name = "tsne_pc1to5")
+  Plot_Luis_Markers_tSNE(tsne_slot_name = "tsne_pc1to6")
   Plot_Luis_Markers_tSNE(tsne_slot_name = "tsne_pc1to8")
   Plot_Luis_Markers_tSNE(tsne_slot_name = "tsne_pc1to10")
   Plot_Luis_Markers_tSNE(tsne_slot_name = "tsne_pc1to15")
   Plot_Luis_Markers_tSNE(tsne_slot_name = "tsne_pc1to40")
   Plot_Luis_Markers_Violin()
-  Plot_Luis_Markers_Heatmap()
-}
-
-Format_Cell_Cycle_Genes_Table <- function(){
-  print("Format_Cell_Cycle_Genes_Table")
-  ccDF <- melt(ccDF, measure.vars = c("G1.S", "S", "G2.M", "M", "M.G1"))
-  colnames(ccDF) <- c("Grouping", "Gene.Symbol")
-  ccDF$Gene.Symbol <- gsub(" *", "", ccDF$Gene.Symbol)
-  ccDF <- ccDF[! ccDF$Gene.Symbol == "", ]
-  ccDF <- ccDF[! is.na(ccDF$Grouping), ]
-  ccDF$Grouping <- gsub(" *", "", ccDF$Grouping)
-  ccDF$Grouping <- factor(ccDF$Grouping, levels = unique(ccDF$Grouping))
-  return(ccDF)
+  Plot_Luis_Markers_Heatmap(cluster_col = "clusters_pc1to5_res_0.7")
+  Plot_Luis_Markers_Heatmap(cluster_col = "clusters_pc1to6_res_0.7")
+  Plot_Luis_Markers_Heatmap(cluster_col = "clusters_pc1to8_res_0.6")
+  Plot_Luis_Markers_Heatmap(cluster_col = "clusters_pc1to8_res_0.7")
+  Plot_Luis_Markers_Heatmap(cluster_col = "clusters_pc1to10_res_0.6")
+  Plot_Luis_Markers_Heatmap(cluster_col = "clusters_pc1to10_res_0.7")
 }
 ################################################################################
 
@@ -139,6 +133,16 @@ nowakowski_DE_DF <- nowakowski_DE_DF[
 ################################################################################
 
 ### Luis marker genes
+
+FeaturePlot_Graph_CentScale <- function(tsneDF, title, limLow, limHigh
+  , alpha = 0.5, size = 0.02) {
+  ggFp <- ggplot(tsneDF, aes(x = tSNE_1, y = tSNE_2, col = EXPRESSION)) +
+    geom_point(size = size, alpha = alpha, stroke = 0.5) +
+    scale_color_distiller(name = "Normalized\nexpression\nz-score", type = "div"
+      , palette = 5, direction = -1, limits = c(limLow, limHigh)) +
+    ggtitle(title)
+  return(ggFp)
+}
 
 Plot_Luis_Markers_tSNE <- function(tsne_slot_name = tsne_slot_name){
 
@@ -241,36 +245,36 @@ Plot_Luis_Markers_Violin <- function(){
 
   ## Violin plots of genes by cluster
 
-  # Normalized centered scaled
-  Gene_Expression_By_Cluster_ViolinPlot(
-    genes = kmDF$Gene.Symbol
-    , exprM = as.matrix(centSO@scale.data)
-    , clusterIDs = centSO@ident
-    , grouping = kmDF$Grouping
-  ) +
-    ggtitle(paste0(graphCodeTitle
-      , "\n"
-      , "\nMarker gene expression by cluster"
-      , "\nCluster round 2 normalized mean centered scaled expression"
-      , "\n"))
-  ggsave(paste0(outGraph
-    , "KnownMarks_ViolinPlot_Round2NormalizedCenteredScaled.png")
-    , width = 13, height = 26)
-
-  # Cluster round 1 normalized centered scaled
-  Gene_Expression_By_Cluster_ViolinPlot(
-    genes = kmDF$Gene.Symbol
-    , exprM = rd1CentExM
-    , clusterIDs = centSO@ident
-    , grouping = kmDF$Grouping
-  ) +
-    ggtitle(paste0(graphCodeTitle
-      , "\n"
-      , "\nMarker gene expression by cluster"
-      , "\nCluster round 1 normalized mean centered scaled expression"
-      , "\n"))
-  ggsave(paste0(outGraph, "KnownMarks_ViolinPlot_Round1NormalizedCenteredScaled.png")
-    , width = 13, height = 26)
+  # # Normalized centered scaled
+  # Gene_Expression_By_Cluster_ViolinPlot(
+  #   genes = kmDF$Gene.Symbol
+  #   , exprM = as.matrix(centSO@scale.data)
+  #   , clusterIDs = centSO@ident
+  #   , grouping = kmDF$Grouping
+  # ) +
+  #   ggtitle(paste0(graphCodeTitle
+  #     , "\n"
+  #     , "\nMarker gene expression by cluster"
+  #     , "\nCluster round 2 normalized mean centered scaled expression"
+  #     , "\n"))
+  # ggsave(paste0(outGraph
+  #   , "KnownMarks_ViolinPlot_Round2NormalizedCenteredScaled.png")
+  #   , width = 13, height = 26)
+  #
+  # # Cluster round 1 normalized centered scaled
+  # Gene_Expression_By_Cluster_ViolinPlot(
+  #   genes = kmDF$Gene.Symbol
+  #   , exprM = rd1CentExM
+  #   , clusterIDs = centSO@ident
+  #   , grouping = kmDF$Grouping
+  # ) +
+  #   ggtitle(paste0(graphCodeTitle
+  #     , "\n"
+  #     , "\nMarker gene expression by cluster"
+  #     , "\nCluster round 1 normalized mean centered scaled expression"
+  #     , "\n"))
+  # ggsave(paste0(outGraph, "KnownMarks_ViolinPlot_Round1NormalizedCenteredScaled.png")
+  #   , width = 13, height = 26)
 
   # Normalized
   Gene_Expression_By_Cluster_ViolinPlot(
@@ -288,15 +292,22 @@ Plot_Luis_Markers_Violin <- function(){
     , width = 13, height = 26)
 }
 
-Plot_Luis_Markers_Heatmap <- function(){
+
+Plot_Luis_Markers_Heatmap <- function(cluster_col){
 
   print("Plot_Luis_Markers_Heatmap")
+  print(cluster_col)
 
   # Heatmap
   # Normalized, no mean centering scaling
   geneGroupDF <- data.frame(Gene = kmDF$Gene.Symbol, Group = kmDF$Grouping)
   geneGroupDF <- geneGroupDF[! duplicated(geneGroupDF), ]
+
+  cluster_ids <- factor(centSO@meta.data[[cluster_col]])
+  names(cluster_ids) <- rownames(centSO@meta.data)
+  centSO@ident <- cluster_ids
   cellID_clusterID <- centSO@ident
+
   gg <- Plot_Marker_Genes_Heatmap_SetColWidths(
     geneGroupDF = geneGroupDF
     , exprM = noCentExM
@@ -313,13 +324,13 @@ Plot_Luis_Markers_Heatmap <- function(){
       , "\nNormalized expression"
       , "\n")
   )
-  ggsave(paste0(outGraph, "KnownMarks_Heatmap_Normalized.png")
+  ggsave(paste0(outGraph, "KnownMarks_Heatmap_Normalized_", cluster_col, ".png")
     , width = 16, height = 80, limitsize = FALSE)
 
   # Clustering round 2 normalized, mean centering scaling
   geneGroupDF <- data.frame(Gene = kmDF$Gene.Symbol, Group = kmDF$Grouping)
   geneGroupDF <- geneGroupDF[! duplicated(geneGroupDF), ]
-  cellID_clusterID <- centSO@ident
+
   gg <- Plot_Marker_Genes_Heatmap_SetColWidths(
     geneGroupDF = geneGroupDF
     , exprM = centSO@scale.data
@@ -336,13 +347,14 @@ Plot_Luis_Markers_Heatmap <- function(){
       , "\nClustering round 2 normalized mean centered scaled expression"
       , "\n")
   )
-  ggsave(paste0(outGraph, "KnownMarks_Heatmap_Round2NormalizedCenteredScaled.png")
+  ggsave(paste0(outGraph, "KnownMarks_Heatmap_Round2NormalizedCenteredScaled"
+      , cluster_col, ".png")
     , width = 16, height = 80, limitsize = FALSE)
 
   # Clustering round 1 normalized, mean centering scaling
   geneGroupDF <- data.frame(Gene = kmDF$Gene.Symbol, Group = kmDF$Grouping)
   geneGroupDF <- geneGroupDF[! duplicated(geneGroupDF), ]
-  cellID_clusterID <- centSO@ident
+
   gg <- Plot_Marker_Genes_Heatmap_SetColWidths(
     geneGroupDF = geneGroupDF
     , exprM = rd1CentExM
@@ -359,7 +371,8 @@ Plot_Luis_Markers_Heatmap <- function(){
       , "\nClustering round 1 normalized mean centered scaled expression"
       , "\n")
   )
-  ggsave(paste0(outGraph, "KnownMarks_Heatmap_Round1NormalizedCenteredScaled.png")
+  ggsave(paste0(outGraph, "KnownMarks_Heatmap_Round1NormalizedCenteredScaled"
+      , cluster_col, ".png")
     , width = 16, height = 80, limitsize = FALSE)
 
 }
