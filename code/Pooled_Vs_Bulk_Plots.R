@@ -742,6 +742,13 @@ df1 <- df1[df1$Grouping %in% c(
   , "IP"
   , "vRG")
   , ]
+df1$Grouping <- droplevels(df1$Grouping)
+pvals_L <- lapply(split(df1, df1$Grouping), function(x){
+  result <- t.test(as.vector(x$Dropseq))
+  result$p.value
+})
+pvals_DF <- data.frame(Grouping = names(pvals_L), Pvalue = unlist(pvals_L))
+pvals_DF$FDR <- p.adjust(pvals_DF$Pvalue, method = "BH")
 # Markers combined as boxplot
 ggplot(df1, aes(x = Grouping, y = Dropseq)) +
   geom_boxplot() +
