@@ -31,7 +31,7 @@ print(args)
 ## Inputs
 
 # Seurat
-in_Seurat <- list.files("../analysis/analyzed_data/Seurat_ClusterRound2/ClusterRound2/20181222/", full.names = TRUE)
+in_Seurat <- list.files("../analysis/analyzed_data/Seurat_ClusterRound2/ClusterRound2/20190103/", full.names = TRUE)
 print(in_Seurat[as.numeric(args[[1]])])
 load(in_Seurat[as.numeric(args[[1]])])
 # load(in_Seurat[9])
@@ -96,7 +96,6 @@ Plot_Luis_Markers <- function(){
   Plot_Luis_Markers_tSNE(tsne_slot_name = "tsne_pc1to6")
   Plot_Luis_Markers_tSNE(tsne_slot_name = "tsne_pc1to8")
   Plot_Luis_Markers_tSNE(tsne_slot_name = "tsne_pc1to10")
-  Plot_Luis_Markers_tSNE(tsne_slot_name = "tsne_pc1to15")
   Plot_Luis_Markers_tSNE(tsne_slot_name = "tsne_pc1to40")
   Plot_Luis_Markers_Violin()
   Plot_Luis_Markers_Heatmap(cluster_col = "clusters_pc1to5_res_0.7")
