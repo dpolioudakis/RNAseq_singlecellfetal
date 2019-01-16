@@ -25,16 +25,16 @@ source("GGplot_Theme.R")
 
 ## Command args to input cluster ID
 args <- commandArgs(trailingOnly = TRUE)
-# args <- 12
+# args <- 2
 print(args)
 
 ## Inputs
 
 # Seurat
-in_Seurat <- list.files("../analysis/analyzed_data/Seurat_ClusterRound2/ClusterRound2/20190103/", full.names = TRUE)
-print(in_Seurat[as.numeric(args[[1]])])
-load(in_Seurat[as.numeric(args[[1]])])
-# load(in_Seurat[9])
+in_seurat <- list.files("../analysis/analyzed_data/Seurat_ClusterRound2/ClusterRound2/20190103/", full.names = TRUE)
+print(in_seurat[as.numeric(args[[1]])])
+load(in_seurat[as.numeric(args[[1]])])
+# load(in_seurat[9])
 centSO <- so
 rm(so)
 
@@ -72,38 +72,61 @@ nowakowski_DE_DF <- read.csv(
 )
 
 ## Variables
+cluster_annot_tb <- tribble(
+    ~cluster_number, ~cluster_annot
+    , "9",  "vRG"
+    , "7",  "oRG"
+    , "8",  "PgS"
+    , "10", "PgG2M"
+    , "2",  "IP"
+    , "0",  "ExN"
+    , "1",  "ExM"
+    , "4",  "ExCal"
+    , "3",  "ExDp1"
+    , "13", "ExDp2"
+    , "5",  "InSST"
+    , "6",  "InCALB2"
+    , "11", "OPC"
+    , "12", "End"
+    , "14", "Per"
+    , "15", "Mic"
+  )
 date <- format(Sys.Date(), "%Y%m%d")
-graphCodeTitle <- paste0("MarkerPlots.R\n", centSO@project.name)
-outGraph <- paste0("../analysis/graphs/Seurat_ClusterRound2/MarkerPlots/"
+script_name <- paste0("MarkerPlots.R\n", centSO@project.name)
+out_graph <- paste0("../analysis/graphs/Seurat_ClusterRound2/MarkerPlots/"
   , date, "/MarkerPlots_"
   , gsub(" ", "", centSO@project.name), "_")
 
 ## Output Directories
-dir.create(dirname(outGraph), recursive = TRUE)
+dir.create(dirname(out_graph), recursive = TRUE)
 ################################################################################
 
 ### Functions
 
 Main_Function <- function(){
-  Plot_Luis_Markers()
-  Plot_Cell_Cycle_Genes()
-  Plot_Lake2017_Enriched()
-  Plot_Nowakowski_Enriched()
+  plot_mean_expression_marker_genes_heatmap(
+    cluster_col = "clusters_pc1to5_res_0.7")
+  plot_mean_expression_marker_genes_heatmap(
+    cluster_col = "clusters_pc1to10_res_0.5")
+  # Plot_Luis_Markers()
+  # Plot_Cell_Cycle_Genes()
+  # Plot_Lake2017_Enriched()
+  # Plot_Nowakowski_Enriched()
 }
 
 Plot_Luis_Markers <- function(){
-  Plot_Luis_Markers_tSNE(tsne_slot_name = "tsne_pc1to5")
-  Plot_Luis_Markers_tSNE(tsne_slot_name = "tsne_pc1to6")
-  Plot_Luis_Markers_tSNE(tsne_slot_name = "tsne_pc1to8")
-  Plot_Luis_Markers_tSNE(tsne_slot_name = "tsne_pc1to10")
-  Plot_Luis_Markers_tSNE(tsne_slot_name = "tsne_pc1to40")
-  Plot_Luis_Markers_Violin()
-  Plot_Luis_Markers_Heatmap(cluster_col = "clusters_pc1to5_res_0.7")
-  Plot_Luis_Markers_Heatmap(cluster_col = "clusters_pc1to6_res_0.7")
-  Plot_Luis_Markers_Heatmap(cluster_col = "clusters_pc1to8_res_0.6")
-  Plot_Luis_Markers_Heatmap(cluster_col = "clusters_pc1to8_res_0.7")
-  Plot_Luis_Markers_Heatmap(cluster_col = "clusters_pc1to10_res_0.6")
-  Plot_Luis_Markers_Heatmap(cluster_col = "clusters_pc1to10_res_0.7")
+  # Plot_Luis_Markers_tSNE(tsne_slot_name = "tsne_pc1to5")
+  # Plot_Luis_Markers_tSNE(tsne_slot_name = "tsne_pc1to6")
+  # Plot_Luis_Markers_tSNE(tsne_slot_name = "tsne_pc1to8")
+  # Plot_Luis_Markers_tSNE(tsne_slot_name = "tsne_pc1to10")
+  # Plot_Luis_Markers_tSNE(tsne_slot_name = "tsne_pc1to40")
+  # Plot_Luis_Markers_Violin()
+  # Plot_Luis_Markers_Heatmap(cluster_col = "clusters_pc1to5_res_0.7")
+  # Plot_Luis_Markers_Heatmap(cluster_col = "clusters_pc1to6_res_0.7")
+  # Plot_Luis_Markers_Heatmap(cluster_col = "clusters_pc1to8_res_0.6")
+  # Plot_Luis_Markers_Heatmap(cluster_col = "clusters_pc1to8_res_0.7")
+  # Plot_Luis_Markers_Heatmap(cluster_col = "clusters_pc1to10_res_0.5")
+  # Plot_Luis_Markers_Heatmap(cluster_col = "clusters_pc1to10_res_0.7")
 }
 ################################################################################
 
@@ -129,6 +152,85 @@ lake_DE_DF <- lake_DE_DF[
 # DE filter higher
 nowakowski_DE_DF <- nowakowski_DE_DF[
   nowakowski_DE_DF$avg_diff > 0.75, c("gene", "avg_diff", "cluster")]
+################################################################################
+
+### Heatmap of mean expression of groups of markers
+
+plot_mean_expression_marker_genes_heatmap <- function(cluster_col){
+
+  print("plot_mean_expression_marker_genes_heatmap")
+
+  # cluster number and annotation for labeling plot
+  cluster <- gsub("Cluster ", "", centSO@project.name)
+  cluster_annot <- cluster_annot_tb %>%
+    filter(cluster_number == cluster) %>%
+    pull(cluster_annot)
+
+  # gene groups to plot
+  # cell type markers
+  gene_group_tb <-
+    tibble(gene = kmDF$Gene.Symbol, group = kmDF$Grouping) %>%
+    distinct() %>%
+    filter(group %in% c("oRG", "vRG", "RG", "IP", "Neuron"
+      , "Excitatory Deep Layer Cortical", "Excitatory Upper Layer Cortical")) %>%
+    mutate(gene = gene %>% as.character())
+  # cell cycle genes
+  cc_tb <- ccDF %>%
+    as_tibble() %>%
+    gather(key = "group", value = "gene") %>%
+    filter(grepl("\\w", .$gene, perl = TRUE)) %>%
+    mutate(gene = gsub(" *", "", .$gene))
+  # RP genes
+  rp_tb <- rownames(centSO@scale.data) %>%
+    tibble(gene = .) %>%
+    filter(grepl("^RP[S|L]", .$gene, perl = TRUE)) %>%
+    mutate(group = "RP")
+  # combine
+  gene_group_tb <- bind_rows(gene_group_tb, cc_tb, rp_tb)
+
+  # cell id cluster id key
+  cluster_ids <- factor(centSO@meta.data[[cluster_col]])
+  names(cluster_ids) <- rownames(centSO@meta.data)
+  centSO@ident <- cluster_ids
+  cellid_clusterid_tb <- centSO@ident %>%
+    enframe(name = "cell_id", value = "subcluster")
+
+  # expression z-scores
+  centSO@scale.data %>%
+    as.data.frame %>%
+    rownames_to_column("gene") %>%
+    as_tibble %>%
+    filter(gene %in% gene_group_tb$gene) %>%
+    gather("cell_id", "expression", -gene) %>%
+    # add gene group info
+    left_join(., gene_group_tb, by = c("gene" = "gene")) %>%
+    # add sub-clusters
+    left_join(., cellid_clusterid_tb) %>%
+    # mean expression by subcluster
+    group_by(subcluster, group) %>%
+    summarise(mean_expression = mean(expression)) %>%
+    # set limits
+    mutate(mean_expression = if_else(mean_expression < -0.25, -0.25
+      , if_else(mean_expression > 0.25, 0.25, mean_expression)
+    )) %>%
+    ungroup %>%
+    mutate(group = factor(group, levels = rev(c(
+      "vRG", "oRG", "RG", "IP", "Neuron", "Excitatory Deep Layer Cortical", "Excitatory Upper Layer Cortical", "RP", "G1.S", "S", "G2.M", "M", "M.G1")))) %>%
+    # plot
+    ggplot(aes(x = subcluster, y = group, fill = mean_expression)) +
+      geom_tile() +
+      scale_fill_distiller(name = "Normalized\nexpression\nzscore"
+          , type = "div", palette = 5, direction = -1
+          , limits = c(-0.25, 0.25)
+          , na.value = "grey90") +
+      ggplot_set_theme_publication +
+      ggtitle(paste0(script_name
+        , "\n\nMean expression of groups of marker genes by sub-cluster"
+        , "\nCluster: ", cluster_annot, " (", cluster, ")"
+        , "\n", cluster_col))
+      ggsave(paste0(out_graph, "mean_expression_heatmap", cluster_col, ".pdf")
+        , height = 5, width = 6)
+}
 ################################################################################
 
 ### Luis marker genes
@@ -167,7 +269,7 @@ Plot_Luis_Markers_tSNE <- function(tsne_slot_name = tsne_slot_name){
   # plot_grid combine tSNE graphs
   pg <- plot_grid(plotlist = ggL, ncol = 3, align = 'v', axis = 'r')
   # now add the title
-  title <- ggdraw() + draw_label(paste0(graphCodeTitle
+  title <- ggdraw() + draw_label(paste0(script_name
     , "\n\nExpression of known marker genes"
     , "\nNormalized expression"
     , "\n", tsne_slot_name
@@ -175,7 +277,7 @@ Plot_Luis_Markers_tSNE <- function(tsne_slot_name = tsne_slot_name){
   # rel_heights values control title margins
   plot_grid(title, pg, ncol = 1, rel_heights = c(0.05, 1))
   ggsave(paste0(
-    outGraph, "KnownMarks_FeaturePlot_Normalized_", tsne_slot_name, ".png")
+    out_graph, "KnownMarks_FeaturePlot_Normalized_", tsne_slot_name, ".png")
     , width = 12, height = length(ggL)*1)
 
   # Feature plot
@@ -195,14 +297,14 @@ Plot_Luis_Markers_tSNE <- function(tsne_slot_name = tsne_slot_name){
   # plot_grid combine tSNE graphs
   pg <- plot_grid(plotlist = ggL, ncol = 3, align = 'v', axis = 'r')
   # now add the title
-  title <- ggdraw() + draw_label(paste0(graphCodeTitle
+  title <- ggdraw() + draw_label(paste0(script_name
     , "\n\nExpression of known marker genes"
     , "\nCluster round 2 normalized expression, mean centered and variance scaled"
     , "\n", tsne_slot_name
     , "\n"))
   # rel_heights values control title margins
   plot_grid(title, pg, ncol = 1, rel_heights = c(0.05, 1))
-  ggsave(paste0(outGraph
+  ggsave(paste0(out_graph
       , "KnownMarks_FeaturePlot_Round2NormCenterScale_"
       , tsne_slot_name, ".png")
     , width = 12, height = length(ggL)*1)
@@ -224,7 +326,7 @@ Plot_Luis_Markers_tSNE <- function(tsne_slot_name = tsne_slot_name){
   # plot_grid combine tSNE graphs
   pg <- plot_grid(plotlist = ggL, ncol = 3, align = 'v', axis = 'r')
   # now add the title
-  title <- ggdraw() + draw_label(paste0(graphCodeTitle
+  title <- ggdraw() + draw_label(paste0(script_name
     , "\n\nExpression of known marker genes"
     , "\nCluster round 1 normalized expression, mean centered and variance scaled"
     , "\n", tsne_slot_name
@@ -232,7 +334,7 @@ Plot_Luis_Markers_tSNE <- function(tsne_slot_name = tsne_slot_name){
   # rel_heights values control title margins
   plot_grid(title, pg, ncol = 1, rel_heights = c(0.05, 1))
   ggsave(paste0(
-      outGraph, "KnownMarks_FeaturePlot_Round1NormCenterScale_"
+      out_graph, "KnownMarks_FeaturePlot_Round1NormCenterScale_"
       , tsne_slot_name, ".png")
     , width = 12, height = length(ggL)*1)
 
@@ -251,12 +353,12 @@ Plot_Luis_Markers_Violin <- function(){
   #   , clusterIDs = centSO@ident
   #   , grouping = kmDF$Grouping
   # ) +
-  #   ggtitle(paste0(graphCodeTitle
+  #   ggtitle(paste0(script_name
   #     , "\n"
   #     , "\nMarker gene expression by cluster"
   #     , "\nCluster round 2 normalized mean centered scaled expression"
   #     , "\n"))
-  # ggsave(paste0(outGraph
+  # ggsave(paste0(out_graph
   #   , "KnownMarks_ViolinPlot_Round2NormalizedCenteredScaled.png")
   #   , width = 13, height = 26)
   #
@@ -267,12 +369,12 @@ Plot_Luis_Markers_Violin <- function(){
   #   , clusterIDs = centSO@ident
   #   , grouping = kmDF$Grouping
   # ) +
-  #   ggtitle(paste0(graphCodeTitle
+  #   ggtitle(paste0(script_name
   #     , "\n"
   #     , "\nMarker gene expression by cluster"
   #     , "\nCluster round 1 normalized mean centered scaled expression"
   #     , "\n"))
-  # ggsave(paste0(outGraph, "KnownMarks_ViolinPlot_Round1NormalizedCenteredScaled.png")
+  # ggsave(paste0(out_graph, "KnownMarks_ViolinPlot_Round1NormalizedCenteredScaled.png")
   #   , width = 13, height = 26)
 
   # Normalized
@@ -282,12 +384,12 @@ Plot_Luis_Markers_Violin <- function(){
     , clusterIDs = centSO@ident
     , grouping = kmDF$Grouping
   ) +
-    ggtitle(paste0(graphCodeTitle
+    ggtitle(paste0(script_name
       , "\n"
       , "\nMarker gene expression by cluster"
       , "\nNormalized expression"
       , "\n"))
-  ggsave(paste0(outGraph, "KnownMarks_ViolinPlot_Normalized.png")
+  ggsave(paste0(out_graph, "KnownMarks_ViolinPlot_Normalized.png")
     , width = 13, height = 26)
 }
 
@@ -316,14 +418,14 @@ Plot_Luis_Markers_Heatmap <- function(cluster_col){
     , clusterOrder = sort(unique(centSO@ident))
   )
   gg <- gg + ggtitle(
-    paste0(graphCodeTitle
+    paste0(script_name
       , "\n\nExpression of published marker genes by cluster"
       , "\nx-axis: Marker genes"
       , "\ny-axis: Cells ordered by cluster"
       , "\nNormalized expression"
       , "\n")
   )
-  ggsave(paste0(outGraph, "KnownMarks_Heatmap_Normalized_", cluster_col, ".png")
+  ggsave(paste0(out_graph, "KnownMarks_Heatmap_Normalized_", cluster_col, ".png")
     , width = 16, height = 80, limitsize = FALSE)
 
   # Clustering round 2 normalized, mean centering scaling
@@ -339,14 +441,14 @@ Plot_Luis_Markers_Heatmap <- function(cluster_col){
     , clusterOrder = sort(unique(centSO@ident))
   )
   gg <- gg + ggtitle(
-    paste0(graphCodeTitle
+    paste0(script_name
       , "\n\nExpression of published marker genes by cluster"
       , "\nx-axis: Marker genes"
       , "\ny-axis: Cells ordered by cluster"
       , "\nClustering round 2 normalized mean centered scaled expression"
       , "\n")
   )
-  ggsave(paste0(outGraph, "KnownMarks_Heatmap_Round2NormalizedCenteredScaled"
+  ggsave(paste0(out_graph, "KnownMarks_Heatmap_Round2NormalizedCenteredScaled"
       , cluster_col, ".png")
     , width = 16, height = 80, limitsize = FALSE)
 
@@ -363,14 +465,14 @@ Plot_Luis_Markers_Heatmap <- function(cluster_col){
     , clusterOrder = sort(unique(centSO@ident))
   )
   gg <- gg + ggtitle(
-    paste0(graphCodeTitle
+    paste0(script_name
       , "\n\nExpression of published marker genes by cluster"
       , "\nx-axis: Marker genes"
       , "\ny-axis: Cells ordered by cluster"
       , "\nClustering round 1 normalized mean centered scaled expression"
       , "\n")
   )
-  ggsave(paste0(outGraph, "KnownMarks_Heatmap_Round1NormalizedCenteredScaled"
+  ggsave(paste0(out_graph, "KnownMarks_Heatmap_Round1NormalizedCenteredScaled"
       , cluster_col, ".png")
     , width = 16, height = 80, limitsize = FALSE)
 
@@ -422,13 +524,13 @@ Plot_Cell_Cycle_Genes <- function(){
   # plot_grid combine tSNE graphs
   pg <- plot_grid(plotlist = ggL, ncol = 3, align = 'v', axis = 'r')
   # now add the title
-  title <- ggdraw() + draw_label(paste0(graphCodeTitle
+  title <- ggdraw() + draw_label(paste0(script_name
     , "\n\nExpression of cell cycle genes from Macosko"
     , "\nNormalized expression"
     , "\n"))
   # rel_heights values control title margins
   plot_grid(title, pg, ncol = 1, rel_heights = c(0.2, 1))
-  ggsave(paste0(outGraph, "CellCycle_FeaturePlot_Normalized.png")
+  ggsave(paste0(out_graph, "CellCycle_FeaturePlot_Normalized.png")
     , width = 14, height = length(ggL)*1)
 
   # Feature plot
@@ -449,13 +551,13 @@ Plot_Cell_Cycle_Genes <- function(){
   # plot_grid combine tSNE graphs
   pg <- plot_grid(plotlist = ggL, ncol = 3, align = 'v', axis = 'r')
   # now add the title
-  title <- ggdraw() + draw_label(paste0(graphCodeTitle
+  title <- ggdraw() + draw_label(paste0(script_name
     , "\n\nExpression of cell cycle genes from Macosko"
     , "\nNormalized expression, mean centered and variance scaled"
     , "\n"))
   # rel_heights values control title margins
   plot_grid(title, pg, ncol = 1, rel_heights = c(0.2, 1))
-  ggsave(paste0(outGraph
+  ggsave(paste0(out_graph
     , "CellCycle_FeaturePlot_Round2NormalizedCenteredScaled.png")
     , width = 14, height = length(ggL)*1)
 
@@ -477,13 +579,13 @@ Plot_Cell_Cycle_Genes <- function(){
   # plot_grid combine tSNE graphs
   pg <- plot_grid(plotlist = ggL, ncol = 3, align = 'v', axis = 'r')
   # now add the title
-  title <- ggdraw() + draw_label(paste0(graphCodeTitle
+  title <- ggdraw() + draw_label(paste0(script_name
     , "\n\nExpression of cell cycle genes from Macosko"
     , "\nNormalized expression, mean centered and variance scaled"
     , "\n"))
   # rel_heights values control title margins
   plot_grid(title, pg, ncol = 1, rel_heights = c(0.2, 1))
-  ggsave(paste0(outGraph
+  ggsave(paste0(out_graph
     , "CellCycle_FeaturePlot_Round1NormalizedCenteredScaled.png")
     , width = 14, height = length(ggL)*1)
 
@@ -502,14 +604,14 @@ Plot_Cell_Cycle_Genes <- function(){
     , clusterOrder = sort(unique(centSO@ident))
   )
   gg <- gg + ggtitle(
-    paste0(graphCodeTitle
+    paste0(script_name
       , "\n\nExpression of cell cycle genes (Macosko) by cluster"
       , "\nx-axis: Marker genes"
       , "\ny-axis: Cells ordered by cluster"
       , "\nNormalized expression"
       , "\n")
   )
-  ggsave(paste0(outGraph, "CellCycle_Heatmap_Normalized.png")
+  ggsave(paste0(out_graph, "CellCycle_Heatmap_Normalized.png")
     , width = 16, height = 44)
 
   # Round 2 normalized mean centered scaled
@@ -525,14 +627,14 @@ Plot_Cell_Cycle_Genes <- function(){
     , clusterOrder = sort(unique(centSO@ident))
   )
   gg <- gg + ggtitle(
-    paste0(graphCodeTitle
+    paste0(script_name
       , "\n\nExpression of cell cycle genes (Macosko) by cluster"
       , "\nx-axis: Marker genes"
       , "\ny-axis: Cells ordered by cluster"
       , "\nClustering round 2 normalized mean centered scaled expression"
       , "\n")
   )
-  ggsave(paste0(outGraph, "CellCycle_Heatmap_Round2NormalizedCenteredScaled.png")
+  ggsave(paste0(out_graph, "CellCycle_Heatmap_Round2NormalizedCenteredScaled.png")
     , width = 16, height = 44)
 
   # Round 1 normalized, mean centered and scaled
@@ -548,14 +650,14 @@ Plot_Cell_Cycle_Genes <- function(){
     , clusterOrder = sort(unique(centSO@ident))
   )
   gg <- gg + ggtitle(
-    paste0(graphCodeTitle
+    paste0(script_name
       , "\n\nExpression of cell cycle genes (Macosko) by cluster"
       , "\nx-axis: Marker genes"
       , "\ny-axis: Cells ordered by cluster"
       , "\nClustering round 1 normalized mean centered scaled expression"
       , "\n")
   )
-  ggsave(paste0(outGraph, "CellCycle_Heatmap_Round1NormalizedCenteredScaled.png")
+  ggsave(paste0(out_graph, "CellCycle_Heatmap_Round1NormalizedCenteredScaled.png")
     , width = 16, height = 44)
 
 }
@@ -585,13 +687,13 @@ Plot_Lake2017_Enriched <- function(){
   # plot_grid combine tSNE graphs
   pg <- plot_grid(plotlist = ggL, ncol = 3, align = 'v', axis = 'r')
   # now add the title
-  title <- ggdraw() + draw_label(paste0(graphCodeTitle
+  title <- ggdraw() + draw_label(paste0(script_name
     , "\n\nExpression of Lake cluster enriched"
     , "\nNormalized expression"
     , "\n"))
   # rel_heights values control title margins
   plot_grid(title, pg, ncol = 1, rel_heights = c(0.05, 1))
-  ggsave(paste0(outGraph, "LakeEnriched_FeaturePlot_Normalized.png")
+  ggsave(paste0(out_graph, "LakeEnriched_FeaturePlot_Normalized.png")
     , width = 12, height = length(ggL)*1)
 
   # Feature plot
@@ -610,13 +712,13 @@ Plot_Lake2017_Enriched <- function(){
   # plot_grid combine tSNE graphs
   pg <- plot_grid(plotlist = ggL, ncol = 3, align = 'v', axis = 'r')
   # now add the title
-  title <- ggdraw() + draw_label(paste0(graphCodeTitle
+  title <- ggdraw() + draw_label(paste0(script_name
     , "\n\nExpression of Lake cluster enriched"
     , "\nCluster round 2 normalized expression, mean centered and variance scaled"
     , "\n"))
   # rel_heights values control title margins
   plot_grid(title, pg, ncol = 1, rel_heights = c(0.05, 1))
-  ggsave(paste0(outGraph
+  ggsave(paste0(out_graph
     , "LakeEnriched_FeaturePlot_Round2NormalizedCenteredScaled.png")
     , width = 12, height = length(ggL)*1)
 
@@ -637,13 +739,13 @@ Plot_Lake2017_Enriched <- function(){
   # plot_grid combine tSNE graphs
   pg <- plot_grid(plotlist = ggL, ncol = 3, align = 'v', axis = 'r')
   # now add the title
-  title <- ggdraw() + draw_label(paste0(graphCodeTitle
+  title <- ggdraw() + draw_label(paste0(script_name
     , "\n\nExpression of Lake cluster enriched"
     , "\nCluster round 1 normalized expression, mean centered and variance scaled"
     , "\n"))
   # rel_heights values control title margins
   plot_grid(title, pg, ncol = 1, rel_heights = c(0.05, 1))
-  ggsave(paste0(outGraph, "LakeEnriched_FeaturePlot_Round1NormalizedCenteredScaled.png")
+  ggsave(paste0(out_graph, "LakeEnriched_FeaturePlot_Round1NormalizedCenteredScaled.png")
     , width = 12, height = length(ggL)*1)
 
 
@@ -656,12 +758,12 @@ Plot_Lake2017_Enriched <- function(){
     , clusterIDs = centSO@ident
     , grouping = lake_DE_DF$Cluster
   ) +
-    ggtitle(paste0(graphCodeTitle
+    ggtitle(paste0(script_name
       , "\n"
       , "\nExpression of Lake cluster enriched"
       , "\nCluster round 2 normalized mean centered scaled expression"
       , "\n"))
-  ggsave(paste0(outGraph
+  ggsave(paste0(out_graph
     , "LakeEnriched_ViolinPlot_Round2NormalizedCenteredScaled.png")
     , width = 13, height = 26)
 
@@ -672,12 +774,12 @@ Plot_Lake2017_Enriched <- function(){
     , clusterIDs = centSO@ident
     , grouping = lake_DE_DF$Cluster
   ) +
-    ggtitle(paste0(graphCodeTitle
+    ggtitle(paste0(script_name
       , "\n"
       , "\nExpression of Lake cluster enriched"
       , "\nCluster round 1 normalized mean centered scaled expression"
       , "\n"))
-  ggsave(paste0(outGraph, "LakeEnriched_ViolinPlot_Round1NormalizedCenteredScaled.png")
+  ggsave(paste0(out_graph, "LakeEnriched_ViolinPlot_Round1NormalizedCenteredScaled.png")
     , width = 13, height = 26)
 
   # Normalized
@@ -687,12 +789,12 @@ Plot_Lake2017_Enriched <- function(){
     , clusterIDs = centSO@ident
     , grouping = lake_DE_DF$Cluster
   ) +
-    ggtitle(paste0(graphCodeTitle
+    ggtitle(paste0(script_name
       , "\n"
       , "\nExpression of Lake cluster enriched"
       , "\nNormalized expression"
       , "\n"))
-  ggsave(paste0(outGraph, "LakeEnriched_ViolinPlot_Normalized.png")
+  ggsave(paste0(out_graph, "LakeEnriched_ViolinPlot_Normalized.png")
     , width = 13, height = 26)
 
 
@@ -714,14 +816,14 @@ Plot_Lake2017_Enriched <- function(){
     , clusterOrder = sort(unique(centSO@ident))
   )
   gg <- gg + ggtitle(
-    paste0(graphCodeTitle
+    paste0(script_name
       , "\n\nExpression of Lake cluster top 10 enriched by cluster"
       , "\nx-axis: Marker genes"
       , "\ny-axis: Cells ordered by cluster"
       , "\nNormalized expression"
       , "\n")
   )
-  ggsave(paste0(outGraph, "LakeEnriched_Heatmap_Normalized.png")
+  ggsave(paste0(out_graph, "LakeEnriched_Heatmap_Normalized.png")
     , width = 16, height = 40, limitsize = FALSE)
 
   # Clustering round 2 normalized, mean centering scaling
@@ -741,14 +843,14 @@ Plot_Lake2017_Enriched <- function(){
     , clusterOrder = sort(unique(centSO@ident))
   )
   gg <- gg + ggtitle(
-    paste0(graphCodeTitle
+    paste0(script_name
       , "\n\nExpression of Lake cluster top 10 enriched by cluster"
       , "\nx-axis: Marker genes"
       , "\ny-axis: Cells ordered by cluster"
       , "\nClustering round 2 normalized mean centered scaled expression"
       , "\n")
   )
-  ggsave(paste0(outGraph, "LakeEnriched_Heatmap_Round2NormalizedCenteredScaled.png")
+  ggsave(paste0(out_graph, "LakeEnriched_Heatmap_Round2NormalizedCenteredScaled.png")
     , width = 16, height = 40, limitsize = FALSE)
 
   # Clustering round 1 normalized, mean centering scaling
@@ -768,14 +870,14 @@ Plot_Lake2017_Enriched <- function(){
     , clusterOrder = sort(unique(centSO@ident))
   )
   gg <- gg + ggtitle(
-    paste0(graphCodeTitle
+    paste0(script_name
       , "\n\nExpression of Lake cluster top 10 enriched by cluster"
       , "\nx-axis: Marker genes"
       , "\ny-axis: Cells ordered by cluster"
       , "\nClustering round 1 normalized mean centered scaled expression"
       , "\n")
   )
-  ggsave(paste0(outGraph, "LakeEnriched_Heatmap_Round1NormalizedCenteredScaled.png")
+  ggsave(paste0(out_graph, "LakeEnriched_Heatmap_Round1NormalizedCenteredScaled.png")
     , width = 16, height = 40, limitsize = FALSE)
 
 }
@@ -803,13 +905,13 @@ Plot_Nowakowski_Enriched <- function(){
   # plot_grid combine tSNE graphs
   pg <- plot_grid(plotlist = ggL, ncol = 3, align = 'v', axis = 'r')
   # now add the title
-  title <- ggdraw() + draw_label(paste0(graphCodeTitle
+  title <- ggdraw() + draw_label(paste0(script_name
     , "\n\nExpression of Nowakowski cluster enriched"
     , "\nNormalized expression"
     , "\n"))
   # rel_heights values control title margins
   plot_grid(title, pg, ncol = 1, rel_heights = c(0.05, 1))
-  ggsave(paste0(outGraph, "NowakowskiEnriched_FeaturePlot_Normalized.png")
+  ggsave(paste0(out_graph, "NowakowskiEnriched_FeaturePlot_Normalized.png")
     , width = 12, height = length(ggL)*1)
 
   # Feature plot
@@ -828,13 +930,13 @@ Plot_Nowakowski_Enriched <- function(){
   # plot_grid combine tSNE graphs
   pg <- plot_grid(plotlist = ggL, ncol = 3, align = 'v', axis = 'r')
   # now add the title
-  title <- ggdraw() + draw_label(paste0(graphCodeTitle
+  title <- ggdraw() + draw_label(paste0(script_name
     , "\n\nExpression of Nowakowski cluster enriched"
     , "\nCluster round 2 normalized expression, mean centered and variance scaled"
     , "\n"))
   # rel_heights values control title margins
   plot_grid(title, pg, ncol = 1, rel_heights = c(0.05, 1))
-  ggsave(paste0(outGraph
+  ggsave(paste0(out_graph
     , "NowakowskiEnriched_FeaturePlot_Round2NormalizedCenteredScaled.png")
     , width = 12, height = length(ggL)*1)
 
@@ -854,13 +956,13 @@ Plot_Nowakowski_Enriched <- function(){
   # plot_grid combine tSNE graphs
   pg <- plot_grid(plotlist = ggL, ncol = 3, align = 'v', axis = 'r')
   # now add the title
-  title <- ggdraw() + draw_label(paste0(graphCodeTitle
+  title <- ggdraw() + draw_label(paste0(script_name
     , "\n\nExpression of Nowakowski cluster enriched"
     , "\nCluster round 1 normalized expression, mean centered and variance scaled"
     , "\n"))
   # rel_heights values control title margins
   plot_grid(title, pg, ncol = 1, rel_heights = c(0.05, 1))
-  ggsave(paste0(outGraph, "NowakowskiEnriched_FeaturePlot_Round1NormalizedCenteredScaled.png")
+  ggsave(paste0(out_graph, "NowakowskiEnriched_FeaturePlot_Round1NormalizedCenteredScaled.png")
     , width = 12, height = length(ggL)*1)
 
 
@@ -873,12 +975,12 @@ Plot_Nowakowski_Enriched <- function(){
     , clusterIDs = centSO@ident
     , grouping = nowakowski_DE_DF$cluster
   ) +
-    ggtitle(paste0(graphCodeTitle
+    ggtitle(paste0(script_name
       , "\n"
       , "\nExpression of Nowakowski cluster enriched"
       , "\nCluster round 2 normalized mean centered scaled expression"
       , "\n"))
-  ggsave(paste0(outGraph
+  ggsave(paste0(out_graph
     , "NowakowskiEnriched_ViolinPlot_Round2NormalizedCenteredScaled.png")
     , width = 13, height = 26)
 
@@ -889,12 +991,12 @@ Plot_Nowakowski_Enriched <- function(){
     , clusterIDs = centSO@ident
     , grouping = nowakowski_DE_DF$cluster
   ) +
-    ggtitle(paste0(graphCodeTitle
+    ggtitle(paste0(script_name
       , "\n"
       , "\nExpression of Nowakowski cluster enriched"
       , "\nCluster round 1 normalized mean centered scaled expression"
       , "\n"))
-  ggsave(paste0(outGraph, "NowakowskiEnriched_ViolinPlot_Round1NormalizedCenteredScaled.png")
+  ggsave(paste0(out_graph, "NowakowskiEnriched_ViolinPlot_Round1NormalizedCenteredScaled.png")
     , width = 13, height = 26)
 
   # Normalized
@@ -904,12 +1006,12 @@ Plot_Nowakowski_Enriched <- function(){
     , clusterIDs = centSO@ident
     , grouping = nowakowski_DE_DF$cluster
   ) +
-    ggtitle(paste0(graphCodeTitle
+    ggtitle(paste0(script_name
       , "\n"
       , "\nExpression of Nowakowski cluster enriched"
       , "\nNormalized expression"
       , "\n"))
-  ggsave(paste0(outGraph, "NowakowskiEnriched_ViolinPlot_Normalized.png")
+  ggsave(paste0(out_graph, "NowakowskiEnriched_ViolinPlot_Normalized.png")
     , width = 13, height = 26)
 
 
@@ -931,14 +1033,14 @@ Plot_Nowakowski_Enriched <- function(){
     , clusterOrder = sort(unique(centSO@ident))
   )
   gg <- gg + ggtitle(
-    paste0(graphCodeTitle
+    paste0(script_name
       , "\n\nExpression of Nowakowski cluster top 10 enriched by cluster"
       , "\nx-axis: Marker genes"
       , "\ny-axis: Cells ordered by cluster"
       , "\nNormalized expression"
       , "\n")
   )
-  ggsave(paste0(outGraph, "NowakowskiEnriched_Heatmap_Normalized.png")
+  ggsave(paste0(out_graph, "NowakowskiEnriched_Heatmap_Normalized.png")
     , width = 16, height = 40, limitsize = FALSE)
 
   # Clustering round 2 normalized, mean centering scaling
@@ -958,14 +1060,14 @@ Plot_Nowakowski_Enriched <- function(){
     , clusterOrder = sort(unique(centSO@ident))
   )
   gg <- gg + ggtitle(
-    paste0(graphCodeTitle
+    paste0(script_name
       , "\n\nExpression of Nowakowski cluster top 10 enriched by cluster"
       , "\nx-axis: Marker genes"
       , "\ny-axis: Cells ordered by cluster"
       , "\nClustering round 2 normalized mean centered scaled expression"
       , "\n")
   )
-  ggsave(paste0(outGraph, "NowakowskiEnriched_Heatmap_Round2NormalizedCenteredScaled.png")
+  ggsave(paste0(out_graph, "NowakowskiEnriched_Heatmap_Round2NormalizedCenteredScaled.png")
     , width = 16, height = 40, limitsize = FALSE)
 
   # Clustering round 1 normalized, mean centering scaling
@@ -985,14 +1087,14 @@ Plot_Nowakowski_Enriched <- function(){
     , clusterOrder = sort(unique(centSO@ident))
   )
   gg <- gg + ggtitle(
-    paste0(graphCodeTitle
+    paste0(script_name
       , "\n\nExpression of Nowakowski cluster top 10 enriched by cluster"
       , "\nx-axis: Marker genes"
       , "\ny-axis: Cells ordered by cluster"
       , "\nClustering round 1 normalized mean centered scaled expression"
       , "\n")
   )
-  ggsave(paste0(outGraph, "NowakowskiEnriched_Heatmap_Round1NormalizedCenteredScaled.png")
+  ggsave(paste0(out_graph, "NowakowskiEnriched_Heatmap_Round1NormalizedCenteredScaled.png")
     , width = 16, height = 40, limitsize = FALSE)
 }
 ################################################################################
