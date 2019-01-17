@@ -113,6 +113,7 @@ main_plotting_function <- function(){
     , cluster_id = clusterID)
   plot_tsne_colored_by_pc_scores(so = so, tsne_slot = "tsne_pc1to5")
   plot_tsne_colored_by_pc_scores(so = so, tsne_slot = "tsne_pc1to10")
+  make_cell_metadata_table()
 }
 ################################################################################
 
