@@ -171,7 +171,8 @@ make_subcluster_enriched_table_for_paper <- function(){
     ) %>%
     # order by annotated cluster labels and FDR
     mutate(Cluster = factor(Cluster, levels = cluster_annot_tb$cluster_annot)) %>%
-    arrange(Cluster, FDR)
+    arrange(Cluster, Subcluster, FDR) %>%
+    mutate(Subcluster = paste0(Cluster, "_", Subcluster))
 
   write.csv(subclust_de_tb
     , file = paste0(out_table, "enriched_table_paper.csv")
