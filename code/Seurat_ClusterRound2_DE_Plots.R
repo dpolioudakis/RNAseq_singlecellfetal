@@ -92,11 +92,18 @@ id_genes_tb <- load_id_nejm_lancet_genes()
 ## outputs
 out_graph <- paste0(
   "../analysis/graphs/Seurat_ClusterRound2/DE/", date, "/Seurat_ClusterRound2_")
+out_table <- paste0(
+  "../analysis/tables/Seurat_ClusterRound2/DE_Plots/", date
+  , "/Seurat_ClusterRound2_")
+# make output directories
+dir.create(dirname(out_graph), recursive = TRUE)
+dir.create(dirname(out_table), recursive = TRUE)
 ################################################################################
 
 ### main function
 
 main_function <- function(){
+  make_subcluster_enriched_table_for_paper()
   # run_plot_de_vs_40k_expression_heatmaps(cluster_col = cluster_col)
   # run_plot_de_vs_subcluster_expression_heatmaps(cluster_col = cluster_col)
   # run_plot_subcluster_expression_heatmaps(cluster_col = cluster_col)
@@ -116,9 +123,60 @@ subclust_de_tb <- in_subclust_de_dir %>%
   # list.files(pattern = paste0("_Cluster", cluster_id), full.names = TRUE) %>%
   list.files(pattern = paste0("_Cluster"), full.names = TRUE) %>%
   map_df(~read_csv(.))
+################################################################################
 
-# make output directories
-dir.create(dirname(out_graph), recursive = TRUE)
+### Sub-cluster enriched genes table for paper
+
+make_subcluster_enriched_table_for_paper <- function(){
+
+  print("make_subcluster_enriched_table_for_paper")
+
+  # DE for sub-clusters
+  in_subclust_de_pc15res07_dir <-
+    "../analysis/tables/Seurat_ClusterRound2/DE/20190115/"
+  in_subclust_de_pc110res05_dir <-
+    "../analysis/tables/Seurat_ClusterRound2/DE/20190116/"
+
+  format_subcluster_de_table <- function(
+    subclust_de_dir, fdr_filter, clusters, log2_fold_change){
+
+      print("format_subcluster_de_table")
+
+      subclust_de_tb <- subclust_de_dir %>%
+        list.files(pattern = paste0("_Cluster"), full.names = TRUE) %>%
+        map_df(~read_csv(.)) %>%
+        filter(FDR < fdr_filter & Cluster %in% clusters) %>%
+        filter(Log2_Fold_Change > log2_fold_change) %>%
+        mutate(Cluster = as.character(Cluster)) %>%
+        left_join(., cluster_annot_tb, by = c("Cluster" = "cluster_number")) %>%
+        mutate(Cluster = cluster_annot) %>%
+        select(-cluster_annot)
+
+      return(subclust_de_tb)
+  }
+
+  # larger clusters were subclustered with different parameters than smaller
+  # need to combine
+  subclust_de_tb <- bind_rows(
+    format_subcluster_de_table(
+    subclust_de_dir = in_subclust_de_pc110res05_dir
+      , fdr_filter = 0.05
+      , clusters = c(0,1,2,3)
+      , log2_fold_change = 0.2)
+    , format_subcluster_de_table(
+      subclust_de_dir = in_subclust_de_pc15res07_dir
+      , fdr_filter = 0.05
+      , clusters = c(4:15)
+      , log2_fold_change = 0.2)
+    ) %>%
+    # order by annotated cluster labels and FDR
+    mutate(Cluster = factor(Cluster, levels = cluster_annot_tb$cluster_annot)) %>%
+    arrange(Cluster, FDR)
+
+  write.csv(subclust_de_tb
+    , file = paste0(out_table, "enriched_table_paper.csv")
+    , quote = FALSE, row.names = FALSE)
+}
 ################################################################################
 
 ### differentially expressed genes for each cluster vs other cells in cluster
