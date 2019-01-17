@@ -29,6 +29,9 @@ load("../analysis/analyzed_data/Xu_TF_analysis/20181129/results_withJaspar/cells
 # enrichment of TF regulons by Seurat cluster
 scenic_enr_tb <- read_csv("../analysis/analyzed_data/Xu_TF_analysis/20181129/results_withJaspar/cells_enrich_TF_final.csv")
 
+# TF regulons
+in_scenic_tf_gene_mods_l <- list.files("../analysis/analyzed_data/Xu_TF_analysis/20181129/results_withJaspar/genemods", full.names = TRUE)
+
 ## other variables
 script_name <- "tf_scenic.R"
 date <- format(Sys.Date(), "%Y%m%d")
@@ -74,6 +77,7 @@ main_function <- function(){
   plot_tsne_colored_by_auc()
   plot_heatmap_tf_regulon_cluster_enrichment()
   format_cluster_tf_enrichment_table_for_paper()
+  make_tfs_gene_mods_table_for_paper()
 }
 ################################################################################
 
@@ -297,6 +301,29 @@ format_cluster_tf_enrichment_table_for_paper <- function(){
 }
 ################################################################################
 
+### make table of TF gene modules for paper
+
+make_tfs_gene_mods_table_for_paper <- function(){
+
+  print("make_tfs_gene_mods_table_for_paper")
+
+  scenic_tf_gene_mods_l <- map(in_scenic_tf_gene_mods_l
+    , .f = function(in_scenic_tf_gene_mods){
+    read_tsv(in_scenic_tf_gene_mods, col_names = FALSE) %>% pull})
+  max_length <- sapply(scenic_tf_gene_mods_l, length) %>% max
+  tf_gene_mods_m <-
+    matrix("", nrow = max_length, ncol = length(scenic_tf_gene_mods_l))
+  for(i in 1:length(scenic_tf_gene_mods_l)){
+    scenic_tf_gene_mod <- scenic_tf_gene_mods_l[[i]]
+    tf_gene_mods_m[1:length(scenic_tf_gene_mod),i] <- scenic_tf_gene_mod
+  }
+  colnames(tf_gene_mods_m) <- tf_gene_mods_m[1, ]
+  tf_gene_mods_m <- tf_gene_mods_m[-1, ]
+
+  write.csv(tf_gene_mods_m, paste0(out_table, "tf_gene_mods.csv")
+    , row.names = FALSE, quote = FALSE)
+}
+################################################################################
 
 ### run
 
