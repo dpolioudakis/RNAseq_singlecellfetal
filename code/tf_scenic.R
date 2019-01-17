@@ -57,11 +57,14 @@ cluster_annot_tb <- tribble(
 ## outputs
 out_graph <- paste0(
   "../analysis/graphs/tf_scenic/", date, "/tf_scenic_")
+out_table <- paste0(
+  "../analysis/tables/tf_scenic/", date, "/tf_scenic_")
 out_scratch <- paste0(
   "/u/flashscratch/d/dpolioud/tf_scenic/", date, "/tf_scenic_")
 
 # make output directories
 dir.create(dirname(out_graph), recursive = TRUE)
+dir.create(dirname(out_table), recursive = TRUE)
 dir.create(dirname(out_scratch), recursive = TRUE)
 ################################################################################
 
@@ -70,8 +73,8 @@ dir.create(dirname(out_scratch), recursive = TRUE)
 main_function <- function(){
   plot_tsne_colored_by_auc()
   plot_heatmap_tf_regulon_cluster_enrichment()
+  format_cluster_tf_enrichment_table_for_paper()
 }
-
 ################################################################################
 
 ### functions
@@ -79,7 +82,7 @@ main_function <- function(){
 plot_tsne_colored_by_variable <- function(
   tsne_1, tsne_2, variable_value, facet_variable
   , title = NULL, guide_size = 4, legend_title = NULL
-  , alpha = 0.5, size = 0.1, ncol = 4
+  , alpha = 0.25, size = 0.01, ncol = 4
   , expression_color_gradient = FALSE){
 
   print("plot_tsne_colored_by_variable")
@@ -110,8 +113,8 @@ plot_tsne_colored_by_variable <- function(
       }} +
       # color scale options
       { if (expression_color_gradient == TRUE){
-        # scale_color_gradientn(name = legend_title
-        #   , colours = c(
+        scale_color_gradientn(name = legend_title
+          , colours = c(
         #     # desert
         #     # "lightgrey", "#fee090", "#fdae61", "#f46d43", "#ca0020")
         #     # colortest1
@@ -120,9 +123,13 @@ plot_tsne_colored_by_variable <- function(
         #     # "lightgrey", "#e0f3f8", "#74add1", "#d73027", "#a50026")
         #     # colortest3
         #     "#d9d9d9", "#bdbdbd", "#6baed6", "#4292c6", "#cb181d", "#99000d")
-        #   )
-        scale_colour_distiller(
-          name = legend_title, type = "seq", palette = "PuRd", direction = 1)
+        #     # colortest4
+            # "#d9d9d9", "#92c5de", "#ca0020")
+        #     # colortest5
+            "#F8F8F8", "#0571b0", "#ca0020")
+          )
+        # scale_colour_distiller(
+        #   name = legend_title, type = "seq", palette = "PuRd", direction = 1)
       } else {
         scale_color_viridis(name = legend_title)
       }}
@@ -174,8 +181,8 @@ plot_tsne_colored_by_auc <- function(){
           , axis.text = element_blank()
           , axis.ticks = element_blank()
         )
-  ggsave(paste0(out_graph, "tsne_auc.png")
-    , width = 13, height = 90, limitsize = FALSE)
+  ggsave(paste0(out_graph, "tsne_auc_colortest5_2.png")
+    , width = 13, height = 100, limitsize = FALSE, dpi = 150)
 }
 
 
@@ -269,6 +276,27 @@ plot_heatmap_tf_regulon_cluster_enrichment <- function(){
         , height = 20, width = 25)
 }
 ################################################################################
+
+### format cluster TF enrichment table for paper
+
+format_cluster_tf_enrichment_table_for_paper <- function(){
+
+  print("format_cluster_tf_enrichment_table_for_paper")
+
+  scenic_enr_tb %>%
+    gather(cluster, pvalue, -TF) %>%
+    clean_variable_names %>%
+    arrange(pvalue) %>%
+    left_join(., cluster_annot_tb, by = c("cluster" = "cluster_annot_xu")) %>%
+    mutate(cluster_annot = factor(
+      cluster_annot, levels = cluster_annot_tb$cluster_annot)) %>%
+    select(-cluster, -cluster_number) %>%
+    spread(key = cluster_annot, value = pvalue) %>%
+    write.csv(., file = paste0(out_table, "cluster_tf_enrichment.csv")
+      , row.names = FALSE, quote = FALSE)
+}
+################################################################################
+
 
 ### run
 
