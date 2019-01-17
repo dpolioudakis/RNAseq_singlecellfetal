@@ -15,11 +15,12 @@ require(methods)
 require(Seurat)
 require(dplyr)
 require(Matrix)
-require(reshape2)
 require(irlba)
 require(gridExtra)
 require(cowplot)
 require(viridis)
+require(tidyverse)
+require(reshape2)
 source("Function_Library.R")
 source("GGplot_Theme.R")
 # require(xlsx)
@@ -42,20 +43,41 @@ clusterID <- clustersL[[as.numeric(args[1])]]
 print(paste0("Cluster ID: ", clusterID))
 
 ## Variables
-graphCodeTitle <- "Seurat_ClusterRound2.R"
+cluster_annot_tb <- tribble(
+    ~cluster_number, ~cluster_annot
+    , "9",  "vRG"
+    , "7",  "oRG"
+    , "8",  "PgS"
+    , "10", "PgG2M"
+    , "2",  "IP"
+    , "0",  "ExN"
+    , "1",  "ExM"
+    , "4",  "ExCal"
+    , "3",  "ExDp1"
+    , "13", "ExDp2"
+    , "5",  "InSST"
+    , "6",  "InCALB2"
+    , "11", "OPC"
+    , "12", "End"
+    , "14", "Per"
+    , "15", "Mic"
+  )
+script_name <- "Seurat_ClusterRound2.R"
 date <- format(Sys.Date(), "%Y%m%d")
-date <- "20181222"
+# date <- "20181222"
 outGraph <- paste0("../analysis/graphs/Seurat_ClusterRound2/ClusterRound2/"
   , date, "/Seurat_ClusterRound2_")
 outData <- paste0(
   "../analysis/analyzed_data/Seurat_ClusterRound2/ClusterRound2/"
   , date, "/Seurat_ClusterRound2_")
+out_table <- paste0(
+  "../analysis/tables/Seurat_ClusterRound2/ClusterRound2/"
+  , date, "/Seurat_ClusterRound2_")
 
 ## Output Directories
 dir.create(dirname(outGraph), recursive = TRUE)
 dir.create(dirname(outData), recursive = TRUE)
-
-# load(paste0(outData, "seuratO.Robj"))
+dir.create(dirname(out_table), recursive = TRUE)
 ################################################################################
 
 ### Plotting function
@@ -67,20 +89,30 @@ main_function <- function(){
   rd1CentExM <- so_and_reg_exm_l[[3]]
   rm(so_and_reg_exm_l)
   so <- seurat_cluster_and_tsne(
-    so = so, pcs = list(c(1:5), c(1:8), c(1:10), c(1:15), c(1:40))
+    so = so, pcs = list(c(1:5), c(1:6), c(1:8), c(1:10), c(1:40))
     , resolutions = c(0.4, 0.5, 0.54, 0.6, 0.7, 0.8))
   save(so, noCentExM, rd1CentExM
     , file = paste0(outData, "Cluster", clusterID, "_seuratO.Robj"))
 }
 
 main_plotting_function <- function(){
-  load(paste0(outData, "Cluster", clusterID, "_seuratO.Robj"))
+  load(paste0("../analysis/analyzed_data/Seurat_ClusterRound2/ClusterRound2/"
+  , "20190103", "/Seurat_ClusterRound2_", "Cluster", clusterID, "_seuratO.Robj"))
+  # load(paste0(outData, "Cluster", clusterID, "_seuratO.Robj"))
   plot_pcs_variance(so = so)
   plot_genes_with_highest_pc_loadings(so = so)
   plot_seurat_pcs_tsne_cluster_tests(so = so)
   plot_tsnes_colored_by_covariates(so = so)
   plot_40k_cell_tsne_colored_by_subclustering(so = so)
   plot_40k_cell_tsne_subclustered(so = so)
+  plot_genes_with_highest_pc_loadings_expression_heatmap(
+    so = so, seurat_40k_obj = centSO, cluster_col = "clusters_pc1to5_res_0.7"
+    , cluster_id = clusterID)
+  plot_genes_with_highest_pc_loadings_expression_heatmap(
+    so = so, seurat_40k_obj = centSO, cluster_col = "clusters_pc1to10_res_0.5"
+    , cluster_id = clusterID)
+  plot_tsne_colored_by_pc_scores(so = so, tsne_slot = "tsne_pc1to5")
+  plot_tsne_colored_by_pc_scores(so = so, tsne_slot = "tsne_pc1to10")
 }
 ################################################################################
 
@@ -281,7 +313,7 @@ plot_pcs_variance <- function(so){
   # PC variance plot
   gg <- DimElbowPlot(so, reduction.type = "pca", dims.plot = 50)
   gg <- gg + ggtitle(
-      paste0(graphCodeTitle
+      paste0(script_name
         , "\n\nPC variance for each cluster"
         , "\nCluster: ", clusterID)
       ) +
@@ -331,7 +363,7 @@ plot_seurat_pcs_tsne_cluster_tests <- function(so){
   gg_l <- gg_l[! is.na(gg_l)]
   # Combine tSNE graphs
   Plot_Grid(gg_l, ncol = 3, rel_height = 0.1
-    , title = paste0(graphCodeTitle
+    , title = paste0(script_name
       , "\n\nSeurat cluster and tSNE with different PCs used"
       , "\nCluster: ", clusterID)
   )
@@ -394,7 +426,7 @@ plot_seurat_pcs_tsne_cluster_tests <- function(so){
 #   ggL <- ggL[! is.na(ggL)]
 #   # Combine tSNE graphs
 #   pg <- Plot_Grid(ggL, ncol = 3, rel_height = 0.3
-#     , title = paste0(graphCodeTitle
+#     , title = paste0(script_name
 #       , "\n\nSeurat cluster and tSNE with different resolutions"
 #       , "\nCluster: ", clusterID
 #       , "\nPC 1-40"
@@ -412,7 +444,7 @@ plot_seurat_pcs_tsne_cluster_tests <- function(so){
 #   ggL <- ggL[! is.na(ggL)]
 #   # Combine tSNE graphs
 #   pg <- Plot_Grid(ggL, ncol = 3, rel_height = 0.3
-#     , title = paste0(graphCodeTitle
+#     , title = paste0(script_name
 #       , "\n\nSeurat cluster and tSNE with different resolutions"
 #       , "\nCluster: ", clusterID
 #       , "\nPC 1-10"
@@ -430,7 +462,7 @@ plot_seurat_pcs_tsne_cluster_tests <- function(so){
 #   ggL <- ggL[! is.na(ggL)]
 #   # Combine tSNE graphs
 #   pg <- Plot_Grid(ggL, ncol = 3, rel_height = 0.3
-#     , title = paste0(graphCodeTitle
+#     , title = paste0(script_name
 #       , "\n\nSeurat cluster and tSNE with different resolutions"
 #       , "\nCluster: ", clusterID
 #       , "\nPC 1-10"
@@ -448,7 +480,7 @@ plot_seurat_pcs_tsne_cluster_tests <- function(so){
 #   ggL <- ggL[! is.na(ggL)]
 #   # Combine tSNE graphs
 #   pg <- Plot_Grid(ggL, ncol = 3, rel_height = 0.3
-#     , title = paste0(graphCodeTitle
+#     , title = paste0(script_name
 #       , "\n\nSeurat cluster and tSNE with different resolutions"
 #       , "\nCluster: ", clusterID
 #       , "\nPC 1-10"
@@ -466,7 +498,7 @@ plot_seurat_pcs_tsne_cluster_tests <- function(so){
 #   ggL <- ggL[! is.na(ggL)]
 #   # Combine tSNE graphs
 #   pg <- Plot_Grid(ggL, ncol = 3, rel_height = 0.3
-#     , title = paste0(graphCodeTitle
+#     , title = paste0(script_name
 #       , "\n\nSeurat cluster and tSNE with different resolutions"
 #       , "\nCluster: ", clusterID
 #       , "\nPC 1-5"
@@ -517,7 +549,7 @@ plot_tsnes_colored_by_covariates <- function(so){
   # plot grid
   pg <- Plot_Grid(list(ggTsne, gg1, gg2, gg3, gg4, gg5)
     , align = "v", axis = "r", ncol = 3, rel_height = 0.3
-    , title = paste0(graphCodeTitle
+    , title = paste0(script_name
       , "\n\nSeurat clustering round 2 and covariates"
       , "\nCluster: ", clusterID
       , "\nSeurat variable genes used for clustering"
@@ -545,7 +577,7 @@ plot_tsnes_colored_by_covariates <- function(so){
   # plot grid
   pg <- Plot_Grid(list(ggTsne, gg1, gg2, gg3, gg4, gg5)
     , align = "v", axis = "r", ncol = 3, rel_height = 0.3
-    , title = paste0(graphCodeTitle
+    , title = paste0(script_name
       , "\n\nSeurat clustering round 2 and covariates"
       , "\nCluster: ", clusterID
       , "\nSeurat variable genes used for clustering"
@@ -573,7 +605,7 @@ plot_tsnes_colored_by_covariates <- function(so){
   # plot grid
   pg <- Plot_Grid(list(ggTsne, gg1, gg2, gg3, gg4, gg5)
     , align = "v", axis = "r", ncol = 3, rel_height = 0.3
-    , title = paste0(graphCodeTitle
+    , title = paste0(script_name
       , "\n\nSeurat clustering round 2 and covariates"
       , "\nCluster: ", clusterID
       , "\nSeurat variable genes used for clustering"
@@ -601,7 +633,7 @@ plot_tsnes_colored_by_covariates <- function(so){
   # plot grid
   pg <- Plot_Grid(list(ggTsne, gg1, gg2, gg3, gg4, gg5)
     , align = "v", axis = "r", ncol = 3, rel_height = 0.3
-    , title = paste0(graphCodeTitle
+    , title = paste0(script_name
       , "\n\nSeurat clustering round 2 and covariates"
       , "\nCluster: ", clusterID
       , "\nSeurat variable genes used for clustering"
@@ -620,9 +652,9 @@ plot_genes_with_highest_pc_loadings <- function(so){
   print("plot_genes_with_highest_pc_loadings")
 
   # Plot genes with highest PC loadings
-  ggL <- lapply(1:8, function(pc) {
+  ggL <- lapply(1:10, function(pc) {
     df <- rbind(data.frame(PC = sort(so@dr$pca@gene.loadings[ ,pc])[1:10])
-    , data.frame(PC = sort(so@dr$pca@gene.loadings[ ,pc], decreasing = TRUE)[1:10])
+    , data.frame(PC = sort(so@dr$pca@gene.loadings[ ,pc], decreasing = TRUE)[10:1])
       )
     df$GENE <- factor(row.names(df), levels = row.names(df))
     gg <- ggplot(df, aes(x = PC, y = GENE)) +
@@ -632,13 +664,52 @@ plot_genes_with_highest_pc_loadings <- function(so){
       ggtitle(paste0("Cluster: ", clusterID, "\nPC ", pc))
     return(gg)
   })
-  Plot_Grid(ggL, ncol = 4, align = 'v', axis = 'r', rel_height = 0.2
-    , title = paste0(graphCodeTitle
+  Plot_Grid(ggL, ncol = 5, align = 'v', axis = 'r', rel_height = 0.2
+    , title = paste0(script_name
       , "\n\nGenes with highest PC loadings"
       , "\nCluster: ", clusterID)
   )
-  ggsave(paste0(outGraph, "cluster", clusterID, "_PCAplots.pdf"), width = 13
-    , height = 14, limitsize = FALSE)
+  ggsave(paste0(outGraph, "cluster", clusterID, "_PCAplots.pdf"), width = 15
+    , height = 12, limitsize = FALSE)
+}
+################################################################################
+
+### tSNE plot colored by top PC scores
+
+plot_tsne_colored_by_pc_scores <- function(so = so, tsne_slot){
+
+  print("plot_tsne_colored_by_pc_scores")
+
+  so@dr$tsne <- so@dr[[tsne_slot]]
+
+  # Feature plots of top PC scores
+  ggL <- lapply(c(1:10), function(i) {
+    # Collect tSNE values
+    ggDF <- as.data.frame(so@dr$tsne@cell.embeddings)
+    # Add PC score
+    ggDF$PC <- so@dr$pca@cell.embeddings[ ,i]
+    gg <- ggplot(ggDF, aes(x = tSNE_1, y = tSNE_2, col = PC)) +
+      geom_point(size = 1, alpha = 0.5) +
+      # guides(colour = guide_legend(override.aes = list(size = 7))) +
+      scale_color_distiller(name = "PC score", type = "div"
+        , palette = 5, direction = -1) +
+      ggtitle(paste0("PC: ", i)) +
+      ggplot_set_theme_publication
+    return(gg)
+  })
+  # plot grid
+  pg <- plot_grid(plotlist = ggL, align = "v", axis = "l", ncol = 3)
+  # now add the title
+  title <- ggdraw() + draw_label(paste0(script_name
+    , "\n\nSeurat cluster and tSNE colored by PC scores"
+    , "\nCluster: ", clusterID
+    , "\n", tsne_slot
+    , "\n"))
+  # rel_heights values control title margins
+  plot_grid(title, pg, ncol = 1, rel_heights = c(0.1, 1))
+  # save
+  ggsave(paste0(outGraph, "cluster", clusterID, "_PCscore_", tsne_slot, ".png")
+  , width = 15, height = 15)
 }
 ################################################################################
 
@@ -679,7 +750,7 @@ plot_40k_cell_tsne_colored_by_subclustering <- function(so){
   # add tsne colored by round 1 to round 2 clusterings
   Plot_Grid(append(list(tnse_r1_gg), gg_l)
     , ncol = 2, rel_height = 0.1, align = 'v', axis = 'r'
-    , title = paste0(graphCodeTitle
+    , title = paste0(script_name
       , "\n\nSeurat tSNE round 1 colored by round 2 clustering"
       , "\nCluster: ", clusterID
       , "\n")
@@ -728,7 +799,7 @@ plot_40k_cell_tsne_subclustered <- function(so){
   # add tsne colored by round 1 to round 2 clusterings
   Plot_Grid(append(list(tnse_r1_gg), gg_l)
     , ncol = 2, rel_height = 0.1, align = 'v', axis = 'r'
-    , title = paste0(graphCodeTitle
+    , title = paste0(script_name
       , "\n\nSeurat tSNE round 1 colored by round 2 clustering"
       , "\nCluster: ", clusterID
       , "\n")
@@ -736,6 +807,188 @@ plot_40k_cell_tsne_subclustered <- function(so){
   ggsave(paste0(
       outGraph, "cluster", clusterID, "_tSNE_R1_subcluster_subset.png")
     , width = 10, height = 4+1.75*length(clusterings), limitsize = FALSE)
+}
+################################################################################
+
+### Plot expression heatmap of genes loading highly on PCs of cluster
+
+plot_genes_with_highest_pc_loadings_expression_heatmap <- function(
+  so, seurat_40k_obj, cluster_col, cluster_id){
+
+  print("plot_genes_with_highest_pc_loadings_expression_heatmap")
+
+  # genes with high pc loadings
+  gene_group_df <- lapply(1:10, function(pc){
+    rbind(
+      data.frame(loading = sort(so@dr$pca@gene.loadings[ ,pc])[1:10])
+      , data.frame(loading = sort(so@dr$pca@gene.loadings[ ,pc], decreasing = TRUE)[1:10])[10:1, ,drop = FALSE]
+    ) %>%
+    # data.frame(loading = sort(so@dr$pca@gene.loadings[ ,pc]
+    #     , decreasing = TRUE)[1:20] %>% rev) %>%
+      rownames_to_column(var = "Gene") %>%
+      mutate(Group = pc)
+    }) %>% do.call("rbind", .)
+
+  # set clustering to use
+  cluster_ids <- factor(so@meta.data[[cluster_col]])
+  names(cluster_ids) <- rownames(so@meta.data)
+  so@ident <- cluster_ids
+
+  # Gather cell IDs and cluster IDs for heatmap
+  cellid_clusterid <- seurat_40k_obj@ident %>% enframe(
+    name = "cell_id", value = "cluster_ids") %>%
+    left_join(
+      (so@ident %>% enframe(name = "cell_id", value = "sub_cluster_id"))
+      , by = "cell_id") %>%
+    mutate_if(is.factor, as.character) %>%
+    mutate(cluster_ids = if_else(cluster_ids == cluster_id, paste0(.$cluster_ids, "_", .$sub_cluster_id), cluster_ids))  %>%
+    left_join(cluster_annot_tb
+      , by = c("cluster_ids" = "cluster_number")) %>%
+      select(cell_id, cluster_ids) %>% deframe
+
+  expr_m <- as.matrix(seurat_40k_obj@scale.data)
+
+  cluster_annot <- cluster_annot_tb %>%
+    filter(cluster_number == cluster_id) %>%
+    pull(cluster_annot)
+
+  cluster_order <- cluster_annot_tb %>%
+    left_join(.
+        , so@ident %>%
+          unique %>%
+          sort %>%
+          as_tibble %>%
+          mutate(cluster = cluster_id %>% as.character) %>%
+          mutate(cluster_subcluster = paste0(cluster, "_", value))
+      , by = c("cluster_number" = "cluster")) %>%
+    mutate(cluster_number = if_else(
+      cluster_number == cluster_id, cluster_subcluster, cluster_number)) %>%
+    pull(cluster_number)
+
+  graph_height = 2 + nrow(gene_group_df)*0.15
+
+  Plot_Marker_Genes_Heatmap_SetColWidths(
+    geneGroupDF = gene_group_df
+    , exprM = expr_m
+    , cellID_clusterID = cellid_clusterid
+    , clusters = cellid_clusterid %>% unique
+    , clusterOrder = cluster_order
+    , lowerLimit = -1.5
+    , upperLimit = 1.5
+  ) + ggtitle(paste0(
+    script_name
+    , "\n\nExpression of by sub-cluster of genes loading highly on PCs of cluster: "
+    , cluster_annot, " (", cluster_id, ")"
+    , "\nx-axis: Genes"
+    , "\ny-axis: Cells ordered by cluster"
+    , "\nNormalized expression, mean centered variance scaled by gene"
+  ))
+  ggsave(
+    paste0(outGraph, "cluster", clusterID, "_", cluster_col
+      , "_pc_loading_genes_expression_heatmap_zscore.png")
+    , height = graph_height, width = 13, limitsize = FALSE)
+}
+################################################################################
+
+### make table of cell metadata
+
+make_cell_metadata_table <- function(){
+
+  print("make_cell_metadata_table")
+
+  # compile cell ids and subclusters
+  in_subclust_so_l <- list.files(
+    "../analysis/analyzed_data/Seurat_ClusterRound2/ClusterRound2/20190103/"
+    , full.names = TRUE)
+  subclust_cellid_tb <- in_subclust_so_l %>%
+    map(., .f = function(in_subclust_so){
+      load(in_subclust_so)
+      cluster_number <- so@project.name %>% gsub("Cluster ", "", .) %>% as.numeric
+      if(cluster_number %in% c(1:4)){
+        tibble(
+          Cell = so@meta.data$CELL
+          , Subcluster = so@meta.data[["clusters_pc1to10_res_0.5"]]
+          , Cluster = cluster_number
+          )
+      }
+      if(cluster_number %in% c(5:15)){
+        tibble(
+          Cell = so@meta.data$CELL
+          , Subcluster = so@meta.data[["clusters_pc1to5_res_0.7"]]
+          , Cluster = cluster_number
+          )
+      }
+    }) %>%
+    bind_rows() %>%
+    mutate(Cluster = as.character(Cluster)) %>%
+    left_join(., cluster_annot_tb, by = c("Cluster" = "cluster_number")) %>%
+    mutate(Subcluster = paste0(cluster_annot, "_", Subcluster)) %>%
+    mutate(Cluster = cluster_annot) %>%
+    select(-cluster_annot, -Cluster)
+
+  ## Cell metadata
+  mdat_paper_DF <- centSO@meta.data
+  mdat_paper_DF <- mdat_paper_DF[ ,c("CELL", "res.0.54", "BRAIN", "REGION"
+    , "NEXTERA", "LIBRARY", "nGene", "nUMI", "percent.mito"
+    , "S.Score", "G2M.Score", "Phase")]
+  mdat_paper_DF$Cluster_number <- mdat_paper_DF$"res.0.54"
+  # Cluster annotations
+  cluster_annot <- c(
+    "9" = "vRG"
+    , "7" = "oRG"
+    , "8" = "PgS"
+    , "10" = "PgG2M"
+    , "2" = "IP"
+    , "0" = "ExN"
+    , "1" = "ExM"
+    , "4" = "ExCal"
+    , "3" = "ExDp1"
+    , "13" = "ExDp2"
+    , "5" = "InSST"
+    , "6" = "InCALB2"
+    , "11" = "OPC"
+    , "12" = "End"
+    , "14" = "Per"
+    , "15" = "Mic"
+    , "16" = "NA"
+  )
+  idx <- match(mdat_paper_DF$Cluster_number, names(cluster_annot))
+  mdat_paper_DF$Cluster <- cluster_annot[idx]
+  # Donor IDs
+  donor_annot <- c("2" = "368", "3" = "370", "4" = "371", "5" = "372")
+  idx <- match(mdat_paper_DF$BRAIN, names(donor_annot))
+  mdat_paper_DF$BRAIN <- donor_annot[idx]
+  mdat_paper_DF <- mdat_paper_DF[ ,c(1, 14:13, 3:12)]
+  # Gestation week
+  gw_annot <- c("368" = "17", "370" = "18", "371" = "17", "372" = "18")
+  idx <- match(mdat_paper_DF$BRAIN, names(gw_annot))
+  mdat_paper_DF$GW <- gw_annot[idx]
+  # Convert to percentage
+  mdat_paper_DF$percent.mito <- round(mdat_paper_DF$percent.mito * 100, 2)
+  # Order by cluster
+  mdat_paper_DF$Cluster_number <- factor(mdat_paper_DF$Cluster_number
+    , levels = c(9,7,8,10,2,0,1,4,3,13,5,6,11,12,14,15,16))
+  mdat_paper_DF <- mdat_paper_DF[order(mdat_paper_DF$Cluster_number), ]
+  # Remove cluster 16 cells
+  mdat_paper_DF <- mdat_paper_DF[! mdat_paper_DF$Cluster_number == 16, ]
+  colnames(mdat_paper_DF) <- c("Cell", "Cluster", "Cluster_number", "Donor"
+    , "Layer", "Index", "Library", "Number_genes_detected", "Number_UMI"
+    , "Percentage_mitochondrial", "S_phase_score", "G2M_phase_score", "Phase"
+    , "Gestation_week")
+  # Round
+  mdat_paper_DF$S_phase_score <- signif(mdat_paper_DF$S_phase_score, 2)
+  mdat_paper_DF$G2M_phase_score <- signif(mdat_paper_DF$G2M_phase_score, 2)
+  mdat_paper_DF <- mdat_paper_DF[ ,c(1:2,4:5,14,6:13)]
+
+  # add subcluster ids
+  mdat_paper_tb <- left_join(mdat_paper_DF, subclust_cellid_tb
+      , by = c("Cell" = "Cell")) %>%
+    as_tibble() %>%
+    select(Cell, Cluster, Subcluster, everything())
+
+  # output table
+  write.csv(mdat_paper_tb, file = paste0(out_table, "cell_metadata.csv")
+    , quote = FALSE, row.names = FALSE)
 }
 ################################################################################
 
